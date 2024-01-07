@@ -31,9 +31,6 @@ subprojects {
 
     repositories {
         mavenCentral()
-        maven(
-            url = "https://repo.daumkakao.io/content/repositories/daum-contents"
-        )
     }
 
     dependencies {
