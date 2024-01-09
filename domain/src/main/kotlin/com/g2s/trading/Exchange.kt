@@ -3,5 +3,5 @@ package com.g2s.trading
 interface Exchange {
     fun getAccount(): Account
 
-    fun getIndicators()
+    fun getIndicators(): List<String>
 }

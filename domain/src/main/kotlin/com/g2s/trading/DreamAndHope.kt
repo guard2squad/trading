@@ -8,9 +8,8 @@ class DreamAndHope(
     private val exchangeImpl: Exchange
 ) {
     fun test(){
-        val account = exchangeImpl.getAccount()
-
-
+//        val account = exchangeImpl.getAccount()
+        val indicators = exchangeImpl.getIndicators()
     }
 
 
