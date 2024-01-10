@@ -41,3 +41,9 @@ out/
 
 # Ignore application properties files
 application.properties
+
+# logs 디렉토리 및 하위 파일 무시
+logs/
+
+# web/logs 디렉토리 및 하위 파일 무시
+web/logs/
