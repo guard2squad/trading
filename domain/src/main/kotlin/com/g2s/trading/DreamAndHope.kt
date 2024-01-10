@@ -7,9 +7,10 @@ import org.springframework.stereotype.Service
 class DreamAndHope(
     private val exchangeImpl: Exchange
 ) {
-    fun test(){
+    fun test() : String {
 //        val account = exchangeImpl.getAccount()
         val indicators = exchangeImpl.getIndicators()
+        return indicators.toString()
     }
 
 
