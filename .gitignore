@@ -1,10 +1,6 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# .gitignore
 
+# IDE 관련 설정
 ### STS ###
 .apt_generated
 .classpath
@@ -18,7 +14,7 @@ bin/
 !**/src/test/**/bin/
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -33,7 +29,7 @@ out/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+# VS Code
 .vscode/
 
 # Ignore log files
@@ -42,8 +38,14 @@ out/
 # Ignore application properties files
 application.properties
 
-# logs 디렉토리 및 하위 파일 무시
+# Ignore logs directories and their contents
 logs/
-
-# web/logs 디렉토리 및 하위 파일 무시
 web/logs/
+
+# Gradle build
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
