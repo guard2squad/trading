@@ -1,36 +1,82 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.g2s.trading.Account
-import com.g2s.trading.Exchange
+import com.fasterxml.jackson.module.kotlin.readValue
+import com.g2s.trading.*
 import org.springframework.stereotype.Component
 
 
 @Component
 class ExchangeImpl(
-    val binanceClient: UMFuturesClientImpl
+    val binanceClient: UMFuturesClientImpl,
+    private val account: AccountUseCase
 ) : Exchange {
 
     private final val symbol = "USDT"
+
     override fun getAccount(): Account {
+        val parameters = LinkedHashMap<String, Any>()
 
+        //  TODO(TimeSynchronization)
+        parameters["timestamp"] = System.currentTimeMillis().toString()
 
-        val a = (ObjectMapper().readTree(binanceClient.account().futuresAccountBalance(linkedMapOf())) as ArrayNode)
-            .first { it["asset"].asText() == "USDT" }
-            .let { it["availableBalance"].asInt() }
+        val objectMapper = ObjectMapper()
 
-        return Account(a)
+        val jsonString = binanceClient.account().futuresAccountBalance(parameters)
+
+        val accountList: List<Account> = objectMapper.readValue(jsonString)
+
+        return accountList.find { it.asset == symbol } ?: throw Exception("USDT Account not found")
     }
 
-    override fun getIndicators(): List<String> {
+    fun getAvailableBalance(): Double {
+        return getAccount().availableBalance;
+    }
+
+    // TODO(Indicator 데이터 클래스 만들기)
+    override fun getIndicators(): Map<String, String> {
 
         val indicatorMap = linkedMapOf<String, String>()
 
-        println(getCandleStickData())
+        // CandleStickData
+        val candleStick = getCandleStickData()
+        indicatorMap["openTime"] = candleStick.openTime.toString()
+        indicatorMap["open"] = candleStick.open.toString()
+        indicatorMap["high"] = candleStick.high.toString()
+        indicatorMap["low"] = candleStick.low.toString()
+        indicatorMap["close"] = candleStick.close.toString()
+        indicatorMap["volume"] = candleStick.volume.toString()
+        indicatorMap["closeTime"] = candleStick.closeTime.toString()
+        indicatorMap["quoteAssetVolume"] = candleStick.quoteAssetVolume.toString()
+        indicatorMap["numberOfTrades"] = candleStick.numberOfTrades.toString()
+        indicatorMap["takerBuyBaseAssetVolume"] = candleStick.takerBuyBaseAssetVolume.toString()
+        indicatorMap["takerBuyQuoteAssetVolume"] = candleStick.takerBuyQuoteAssetVolume.toString()
 
-        return indicatorMap.values.toList();
+        // current price
+        indicatorMap["latestPrice"] = getLatestPrice()
+
+        return indicatorMap
+    }
+
+    override fun getPosition(): Position {
+        TODO("Not yet implemented")
+    }
+
+    fun getPositions(): List<Position> {
+
+        val json = ""
+
+        val objectMapper = ObjectMapper()
+
+        val root: JsonNode = objectMapper.readTree(json)
+
+        val positionNode = root.get("positions")
+
+//        val positions = objectMapper.readValue(positionNode.traverse(), object : TypeReference<List<Position>>() {})
+
+        return TODO("Not yet implemented")
     }
 
     fun getMarkPrice(): String {
@@ -99,20 +145,20 @@ class ExchangeImpl(
 
         val jsonNode = ObjectMapper().readTree(binanceClient.market().ticker24H(parameters))
 
-        jsonNode.fields().forEach {
-            (key, value) -> ticker24HIndicators[key] = value.asText()
+        jsonNode.fields().forEach { (key, value) ->
+            ticker24HIndicators[key] = value.asText()
         }
         return ticker24HIndicators[indicator]
     }
 
 
-    fun getLatestPrice(): Double {
+    fun getLatestPrice(): String {
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = "BTCUSDT"
 
         val jsonNode = ObjectMapper().readTree(binanceClient.market().tickerSymbol(parameters))
 
-        return jsonNode.get("price").asDouble();
+        return jsonNode.get("price").asText()
     }
 
     // TODO: OrderBook 에서 가격과 수량이 결정되는 원리?
@@ -238,24 +284,36 @@ class ExchangeImpl(
         return jsonNode.get("sellVol").asText();
     }
 
-    // TODO(왜 아무런 결과가 안 나오냐 ㅅㅂ)
     // Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
     // interval : 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d 3d 1w 1M
-    fun getCandleStickData(): Map<String, String> {
-        // result
-        val candleStickData = mutableMapOf<String, String>()
+    fun getCandleStickData(): CandleStick {
 
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = "BTCUSDT"
-        parameters["interval"] = "1h"
+        parameters["interval"] = "1m"
+        // limit 증가할 수록 interval만큼 이전 시간의 데이터도 받아온다. (limit = 1이면 현재 시간의 데이터)
+        parameters["limit"] = 1
 
-        val jsonNode = ObjectMapper().readTree(binanceClient.market().klines(parameters))
+        // 정상적으로 값이 나온다고 가정하고 구현
+        val jsonString = binanceClient.market().klines(parameters)
 
-        jsonNode.fields().forEach { (key, value) ->
-            candleStickData[key] = value.asText()
-        }
+        val candleStickDataList: List<List<String>> = ObjectMapper().readValue(jsonString)
 
-        return candleStickData;
+        return candleStickDataList.firstOrNull()?.let { candleStickData ->
+            CandleStick(
+                openTime = candleStickData[0].toLong(),
+                open = candleStickData[1].toDouble(),
+                high = candleStickData[2].toDouble(),
+                low = candleStickData[3].toDouble(),
+                close = candleStickData[4].toDouble(),
+                volume = candleStickData[5].toDouble(),
+                closeTime = candleStickData[6].toLong(),
+                quoteAssetVolume = candleStickData[7].toDouble(),
+                numberOfTrades = candleStickData[8].toInt(),
+                takerBuyBaseAssetVolume = candleStickData[9].toDouble(),
+                takerBuyQuoteAssetVolume = candleStickData[10].toDouble(),
+            )
+        } ?: throw NoSuchElementException("No candlestick data found")
     }
 
     fun getIndexPriceCandleStickData(): Map<String, String> {

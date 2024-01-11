@@ -8,9 +8,28 @@ class DreamAndHope(
     private val exchangeImpl: Exchange
 ) {
     fun test() : String {
-//        val account = exchangeImpl.getAccount()
+
+        // 직전 해머 패턴 보고 포지션 변동
+
+        // 계좌 조회
+        val account = exchangeImpl.getAccount()
+
+        // 잔고조회
+        val balance = account.availableBalance
+
+        // 지표 조회
+
         val indicators = exchangeImpl.getIndicators()
-        return indicators.toString()
+
+//        // 포지션 조회
+//        val positon = exchangeImpl.getPosition()
+//
+//        // close position
+//        closePosition(indicators, positon)
+//
+//        // open position(주문)
+//        openPosition(indicators, account)
+        return "Not yet implemented"
     }
 
 
@@ -18,34 +37,10 @@ class DreamAndHope(
     fun schedule() {
     }
 
-    fun process() {
-        checkCurrentStatus()
-        getIndicator()
-        closePosition()
-        openPosition()
-    }
-
-    fun checkCurrentStatus() {
-        TODO("로컬, 바낸 상태 sync")
-    }
-
-    fun getIndicator() {
-        TODO("지표 조회")
-    }
-
-    fun closePosition(){
-        TODO("현재 포지션 확인")
-        TODO("필요시 주문")
-    }
-
-    fun openPosition() {
-        TODO("전략 적용")
-        TODO("필요시 주문")
-    }
-
-    fun order() {
-        TODO("주문")
-        TODO("최종 결과 갱신")
-        TODO("거래 기록 저장")
-    }
+//    fun process() {
+//        checkCurrentStatus()
+//        getIndicator()
+//        closePosition()
+//        openPosition()
+//    }
 }
