@@ -3,7 +3,7 @@ package com.g2s.trading
 import org.springframework.stereotype.Service
 
 @Service
-class StatusUseCase {
+class PositionUseCase {
 
     fun checkStatus() {}
 }

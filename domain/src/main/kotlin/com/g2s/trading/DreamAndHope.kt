@@ -14,21 +14,28 @@ class DreamAndHope(
         // 계좌 조회
         val account = exchangeImpl.getAccount()
 
-        // 잔고조회
-        val balance = account.availableBalance
-
         // 지표 조회
-
         val indicators = exchangeImpl.getIndicators()
 
-//        // 포지션 조회
-//        val positon = exchangeImpl.getPosition()
+        // 포지션 조회
+        val positon = exchangeImpl.getPosition()
+
+//        // condition 생성
+//        val closeCondition = exchangeImpl.getCondition("")
 //
 //        // close position
-//        closePosition(indicators, positon)
+//        val hasPositionClosed = exchangeImpl.closePosition(positon, indicators, closeCondition)
+//
+//        // condition 생성
+//        val openCondition = exchangeImpl.getCondition("")
 //
 //        // open position(주문)
-//        openPosition(indicators, account)
+//        val hasPositionOpened = exchangeImpl.openPosition(account, indicators, openCondition)
+
+        exchangeImpl.openTest()
+
+        exchangeImpl.closeTest()
+
         return "Not yet implemented"
     }
 
