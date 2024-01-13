@@ -2,19 +2,13 @@ package com.g2s.trading
 
 interface Exchange {
 
-    fun getAccount(): Account
+    fun getAccount(symbol: String, timestamp: String): Account
 
-    fun getIndicators(): Indicator
+    fun getIndicator(symbol: String, interval: String, limit: Int): Indicator
 
-    fun getPosition(): Position
+    fun getPosition(symbol: String, timestamp: String): Position
 
-    fun closePosition(position: Position, indicator: Indicator, condition: Condition): Boolean
+    fun closePosition(symbol: String, side: String, quantity: String, positionSide: String ,type: String, timestamp: String)
 
-    fun openPosition(account: Account, indicator: Indicator, condition: Condition): Boolean
-
-    fun getCondition(jsonString: String): Condition
-
-    fun openTest()
-
-    fun closeTest()
+    fun openPosition(symbol: String, side: String, quantity: String, positionSide: String ,type: String, timestamp: String)
 }
