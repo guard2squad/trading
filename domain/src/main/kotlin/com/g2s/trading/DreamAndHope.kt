@@ -1,6 +1,5 @@
 package com.g2s.trading
 
-import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import kotlin.math.abs
@@ -9,66 +8,70 @@ import kotlin.math.abs
 class DreamAndHope(
     private val exchangeImpl: Exchange
 ) {
-
     companion object {
         private const val UNREALIZED_PROFIT = 5
         private const val UNREALIZED_LOSS = 0
-        private const val HAMMER_RATIO = 1
-        private const val BTC_RATIO = 0.25
+        private const val HAMMER_RATIO = 1.0
+        private const val AVAILABLE_STRATEGY_RATIO = 0.25
         private const val SYMBOL = "BTCUSDT"
         private const val TYPE = "MARKET"
     }
-    fun test() : String {
-        val indicators = exchangeImpl.getIndicator("BTCUSDT", "1m", 1)
-        val account = exchangeImpl.getAccount("USDT", System.currentTimeMillis().toString())
+
+    fun test() {
         val position = exchangeImpl.getPosition("BTCUSDT", System.currentTimeMillis().toString())
-        if (position.positionAmt != 0.0) {
-            if (position.unRealizedProfit > UNREALIZED_PROFIT) {
-                exchangeImpl.closePosition(
+        if (position != null) {
+            if (shouldClose(position)) {
+                val order = Order(
                     symbol = SYMBOL,
-                    side = "SELL",
+                    side = Side.SELL,
                     quantity = String.format("%.3f", abs(position.positionAmt)),
                     positionSide = "BOTH", // ONE_WAY_MODE
                     type = TYPE,
                     timestamp = LocalDateTime.now().toString()
                 )
-            }
-            if (position.unRealizedProfit < UNREALIZED_LOSS) {
-                exchangeImpl.closePosition(
-                    symbol = SYMBOL,
-                    side = "SELL",
-                    quantity = String.format("%.3f", abs(position.positionAmt)),
-                    positionSide = "BOTH", // ONE_WAY_MODE
-                    type = TYPE,
-                    timestamp = LocalDateTime.now().toString()
-                )
-            }
-        }
-        else {
-            if (account.availableBalance > account.balance * BTC_RATIO) {
-                val side: String = if (indicators.open < indicators.close) {
-                    "BUY"
-                } else {
-                    "SELL"
-                }
-                if ((indicators.high - indicators.low) / (indicators.close - indicators.open) > HAMMER_RATIO) {
-                    exchangeImpl.openPosition(
-                        symbol = SYMBOL,
-                        side = side,
-                        quantity = String.format("%.3f", account.availableBalance / indicators.latestPrice * BTC_RATIO),
-                        positionSide = "BOTH", // ONE_WAY_MODE
-                        type = TYPE,
-                        timestamp = LocalDateTime.now().toString()
-                    )
-                }
+                exchangeImpl.closePosition(order) // TODO closePosition(position)
             }
         }
 
-        return "Not yet implemented"
+        val indicator = exchangeImpl.getIndicator("BTCUSDT", "1m", 1)
+        val account = exchangeImpl.getAccount("USDT", System.currentTimeMillis().toString())
+
+        if (hasAvailableBalance(account, AVAILABLE_STRATEGY_RATIO)) {
+            if (shouldOpen(indicator, HAMMER_RATIO)) {
+                val order = Order(
+                    symbol = SYMBOL,
+                    side = side(indicator),
+                    quantity = String.format(
+                        "%.3f",
+                        account.availableBalance / indicator.latestPrice * AVAILABLE_STRATEGY_RATIO
+                    ),
+                    positionSide = "BOTH", // ONE_WAY_MODE
+                    type = TYPE,
+                    timestamp = LocalDateTime.now().toString()
+                )
+                exchangeImpl.openPosition(order) // TODO openPosition(position)
+            }
+        }
+
     }
 
+    private fun shouldClose(position: Position): Boolean {
+        return position.unRealizedProfit > UNREALIZED_PROFIT || position.unRealizedProfit < UNREALIZED_LOSS
+    }
 
-    @PostConstruct
-    fun schedule() {
+    private fun hasAvailableBalance(account: Account, ratio: Double): Boolean {
+        return account.availableBalance > account.balance * ratio
+    }
+
+    private fun side(indicator: Indicator): Side {
+        return if (indicator.open < indicator.close) {
+            Side.BUY
+        } else {
+            Side.SELL
+        }
+    }
+
+    private fun shouldOpen(indicator: Indicator, ratio: Double): Boolean {
+        return (indicator.high - indicator.low) / (indicator.close - indicator.open) > ratio
     }
 }

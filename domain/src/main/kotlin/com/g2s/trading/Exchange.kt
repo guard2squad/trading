@@ -6,9 +6,9 @@ interface Exchange {
 
     fun getIndicator(symbol: String, interval: String, limit: Int): Indicator
 
-    fun getPosition(symbol: String, timestamp: String): Position
+    fun getPosition(symbol: String, timestamp: String): Position?
 
-    fun closePosition(symbol: String, side: String, quantity: String, positionSide: String ,type: String, timestamp: String)
+    fun closePosition(order: Order)
 
-    fun openPosition(symbol: String, side: String, quantity: String, positionSide: String ,type: String, timestamp: String)
+    fun openPosition(order: Order)
 }

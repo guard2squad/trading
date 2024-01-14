@@ -10,7 +10,7 @@ class TradingController(
 ) {
 
     @GetMapping("/test")
-    fun test() : String {
-        return dreamAndHope.test();
+    fun test() {
+        dreamAndHope.test()
     }
 }

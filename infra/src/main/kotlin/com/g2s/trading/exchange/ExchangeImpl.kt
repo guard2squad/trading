@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.*
+import com.g2s.trading.util.ClassMapUtil
 import org.springframework.stereotype.Component
 
 
@@ -44,55 +45,26 @@ class ExchangeImpl(
         )
     }
 
-    override fun getPosition(symbol: String, timestamp: String): Position {
+    override fun getPosition(symbol: String, timestamp: String): Position? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to symbol,
             "timestamp" to timestamp
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
-        val mapper = jacksonObjectMapper()
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        val positions: List<Position> = mapper.readValue(jsonString)
 
-        return positions[0]
+        val position = ObjectMapperProvider.get().readValue<List<Position>>(jsonString)[0]
+
+        return if (position.positionAmt != 0.0) position else null
     }
 
-    override fun closePosition(
-        symbol: String,
-        side: String,
-        quantity: String,
-        positionSide: String,
-        type: String,
-        timestamp: String
-    ) {
-        val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol
-        parameters["side"] = side
-        parameters["positionSide"] = positionSide // ONE WAY MODE
-        parameters["type"] = type
-        parameters["quantity"] = quantity
-        parameters["timestamp"] = timestamp
-
-        binanceClient.account().newOrder(parameters)
+    override fun closePosition(order: Order) {
+        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+        binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(
-        symbol: String,
-        side: String,
-        quantity: String,
-        positionSide: String,
-        type: String,
-        timestamp: String
-    ) {
-        val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol
-        parameters["side"] = side
-        parameters["quantity"] = quantity
-        parameters["positionSide"] = positionSide
-        parameters["type"] = type
-        parameters["timestamp"] = timestamp
-
-        binanceClient.account().newOrder(parameters)
+    override fun openPosition(order: Order) {
+        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+        binanceClient.account().newOrder(params)
     }
 
     fun getLatestPrice(symbol: String): Double {

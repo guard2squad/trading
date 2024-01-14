@@ -594,3 +594,32 @@ java.lang.ClassCastException: class java.lang.String cannot be cast to class com
 2024-01-06 19:48:15.120[1704538095120] | INFO  | main       | o.a.coyote.http11.Http11NioProtocol  - Starting ProtocolHandler ["http-nio-8080"]
 2024-01-06 19:48:15.128[1704538095128] | INFO  | main       | o.s.b.w.e.tomcat.TomcatWebServer     - Tomcat started on port 8080 (http) with context path ''
 2024-01-06 19:48:15.132[1704538095132] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - Started TradingApplicationKt in 0.916 seconds (process running for 1.323)
+2024-01-14 21:20:06.715[1705234806715] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - Starting TradingApplicationKt using Java 17.0.6 with PID 28355 (/Users/kakao/Desktop/hj/trading/web/build/classes/kotlin/main started by kakao in /Users/kakao/Desktop/hj/trading)
+2024-01-14 21:20:06.717[1705234806717] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - No active profile set, falling back to 1 default profile: "default"
+2024-01-14 21:20:07.391[1705234807391] | INFO  | main       | o.s.b.w.e.tomcat.TomcatWebServer     - Tomcat initialized with port 8080 (http)
+2024-01-14 21:20:07.395[1705234807395] | INFO  | main       | o.a.coyote.http11.Http11NioProtocol  - Initializing ProtocolHandler ["http-nio-8080"]
+2024-01-14 21:20:07.396[1705234807396] | INFO  | main       | o.a.catalina.core.StandardService    - Starting service [Tomcat]
+2024-01-14 21:20:07.396[1705234807396] | INFO  | main       | o.a.catalina.core.StandardEngine     - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2024-01-14 21:20:07.429[1705234807429] | INFO  | main       | o.a.c.c.C.[Tomcat].[localhost].[/]   - Initializing Spring embedded WebApplicationContext
+2024-01-14 21:20:07.429[1705234807429] | INFO  | main       | o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 678 ms
+2024-01-14 21:20:07.653[1705234807653] | INFO  | main       | o.a.coyote.http11.Http11NioProtocol  - Starting ProtocolHandler ["http-nio-8080"]
+2024-01-14 21:20:07.661[1705234807661] | INFO  | main       | o.s.b.w.e.tomcat.TomcatWebServer     - Tomcat started on port 8080 (http) with context path ''
+2024-01-14 21:20:07.666[1705234807666] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - Started TradingApplicationKt in 1.126 seconds (process running for 1.583)
+2024-01-14 21:20:11.417[1705234811417] | INFO  | http-nio-8080-exec-2 | o.a.c.c.C.[Tomcat].[localhost].[/]   - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2024-01-14 21:20:11.417[1705234811417] | INFO  | http-nio-8080-exec-2 | o.s.web.servlet.DispatcherServlet    - Initializing Servlet 'dispatcherServlet'
+2024-01-14 21:20:11.418[1705234811418] | INFO  | http-nio-8080-exec-2 | o.s.web.servlet.DispatcherServlet    - Completed initialization in 1 ms
+2024-01-14 21:20:11.436[1705234811436] | INFO  | http-nio-8080-exec-2 | c.b.c.f.client.utils.RequestHandler  - GET https://testnet.binancefuture.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m&limit=1
+2024-01-14 21:20:11.753[1705234811753] | INFO  | http-nio-8080-exec-2 | c.b.c.f.client.utils.RequestHandler  - GET https://testnet.binancefuture.com/fapi/v1/ticker/price?symbol=BTCUSDT
+2024-01-14 21:20:11.870[1705234811870] | INFO  | http-nio-8080-exec-2 | c.b.c.f.client.utils.RequestHandler  - GET https://testnet.binancefuture.com/fapi/v2/balance?timestamp=1705234811868&signature=4fa614d84b0307181bf63860eb7ec6101d02ad9b7a802b18da07999710355c2b
+2024-01-14 21:20:11.971[1705234811971] | INFO  | http-nio-8080-exec-2 | c.b.c.f.client.utils.RequestHandler  - GET https://testnet.binancefuture.com/fapi/v2/positionRisk?symbol=BTCUSDT&timestamp=1705234811971&signature=a4b4afc0b17353fd64d9c50a4cc84dc416260eaf95706de7dd20f02ea409a4be
+2024-01-14 21:57:51.989[1705237071989] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - Starting TradingApplicationKt using Java 17.0.6 with PID 31594 (/Users/kakao/Desktop/hj/trading/web/build/classes/kotlin/main started by kakao in /Users/kakao/Desktop/hj/trading)
+2024-01-14 21:57:51.991[1705237071991] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - No active profile set, falling back to 1 default profile: "default"
+2024-01-14 21:57:52.569[1705237072569] | INFO  | main       | o.s.b.w.e.tomcat.TomcatWebServer     - Tomcat initialized with port 8080 (http)
+2024-01-14 21:57:52.573[1705237072573] | INFO  | main       | o.a.coyote.http11.Http11NioProtocol  - Initializing ProtocolHandler ["http-nio-8080"]
+2024-01-14 21:57:52.574[1705237072574] | INFO  | main       | o.a.catalina.core.StandardService    - Starting service [Tomcat]
+2024-01-14 21:57:52.574[1705237072574] | INFO  | main       | o.a.catalina.core.StandardEngine     - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2024-01-14 21:57:52.601[1705237072601] | INFO  | main       | o.a.c.c.C.[Tomcat].[localhost].[/]   - Initializing Spring embedded WebApplicationContext
+2024-01-14 21:57:52.601[1705237072601] | INFO  | main       | o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 569 ms
+2024-01-14 21:57:52.783[1705237072783] | INFO  | main       | o.a.coyote.http11.Http11NioProtocol  - Starting ProtocolHandler ["http-nio-8080"]
+2024-01-14 21:57:52.792[1705237072792] | INFO  | main       | o.s.b.w.e.tomcat.TomcatWebServer     - Tomcat started on port 8080 (http) with context path ''
+2024-01-14 21:57:52.797[1705237072797] | INFO  | main       | c.g2s.trading.TradingApplicationKt   - Started TradingApplicationKt in 1.004 seconds (process running for 1.434)

@@ -35,9 +35,6 @@ out/
 # Ignore log files
 *.log
 
-# Ignore application properties files
-application.properties
-
 # Ignore logs directories and their contents
 logs/
 web/logs/
