@@ -4,9 +4,9 @@ import java.time.LocalDateTime
 
 data class Order (
     val symbol: String,
-    val side: Side,
+    val orderSide: OrderSide,
     val quantity: String,
-    val type: String,
-    val positionSide: String = "BOTH", // ONE_WAY_MODE
+    val type: OrderType = OrderType.MARKET,
+    val positionSide: PositionSide, // ONE_WAY_MODE
     val timestamp: String = LocalDateTime.now().toString()
 )

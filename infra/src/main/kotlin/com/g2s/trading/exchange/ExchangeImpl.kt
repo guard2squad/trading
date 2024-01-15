@@ -8,6 +8,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.*
 import com.g2s.trading.util.ClassMapUtil
 import org.springframework.stereotype.Component
+import kotlin.math.abs
 
 
 @Component
@@ -57,12 +58,29 @@ class ExchangeImpl(
         return if (position.positionAmt != 0.0) position else null
     }
 
-    override fun closePosition(order: Order) {
+    override fun closePosition(
+        position: Position,
+        positionMode: PositionMode,
+        positionSide: PositionSide
+    ) {
+        val order = Order(
+            symbol = position.symbol,
+            orderSide = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
+            quantity = String.format("%.3f", abs(position.positionAmt)),
+            positionSide = if (positionMode == PositionMode.ONE_WAY_MODE) PositionSide.BOTH else positionSide,
+        )
         val params = ClassMapUtil.dataClassToLinkedHashMap(order)
         binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(order: Order) {
+    override fun openPosition(position: Position, positionMode: PositionMode, positionSide: PositionSide) {
+        // TODO(unimplemented)
+        val order = Order(
+            symbol = position.symbol,
+            orderSide = if (position.positionAmt > 0) OrderSide.BUY else OrderSide.SELL,
+            quantity = String.format("%.3f", abs(position.positionAmt)),
+            positionSide = if (positionMode == PositionMode.ONE_WAY_MODE) PositionSide.BOTH else positionSide,
+        )
         val params = ClassMapUtil.dataClassToLinkedHashMap(order)
         binanceClient.account().newOrder(params)
     }

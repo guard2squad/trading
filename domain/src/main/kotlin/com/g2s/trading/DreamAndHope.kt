@@ -2,7 +2,6 @@ package com.g2s.trading
 
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
-import kotlin.math.abs
 
 @Service
 class DreamAndHope(
@@ -21,15 +20,11 @@ class DreamAndHope(
         val position = exchangeImpl.getPosition("BTCUSDT", System.currentTimeMillis().toString())
         if (position != null) {
             if (shouldClose(position)) {
-                val order = Order(
-                    symbol = SYMBOL,
-                    side = Side.SELL,
-                    quantity = String.format("%.3f", abs(position.positionAmt)),
-                    positionSide = "BOTH", // ONE_WAY_MODE
-                    type = TYPE,
-                    timestamp = LocalDateTime.now().toString()
+                exchangeImpl.closePosition(
+                    position,
+                    positionMode = PositionMode.ONE_WAY_MODE,
+                    positionSide = PositionSide.BOTH
                 )
-                exchangeImpl.closePosition(order) // TODO closePosition(position)
             }
         }
 
@@ -40,16 +35,15 @@ class DreamAndHope(
             if (shouldOpen(indicator, HAMMER_RATIO)) {
                 val order = Order(
                     symbol = SYMBOL,
-                    side = side(indicator),
+                    orderSide = side(indicator),
                     quantity = String.format(
                         "%.3f",
                         account.availableBalance / indicator.latestPrice * AVAILABLE_STRATEGY_RATIO
                     ),
-                    positionSide = "BOTH", // ONE_WAY_MODE
-                    type = TYPE,
+                    positionSide = PositionSide.BOTH, // ONE_WAY_MODE
                     timestamp = LocalDateTime.now().toString()
                 )
-                exchangeImpl.openPosition(order) // TODO openPosition(position)
+                exchangeImpl.openPosition(order) // TODO openPosition(position), 도메인적으로 고민 좀
             }
         }
 
@@ -63,11 +57,11 @@ class DreamAndHope(
         return account.availableBalance > account.balance * ratio
     }
 
-    private fun side(indicator: Indicator): Side {
+    private fun side(indicator: Indicator): OrderSide {
         return if (indicator.open < indicator.close) {
-            Side.BUY
+            OrderSide.BUY
         } else {
-            Side.SELL
+            OrderSide.SELL
         }
     }
 

@@ -8,7 +8,7 @@ interface Exchange {
 
     fun getPosition(symbol: String, timestamp: String): Position?
 
-    fun closePosition(order: Order)
+    fun closePosition(position: Position, positionMode: PositionMode, positionSide: PositionSide)
 
     fun openPosition(order: Order)
 }
