@@ -1,7 +1,6 @@
 package com.g2s.trading
 
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
 
 @Service
 class DreamAndHope(
@@ -9,22 +8,24 @@ class DreamAndHope(
 ) {
     companion object {
         private const val UNREALIZED_PROFIT = 5
-        private const val UNREALIZED_LOSS = 0
+        private const val UNREALIZED_LOSS = -2
         private const val HAMMER_RATIO = 1.0
         private const val AVAILABLE_STRATEGY_RATIO = 0.25
         private const val SYMBOL = "BTCUSDT"
-        private const val TYPE = "MARKET"
     }
 
-    fun test() {
+    fun test(positionMode: PositionMode) {
         val position = exchangeImpl.getPosition("BTCUSDT", System.currentTimeMillis().toString())
         if (position != null) {
             if (shouldClose(position)) {
                 exchangeImpl.closePosition(
                     position,
-                    positionMode = PositionMode.ONE_WAY_MODE,
+                    positionMode = positionMode,
                     positionSide = PositionSide.BOTH
                 )
+            //TODO(PositonMode, PostionSide는 Position이라는
+            // 단어가 붙어있지만 포지션과 다른 개념이다. 바이낸스 API에 의존함
+            // 따라서 포지션 모드는 이 전략에서 전역적으로 유지되는 상태인데)
             }
         }
 
@@ -35,15 +36,17 @@ class DreamAndHope(
             if (shouldOpen(indicator, HAMMER_RATIO)) {
                 val order = Order(
                     symbol = SYMBOL,
-                    orderSide = side(indicator),
+                    orderSide = orderSide(indicator),
                     quantity = String.format(
                         "%.3f",
                         account.availableBalance / indicator.latestPrice * AVAILABLE_STRATEGY_RATIO
                     ),
-                    positionSide = PositionSide.BOTH, // ONE_WAY_MODE
-                    timestamp = LocalDateTime.now().toString()
                 )
-                exchangeImpl.openPosition(order) // TODO openPosition(position), 도메인적으로 고민 좀
+                exchangeImpl.openPosition(
+                    order,
+                    positionMode = positionMode,
+                    positionSide = PositionSide.BOTH
+                )
             }
         }
 
@@ -57,7 +60,7 @@ class DreamAndHope(
         return account.availableBalance > account.balance * ratio
     }
 
-    private fun side(indicator: Indicator): OrderSide {
+    private fun orderSide(indicator: Indicator): OrderSide {
         return if (indicator.open < indicator.close) {
             OrderSide.BUY
         } else {

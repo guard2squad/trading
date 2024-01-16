@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.*
+import com.g2s.trading.dtos.OrderDto
 import com.g2s.trading.util.ClassMapUtil
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 import kotlin.math.abs
 
 
@@ -63,25 +65,30 @@ class ExchangeImpl(
         positionMode: PositionMode,
         positionSide: PositionSide
     ) {
-        val order = Order(
+        val orderDto = OrderDto(
             symbol = position.symbol,
-            orderSide = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
+            side = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
+            type = OrderType.MARKET,
             quantity = String.format("%.3f", abs(position.positionAmt)),
-            positionSide = if (positionMode == PositionMode.ONE_WAY_MODE) PositionSide.BOTH else positionSide,
+            positionMode = positionMode,
+            positionSide = positionSide,
+            timeStamp = LocalDateTime.now().toString()
         )
-        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+        val params = ClassMapUtil.dataClassToLinkedHashMap(orderDto)
         binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(position: Position, positionMode: PositionMode, positionSide: PositionSide) {
-        // TODO(unimplemented)
-        val order = Order(
-            symbol = position.symbol,
-            orderSide = if (position.positionAmt > 0) OrderSide.BUY else OrderSide.SELL,
-            quantity = String.format("%.3f", abs(position.positionAmt)),
-            positionSide = if (positionMode == PositionMode.ONE_WAY_MODE) PositionSide.BOTH else positionSide,
+    override fun openPosition(order: Order, positionMode: PositionMode, positionSide: PositionSide) {
+        val orderDto = OrderDto(
+            symbol = order.symbol,
+            side = order.orderSide,
+            type = OrderType.MARKET,
+            quantity = order.quantity,
+            positionMode = positionMode,
+            positionSide = positionSide,
+            timeStamp = LocalDateTime.now().toString()
         )
-        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+        val params = ClassMapUtil.dataClassToLinkedHashMap(orderDto)
         binanceClient.account().newOrder(params)
     }
 

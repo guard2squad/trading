@@ -10,11 +10,3 @@ data class Position(
     val liquidationPrice: Double,
     val updateTime: Long,
 )
-
-/*
-    val orderSide: OrderSide,
-    val quantity: String,
-    val type: String,
-    val positionSide: String = "BOTH", // ONE_WAY_MODE
-    val timestamp: String = LocalDateTime.now().toString()
- */

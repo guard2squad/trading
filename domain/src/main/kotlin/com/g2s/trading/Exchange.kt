@@ -10,5 +10,5 @@ interface Exchange {
 
     fun closePosition(position: Position, positionMode: PositionMode, positionSide: PositionSide)
 
-    fun openPosition(order: Order)
+    fun openPosition(order: Order, positionMode: PositionMode, positionSide: PositionSide)
 }
