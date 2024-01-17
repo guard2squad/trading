@@ -7,16 +7,20 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.*
 import com.g2s.trading.dtos.OrderDto
-import com.g2s.trading.util.ClassMapUtil
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import kotlin.math.abs
 
 
+// 이거 ONE_WAY_MODE 용 거래소로 하고
+// HEDGE_MODE 용 거래소 따로 만들어서 구현하는게 어떨지..?
 @Component
 class ExchangeImpl(
     val binanceClient: UMFuturesClientImpl
 ) : Exchange {
+
+    private val positionMode = PositionMode.ONE_WAY_MODE;
+    private val positionSide = PositionSide.BOTH;
 
     override fun getAccount(symbol: String, timestamp: String): Account {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
@@ -31,7 +35,6 @@ class ExchangeImpl(
     }
 
     override fun getIndicator(symbol: String, interval: String, limit: Int): Indicator {
-        // CandleStickData
         val candleStick = getCandleStickData(
             symbol = symbol,
             interval = interval,
@@ -61,34 +64,32 @@ class ExchangeImpl(
     }
 
     override fun closePosition(
-        position: Position,
-        positionMode: PositionMode,
-        positionSide: PositionSide
+        position: Position
     ) {
-        val orderDto = OrderDto(
+        val params = OrderDto.toParams(OrderDto(
             symbol = position.symbol,
             side = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
             type = OrderType.MARKET,
             quantity = String.format("%.3f", abs(position.positionAmt)),
-            positionMode = positionMode,
-            positionSide = positionSide,
+            positionMode = this.positionMode,
+            positionSide = this.positionSide,
             timeStamp = LocalDateTime.now().toString()
-        )
-        val params = ClassMapUtil.dataClassToLinkedHashMap(orderDto)
+        ))
         binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(order: Order, positionMode: PositionMode, positionSide: PositionSide) {
-        val orderDto = OrderDto(
-            symbol = order.symbol,
-            side = order.orderSide,
-            type = OrderType.MARKET,
-            quantity = order.quantity,
-            positionMode = positionMode,
-            positionSide = positionSide,
-            timeStamp = LocalDateTime.now().toString()
+    override fun openPosition(order: Order) {
+        val params = OrderDto.toParams(
+            OrderDto(
+                symbol = order.symbol,
+                side = order.orderSide,
+                type = OrderType.MARKET,
+                quantity = order.quantity,
+                positionMode = this.positionMode,
+                positionSide = this.positionSide,
+                timeStamp = LocalDateTime.now().toString()
+            )
         )
-        val params = ClassMapUtil.dataClassToLinkedHashMap(orderDto)
         binanceClient.account().newOrder(params)
     }
 

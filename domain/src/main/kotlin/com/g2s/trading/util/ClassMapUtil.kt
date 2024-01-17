@@ -9,7 +9,6 @@ object ClassMapUtil {
             field.isAccessible = true
             linkedHashMap[field.name] = field.get(dataClassInstance)
         }
-        // TODO(변환시 value 값 String으로)
         return linkedHashMap
     }
 }
