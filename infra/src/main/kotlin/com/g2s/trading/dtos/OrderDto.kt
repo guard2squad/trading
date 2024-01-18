@@ -13,7 +13,7 @@ data class OrderDto(
     val type: OrderType,
     val quantity: String,
     val positionMode: PositionMode,
-    val positionSide: PositionSide = PositionSide.BOTH,
+    val positionSide: PositionSide,
     val timeStamp: String? = LocalDateTime.now().toString()
 ) {
     companion object {
@@ -22,7 +22,6 @@ data class OrderDto(
             for (prop in OrderDto::class.memberProperties) {
                 // null 값은 무시
                 val value = prop.get(orderDto) ?: continue
-                /// TODO(HEDGE_MODE 일 때 positionSide에서 반드시 BOTH말고 LONG/SHORT 로 하고 싶은데, 어떻게 해야할까?)
                 params[prop.name] = value.toString()
             }
 

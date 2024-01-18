@@ -12,17 +12,23 @@ import java.time.LocalDateTime
 import kotlin.math.abs
 
 
-// 이거 ONE_WAY_MODE 용 거래소로 하고
-// HEDGE_MODE 용 거래소 따로 만들어서 구현하는게 어떨지..?
 @Component
 class ExchangeImpl(
     val binanceClient: UMFuturesClientImpl
 ) : Exchange {
 
-    private val positionMode = PositionMode.ONE_WAY_MODE;
-    private val positionSide = PositionSide.BOTH;
+    private lateinit var positionMode : PositionMode
+    private lateinit var positionSide : PositionSide
+    // TODO(HEDGE_MODE 일 때 positionSide -> LONG/SHORT)
 
-    override fun getAccount(symbol: String, timestamp: String): Account {
+    override fun setPositionMode(positionMode: PositionMode) {
+        this.positionMode = positionMode
+        if (positionMode == PositionMode.ONE_WAY_MODE) {
+            this.positionSide = PositionSide.BOTH
+        }
+    }
+
+    override fun getAccount(assets: Assets, timestamp: String): Account {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to timestamp
         )
@@ -31,12 +37,12 @@ class ExchangeImpl(
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         val accountList: List<Account> = mapper.readValue(jsonString)
 
-        return accountList.find { it.asset == symbol } ?: throw RuntimeException("Account not found")
+        return accountList.find { it.asset == assets.toString() } ?: throw RuntimeException("Account not found")
     }
 
-    override fun getIndicator(symbol: String, interval: String, limit: Int): Indicator {
+    override fun getIndicator(symbol: Symbols, interval: String, limit: Int): Indicator {
         val candleStick = getCandleStickData(
-            symbol = symbol,
+            symbol = symbol.toString(),
             interval = interval,
             limit = limit
         )
@@ -47,13 +53,13 @@ class ExchangeImpl(
             low = candleStick.low,
             close = candleStick.close,
             volume = candleStick.volume,
-            latestPrice = getLatestPrice(symbol)
+            latestPrice = getLatestPrice(symbol.toString())
         )
     }
 
-    override fun getPosition(symbol: String, timestamp: String): Position? {
+    override fun getPosition(symbol: Symbols, timestamp: String): Position? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol,
+            "symbol" to symbol.toString(),
             "timestamp" to timestamp
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
@@ -81,7 +87,7 @@ class ExchangeImpl(
     override fun openPosition(order: Order) {
         val params = OrderDto.toParams(
             OrderDto(
-                symbol = order.symbol,
+                symbol = order.symbol.toString(),
                 side = order.orderSide,
                 type = OrderType.MARKET,
                 quantity = order.quantity,

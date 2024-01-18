@@ -32,7 +32,7 @@ class SimpleStrategy : Strategy {
         }
     }
 
-    override fun makeOrder(symbol: String, orderType: OrderType, orderSide: OrderSide, quantity: Double): Order {
+    override fun makeOrder(symbol: Symbols, orderType: OrderType, orderSide: OrderSide, quantity: Double): Order {
         return Order(
             symbol = symbol,
             orderType = orderType,
