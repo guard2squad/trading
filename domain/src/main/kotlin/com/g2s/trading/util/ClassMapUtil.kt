@@ -9,7 +9,6 @@ object ClassMapUtil {
             field.isAccessible = true
             linkedHashMap[field.name] = field.get(dataClassInstance)
         }
-
         return linkedHashMap
     }
 }

@@ -1,6 +1,7 @@
 package com.g2s.trading
 
 data class Position(
+    val symbol: String,
     val positionAmt: Double,
     val entryPrice: Double,
     val breakEvenPrice: Double,

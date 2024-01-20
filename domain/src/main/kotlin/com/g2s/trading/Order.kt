@@ -3,10 +3,10 @@ package com.g2s.trading
 import java.time.LocalDateTime
 
 data class Order (
-    val symbol: String,
-    val side: Side,
+    val symbol: Symbols,
+    val orderSide: OrderSide,
+    val orderType: OrderType,
     val quantity: String,
-    val type: String,
-    val positionSide: String = "BOTH", // ONE_WAY_MODE
     val timestamp: String = LocalDateTime.now().toString()
 )
+

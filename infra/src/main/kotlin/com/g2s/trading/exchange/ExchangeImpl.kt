@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.*
-import com.g2s.trading.util.ClassMapUtil
+import com.g2s.trading.dtos.OrderDto
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
+import kotlin.math.abs
 
 
 @Component
@@ -15,7 +17,18 @@ class ExchangeImpl(
     val binanceClient: UMFuturesClientImpl
 ) : Exchange {
 
-    override fun getAccount(symbol: String, timestamp: String): Account {
+    private lateinit var positionMode : PositionMode
+    private lateinit var positionSide : PositionSide
+    // TODO(HEDGE_MODE 일 때 positionSide -> LONG/SHORT)
+
+    override fun setPositionMode(positionMode: PositionMode) {
+        this.positionMode = positionMode
+        if (positionMode == PositionMode.ONE_WAY_MODE) {
+            this.positionSide = PositionSide.BOTH
+        }
+    }
+
+    override fun getAccount(assets: Assets, timestamp: String): Account {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to timestamp
         )
@@ -24,13 +37,12 @@ class ExchangeImpl(
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         val accountList: List<Account> = mapper.readValue(jsonString)
 
-        return accountList.find { it.asset == symbol } ?: throw RuntimeException("Account not found")
+        return accountList.find { it.asset == assets.toString() } ?: throw RuntimeException("Account not found")
     }
 
-    override fun getIndicator(symbol: String, interval: String, limit: Int): Indicator {
-        // CandleStickData
+    override fun getIndicator(symbol: Symbols, interval: String, limit: Int): Indicator {
         val candleStick = getCandleStickData(
-            symbol = symbol,
+            symbol = symbol.toString(),
             interval = interval,
             limit = limit
         )
@@ -41,13 +53,13 @@ class ExchangeImpl(
             low = candleStick.low,
             close = candleStick.close,
             volume = candleStick.volume,
-            latestPrice = getLatestPrice(symbol)
+            latestPrice = getLatestPrice(symbol.toString())
         )
     }
 
-    override fun getPosition(symbol: String, timestamp: String): Position? {
+    override fun getPosition(symbol: Symbols, timestamp: String): Position? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol,
+            "symbol" to symbol.toString(),
             "timestamp" to timestamp
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
@@ -57,13 +69,33 @@ class ExchangeImpl(
         return if (position.positionAmt != 0.0) position else null
     }
 
-    override fun closePosition(order: Order) {
-        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+    override fun closePosition(
+        position: Position
+    ) {
+        val params = OrderDto.toParams(OrderDto(
+            symbol = position.symbol,
+            side = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
+            type = OrderType.MARKET,
+            quantity = String.format("%.3f", abs(position.positionAmt)),
+            positionMode = this.positionMode,
+            positionSide = this.positionSide,
+            timeStamp = LocalDateTime.now().toString()
+        ))
         binanceClient.account().newOrder(params)
     }
 
     override fun openPosition(order: Order) {
-        val params = ClassMapUtil.dataClassToLinkedHashMap(order)
+        val params = OrderDto.toParams(
+            OrderDto(
+                symbol = order.symbol.toString(),
+                side = order.orderSide,
+                type = OrderType.MARKET,
+                quantity = order.quantity,
+                positionMode = this.positionMode,
+                positionSide = this.positionSide,
+                timeStamp = LocalDateTime.now().toString()
+            )
+        )
         binanceClient.account().newOrder(params)
     }
 
