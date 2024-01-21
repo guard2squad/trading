@@ -1,12 +1,22 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
-import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.*
+import com.g2s.trading.Exchange
+import com.g2s.trading.ObjectMapperProvider
+import com.g2s.trading.Order
+import com.g2s.trading.OrderSide
+import com.g2s.trading.OrderType
+import com.g2s.trading.PositionMode
+import com.g2s.trading.PositionSide
+import com.g2s.trading.Symbol
+import com.g2s.trading.account.Account
+import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.dtos.OrderDto
+import com.g2s.trading.indicator.indicator.CandleStick
+import com.g2s.trading.indicator.indicator.Interval
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import kotlin.math.abs
@@ -16,9 +26,10 @@ import kotlin.math.abs
 class ExchangeImpl(
     val binanceClient: UMFuturesClientImpl
 ) : Exchange {
+    private val om = ObjectMapperProvider.get()
 
-    private lateinit var positionMode : PositionMode
-    private lateinit var positionSide : PositionSide
+    private lateinit var positionMode: PositionMode
+    private lateinit var positionSide: PositionSide
     // TODO(HEDGE_MODE 일 때 positionSide -> LONG/SHORT)
 
     override fun setPositionMode(positionMode: PositionMode) {
@@ -28,59 +39,56 @@ class ExchangeImpl(
         }
     }
 
-    override fun getAccount(assets: Assets, timestamp: String): Account {
+    override fun getAccount(): Account {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "timestamp" to timestamp
+            "timestamp" to System.currentTimeMillis().toString()
         )
-        val jsonString = binanceClient.account().futuresAccountBalance(parameters)
-        val mapper = jacksonObjectMapper()
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        val accountList: List<Account> = mapper.readValue(jsonString)
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
 
-        return accountList.find { it.asset == assets.toString() } ?: throw RuntimeException("Account not found")
-    }
+        val assetWallets = (bodyJson.get("asset") as ArrayNode).map {
+            om.convertValue(it, AssetWallet::class.java)
+        }
+        val positions = (bodyJson.get("position") as ArrayNode).map {
+            om.convertValue(it, Position::class.java)
+        }
 
-    override fun getIndicator(symbol: Symbols, interval: String, limit: Int): Indicator {
-        val candleStick = getCandleStickData(
-            symbol = symbol.toString(),
-            interval = interval,
-            limit = limit
-        )
-
-        return Indicator(
-            open = candleStick.open,
-            high = candleStick.high,
-            low = candleStick.low,
-            close = candleStick.close,
-            volume = candleStick.volume,
-            latestPrice = getLatestPrice(symbol.toString())
+        return Account(
+            assetWallets = assetWallets,
+            positions = positions,
         )
     }
 
-    override fun getPosition(symbol: Symbols, timestamp: String): Position? {
+    override fun getPosition(symbol: Symbol): Position? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to symbol.toString(),
-            "timestamp" to timestamp
+            "timestamp" to System.currentTimeMillis().toString()
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
 
-        val position = ObjectMapperProvider.get().readValue<List<Position>>(jsonString)[0]
+        val position = om.readValue<List<Position>>(jsonString)[0]
 
         return if (position.positionAmt != 0.0) position else null
+    }
+
+    override fun getPositions(symbol: List<Symbol>): List<Position> {
+        TODO("Not yet implemented")
     }
 
     override fun closePosition(
         position: Position
     ) {
-        val params = OrderDto.toParams(OrderDto(
-            symbol = position.symbol,
-            side = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
-            type = OrderType.MARKET,
-            quantity = String.format("%.3f", abs(position.positionAmt)),
-            positionMode = this.positionMode,
-            positionSide = this.positionSide,
-            timeStamp = LocalDateTime.now().toString()
-        ))
+        val params = OrderDto.toParams(
+            OrderDto(
+                symbol = position.symbol,
+                side = if (position.positionAmt > 0) OrderSide.SELL else OrderSide.BUY,
+                type = OrderType.MARKET,
+                quantity = String.format("%.3f", abs(position.positionAmt)),
+                positionMode = this.positionMode,
+                positionSide = this.positionSide,
+                timeStamp = LocalDateTime.now().toString()
+            )
+        )
         binanceClient.account().newOrder(params)
     }
 
@@ -99,27 +107,25 @@ class ExchangeImpl(
         binanceClient.account().newOrder(params)
     }
 
-    fun getLatestPrice(symbol: String): Double {
+
+    /**
+     *  Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
+     *
+     *  @param interval 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d 3d 1w 1M
+     */
+    override fun getCandleStick(
+        symbol: Symbol,
+        interval: Interval,
+        limit: Int
+    ): List<CandleStick> {
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = symbol
-        val jsonNode = ObjectMapper().readTree(binanceClient.market().tickerSymbol(parameters))
-
-        return jsonNode.get("price").asDouble()
-    }
-
-    // Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
-    // interval : 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d 3d 1w 1M
-    // interval * limit 만큼 캔들스틱 데이터를 가져옴
-    // limit = 1이면 현재 시간의 데이터
-    fun getCandleStickData(symbol: String, interval: String, limit: Int): CandleStick {
-        val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol
-        parameters["interval"] = interval
+        parameters["interval"] = interval.value
         parameters["limit"] = limit
         val jsonString = binanceClient.market().klines(parameters)
         val candleStickDataList: List<List<String>> = ObjectMapper().readValue(jsonString)
 
-        return candleStickDataList.firstOrNull()?.let { candleStickData ->
+        return candleStickDataList.map { candleStickData ->
             CandleStick(
                 openTime = candleStickData[0].toLong(),
                 open = candleStickData[1].toDouble(),
@@ -133,7 +139,15 @@ class ExchangeImpl(
                 takerBuyBaseAssetVolume = candleStickData[9].toDouble(),
                 takerBuyQuoteAssetVolume = candleStickData[10].toDouble(),
             )
-        } ?: throw NoSuchElementException("No candlestick data found")
+        }
+    }
+
+    override fun getLastPrice(symbol: Symbol): Double {
+        val parameters = LinkedHashMap<String, Any>()
+        parameters["symbol"] = symbol
+        val jsonNode = om.readTree(binanceClient.market().tickerSymbol(parameters))
+
+        return jsonNode.get("price").asDouble()
     }
 
 

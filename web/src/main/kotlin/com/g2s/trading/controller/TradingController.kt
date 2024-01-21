@@ -12,6 +12,6 @@ class TradingController(
 
     @GetMapping("/test")
     fun test() {
-        dreamAndHope.test(PositionMode.ONE_WAY_MODE)
+        dreamAndHope.test()
     }
 }
