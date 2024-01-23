@@ -1,7 +1,10 @@
 package com.g2s.trading
 
+import com.g2s.trading.account.Account
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
+import com.g2s.trading.order.Order
+import com.g2s.trading.position.Position
 
 interface Exchange {
 

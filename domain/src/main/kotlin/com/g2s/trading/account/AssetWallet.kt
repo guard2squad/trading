@@ -4,8 +4,4 @@ data class AssetWallet(
     val asset: Asset,
     val walletBalance: Double,
     val availableBalance: Double,
-){
-    companion object {
-        fun h
-    }
-}
+)

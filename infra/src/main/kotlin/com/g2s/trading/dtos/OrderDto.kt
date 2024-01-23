@@ -1,9 +1,9 @@
 package com.g2s.trading.dtos
 
-import com.g2s.trading.OrderSide
-import com.g2s.trading.OrderType
+import com.g2s.trading.order.OrderSide
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.PositionMode
-import com.g2s.trading.PositionSide
+import com.g2s.PositionSide
 import java.time.LocalDateTime
 import kotlin.reflect.full.memberProperties
 

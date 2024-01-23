@@ -1,7 +1,5 @@
 package com.g2s.trading.indicator.indicator
 
-import com.fasterxml.jackson.annotation.JsonProperty
-
 data class CandleStick(
     val openTime: Long,
     val open: Double,

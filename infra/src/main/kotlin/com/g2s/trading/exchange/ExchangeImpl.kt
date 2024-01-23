@@ -6,11 +6,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.Exchange
 import com.g2s.trading.ObjectMapperProvider
-import com.g2s.trading.Order
-import com.g2s.trading.OrderSide
-import com.g2s.trading.OrderType
+import com.g2s.trading.order.Order
+import com.g2s.trading.order.OrderSide
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.PositionMode
-import com.g2s.trading.PositionSide
+import com.g2s.PositionSide
 import com.g2s.trading.Symbol
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.AssetWallet
