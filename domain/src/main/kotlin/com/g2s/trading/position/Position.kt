@@ -6,5 +6,5 @@ data class Position(
     val symbol: Symbol,
     val entryPrice: Double,
     val positionAmt: Double,
-    val closeReferenceData: CloseReferenceData
+    var closeReferenceData: CloseReferenceData
 )

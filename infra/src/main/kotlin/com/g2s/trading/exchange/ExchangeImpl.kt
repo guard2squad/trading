@@ -4,17 +4,18 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.position.PositionSide
 import com.g2s.trading.Exchange
 import com.g2s.trading.ObjectMapperProvider
-import com.g2s.trading.position.PositionMode
 import com.g2s.trading.Symbol
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Order
+import com.g2s.trading.position.CloseReferenceData
 import com.g2s.trading.position.Position
+import com.g2s.trading.position.PositionMode
+import com.g2s.trading.position.PositionSide
 import com.g2s.trading.util.BinanceParameter
 import org.springframework.stereotype.Component
 
@@ -78,10 +79,14 @@ class ExchangeImpl(
         binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(order: Order): Position {
+    // TODO(position detail 만들까?)
+    override fun openPosition(order: Order, closeReferenceData: CloseReferenceData): Position {
         val params = BinanceParameter.toBinanceOrderParameter(order, positionMode, positionSide)
         binanceClient.account().newOrder(params)
-        return getPosition(order.symbol)!!
+        val position = getPosition(order.symbol)!!
+        val updatedCloseReferenceData = CloseReferenceDataInterpreter().interpret(order.symbol, closeReferenceData)
+        position.closeReferenceData = updatedCloseReferenceData
+        return position
     }
 
 
@@ -125,6 +130,18 @@ class ExchangeImpl(
         val jsonNode = om.readTree(binanceClient.market().tickerSymbol(parameters))
 
         return jsonNode.get("price").asDouble()
+    }
+
+    inner class CloseReferenceDataInterpreter {
+        fun interpret(symbol: Symbol, closeReferenceData: CloseReferenceData): CloseReferenceData {
+            when (closeReferenceData) {
+                is CloseReferenceData.SimpleCloseReferenceData -> {
+                    return CloseReferenceData.SimpleCloseReferenceData(
+                        price = getLastPrice(symbol)
+                    )
+                }
+            }
+        }
     }
 
 }

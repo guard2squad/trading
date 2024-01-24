@@ -22,13 +22,6 @@ class PositionUseCase(
         strategyPositionMap[position.symbol] = position
     }
 
-    fun addCloseReferenceData(position: Position, closeReferenceData: CloseReferenceData): Position {
-        val positionWithCloseReferenceData = position.copy(
-            closeReferenceData = closeReferenceData
-        )
-        return positionWithCloseReferenceData
-    }
-
     fun getPosition(symbol: Symbol): Position? {
         return getAllPositions().firstOrNull { it.symbol == symbol }
     }

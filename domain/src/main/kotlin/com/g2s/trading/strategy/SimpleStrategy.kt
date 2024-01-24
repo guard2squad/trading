@@ -16,7 +16,7 @@ class SimpleStrategy(
 
     lateinit var strategySpec: StrategySpec.SimpleStrategySpec
 
-    override fun invoke(): StrategyResult? {
+    override fun invoke(): OrderDetail? {
 
         val symbol = strategySpec.symbols.find { symbol -> canOpen(symbol) }
         if (symbol == null) {
@@ -28,14 +28,7 @@ class SimpleStrategy(
             orderSide = getOrderSide(),
             orderType = getOrderType()
         )
-        val simpleCloseReferenceData = CloseReferenceData.SimpleCloseReferenceData(
-            price = indicatorUseCase.getLastPrice(symbol) // TODO(주문 후 포지션 조회할 때 갱신 필요)
-        )
-        val strategyResult = StrategyResult(
-            orderDetail = simpleOrderDetail,
-            closeReferenceData = simpleCloseReferenceData
-        )
-        return strategyResult
+        return simpleOrderDetail
     }
 
     override fun setSpec(strategySpec: StrategySpec.SimpleStrategySpec) {

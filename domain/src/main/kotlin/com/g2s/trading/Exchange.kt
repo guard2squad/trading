@@ -4,8 +4,10 @@ import com.g2s.trading.account.Account
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Order
+import com.g2s.trading.position.CloseReferenceData
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.Position
+import com.g2s.trading.strategy.StrategySpec
 
 interface Exchange {
 
@@ -14,7 +16,7 @@ interface Exchange {
 
     fun getPositions(symbol: List<Symbol>): List<Position>
     fun closePosition(position: Position)
-    fun openPosition(order: Order): Position
+    fun openPosition(order: Order, closeReferenceData: CloseReferenceData): Position
     fun setPositionMode(positionMode: PositionMode)
 
     fun getCandleStick(symbol: Symbol, interval: Interval, limit: Int): List<CandleStick>

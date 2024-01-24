@@ -2,6 +2,7 @@ package com.g2s.trading.strategy
 
 import com.g2s.trading.Symbol
 import com.g2s.trading.account.Asset
+import com.g2s.trading.position.CloseReferenceData
 
 sealed class StrategySpec {
 
@@ -10,7 +11,8 @@ sealed class StrategySpec {
         val strategyKey : String, // simple
         val asset : Asset,
         val hammerRatio: Double,
-        val allocatedRatio: Double
+        val allocatedRatio: Double,
+        val simpleCloseReferenceData: CloseReferenceData.SimpleCloseReferenceData
     ) : StrategySpec()
 
 }
