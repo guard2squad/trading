@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service
 class OrderUseCase(
     private val exchangeImpl: Exchange
 ) {
-
-    fun createOrder(orderDetail: OrderDetail) : Position {
-        // order -> position
+    fun openOrder(order : Order) : Position {
+        val position = exchangeImpl.openPosition(order)
+        return position
     }
 }

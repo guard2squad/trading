@@ -22,11 +22,11 @@ class PositionUseCase(
         strategyPositionMap[position.symbol] = position
     }
 
-    fun createPosition(LiquidationData: LiquidationData): Position {
-        return Position(
-            symbol = Symbol.BTCUSDT,
-            liquidationData = LiquidationData
+    fun addCloseReferenceData(position: Position, closeReferenceData: CloseReferenceData): Position {
+        val positionWithCloseReferenceData = position.copy(
+            closeReferenceData = closeReferenceData
         )
+        return positionWithCloseReferenceData
     }
 
     fun getPosition(symbol: Symbol): Position? {
@@ -40,15 +40,6 @@ class PositionUseCase(
     fun getAllPositions(): List<Position> {
         val account = accountUseCase.getAccount()
         return account.positions
-    }
-
-    // TODO(주문 넣을 때 close 주문 넣도록 바꿀 예정이라 지워도 됨)
-    fun closePosition(position: Position) {
-        exchangeImpl.closePosition(position)
-    }
-
-    fun closePositions(positions: List<Position>) {
-        positions.forEach { closePosition(it) }
     }
 
 }

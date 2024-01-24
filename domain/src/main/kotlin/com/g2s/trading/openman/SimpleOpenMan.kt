@@ -3,11 +3,14 @@ package com.g2s.trading.openman
 import com.g2s.trading.Symbol
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
-import com.g2s.trading.order.OrderUseCase
+import com.g2s.trading.order.*
+import com.g2s.trading.position.CloseReferenceData
+import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.SimpleStrategy
 import com.g2s.trading.strategy.StrategySpec
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 @Component
 class SimpleOpenMan(
@@ -17,11 +20,13 @@ class SimpleOpenMan(
     private val orderUseCase: OrderUseCase
 ) : OpenMan {
 
+    lateinit var position: Position
+
     val simpleStrategySpec = StrategySpec.SimpleStrategySpec(
         symbols = listOf<Symbol>(Symbol.BTCUSDT),
         strategyKey = "simple",
         asset = Asset.USDT,
-        hammerRatio = 0.5,
+        hammerRatio = 2.0,
         allocatedRatio = 0.25
     )
 
@@ -30,22 +35,33 @@ class SimpleOpenMan(
         if (unUsedSymbol.isEmpty()) {
             return
         }
-        simpleStrategy.setSpec(simpleStrategySpec.copy(symbols = unUsedSymbol))
-
         val allocatedBalance = accountUseCase.getAllocatedBalancePerStrategy(
             simpleStrategySpec.asset,
-            simpleStrategySpec.hammerRatio
+            simpleStrategySpec.allocatedRatio
         )
         val availableBalance = accountUseCase.getAvailableBalance(simpleStrategySpec.asset)
         if (allocatedBalance < availableBalance) {
             return
         }
-
+        simpleStrategy.setSpec(simpleStrategySpec)
         val strategyResult = simpleStrategy.invoke() ?: return
-        val order = orderUseCase.createOrder(strategyResult.orderDetail)
-        // TODO(sendOrder 구현)
-        orderUseCase.sendOrder(order)
-        val position = positionUseCase.createPosition(strategyResult.liquidationData)
-        positionUseCase.registerPosition(position)
+        when (strategyResult.orderDetail) {
+            is OrderDetail.SimpleOrderDetail -> {
+                val order = Order(
+                    symbol = strategyResult.orderDetail.symbol,
+                    orderSide = strategyResult.orderDetail.orderSide,
+                    orderType = strategyResult.orderDetail.orderType,
+                    quantity = allocatedBalance.toString(),
+                    timestamp = LocalDateTime.now().toString()
+                )
+                position = orderUseCase.openOrder(order)
+            }
+        }
+        when (strategyResult.closeReferenceData) {
+            is CloseReferenceData.SimpleCloseReferenceData -> {
+                position = positionUseCase.addCloseReferenceData(position, strategyResult.closeReferenceData)
+                positionUseCase.registerPosition(position)
+            }
+        }
     }
 }
