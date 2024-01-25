@@ -2,14 +2,12 @@ package com.g2s.trading.position
 
 import com.g2s.trading.Exchange
 import com.g2s.trading.Symbol
-import com.g2s.trading.account.AccountUseCase
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class PositionUseCase(
     private val exchangeImpl: Exchange,
-    private val accountUseCase: AccountUseCase
 ) {
 
     val strategyPositionMap: MutableMap<Symbol, Position> = ConcurrentHashMap()
@@ -31,8 +29,8 @@ class PositionUseCase(
     }
 
     fun getAllPositions(): List<Position> {
-        val account = accountUseCase.getAccount()
-        return account.positions
+        val positions = exchangeImpl.getAllPositions()
+        return positions
     }
 
 }

@@ -7,7 +7,6 @@ import com.g2s.trading.order.Order
 import com.g2s.trading.position.CloseReferenceData
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.Position
-import com.g2s.trading.strategy.StrategySpec
 
 interface Exchange {
 
@@ -15,6 +14,8 @@ interface Exchange {
     fun getPosition(symbol: Symbol): Position?
 
     fun getPositions(symbol: List<Symbol>): List<Position>
+
+    fun getAllPositions(): List<Position>
     fun closePosition(position: Position)
     fun openPosition(order: Order, closeReferenceData: CloseReferenceData): Position
     fun setPositionMode(positionMode: PositionMode)

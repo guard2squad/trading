@@ -9,6 +9,8 @@ import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.SimpleStrategy
 import com.g2s.trading.strategy.SimpleStrategySpecRepository
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @Component
@@ -20,7 +22,7 @@ class SimpleOpenMan(
     private val simpleStrategySpecRepository: SimpleStrategySpecRepository
 ) : OpenMan {
 
-    lateinit var position: Position
+    lateinit var positionWithCloseReferenceData: Position
 
     override fun open() {
         val simpleStrategySpecs = simpleStrategySpecRepository.findAll()
@@ -34,7 +36,7 @@ class SimpleOpenMan(
                 simpleStrategySpec.allocatedRatio
             )
             val availableBalance = accountUseCase.getAvailableBalance(simpleStrategySpec.asset)
-            if (allocatedBalance < availableBalance) {
+            if (allocatedBalance > availableBalance) {
                 return
             }
             simpleStrategy.setSpec(simpleStrategySpec)
@@ -45,13 +47,15 @@ class SimpleOpenMan(
                         symbol = orderDetail.symbol,
                         orderSide = orderDetail.orderSide,
                         orderType = orderDetail.orderType,
-                        quantity = allocatedBalance.toString(),
+                        quantity = allocatedBalance.divide(BigDecimal(orderDetail.currentPrice), RoundingMode.HALF_UP)
+                            .setScale(orderDetail.symbol.precision, RoundingMode.HALF_UP).toString(),
                         timestamp = LocalDateTime.now().toString()
                     )
-                    position = orderUseCase.openOrder(order, simpleStrategySpec.simpleCloseReferenceData)
+                    positionWithCloseReferenceData =
+                        orderUseCase.openOrder(order, simpleStrategySpec.simpleCloseReferenceData)
                 }
             }
-            positionUseCase.registerPosition(position)
+            positionUseCase.registerPosition(positionWithCloseReferenceData)
         }
     }
 }

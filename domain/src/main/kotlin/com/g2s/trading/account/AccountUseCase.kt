@@ -8,26 +8,27 @@ import java.math.BigDecimal
 class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
-    lateinit var account: Account
+    lateinit var localAccount: Account
 
     fun syncAccount() {
-        val account = exchangeImpl.getAccount()
-        this.account = account
+        this.localAccount = exchangeImpl.getAccount()
     }
 
     @Synchronized
     fun getAccount(): Account {
         syncAccount()
-        return account
+        return this.localAccount
     }
 
-    fun getAllocatedBalancePerStrategy(asset: Asset, availableRatio : Double): BigDecimal {
-        val assetWallet = account.assetWallets.first { it.asset == asset }
+    fun getAllocatedBalancePerStrategy(asset: Asset, availableRatio: Double): BigDecimal {
+        syncAccount()
+        val assetWallet = this.localAccount.assetWallets.first { it.asset == asset }
         return BigDecimal(assetWallet.walletBalance).multiply(BigDecimal(availableRatio))
     }
 
     fun getAvailableBalance(asset: Asset): BigDecimal {
-        val assetWallet = account.assetWallets.first { it.asset == asset }
+        syncAccount()
+        val assetWallet = localAccount.assetWallets.first { it.asset == asset }
         return BigDecimal(assetWallet.availableBalance)
     }
 }

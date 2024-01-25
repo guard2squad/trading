@@ -6,7 +6,6 @@ import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.OrderDetail
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.position.CloseReferenceData
 import org.springframework.stereotype.Component
 
 @Component
@@ -26,7 +25,8 @@ class SimpleStrategy(
         val simpleOrderDetail = OrderDetail.SimpleOrderDetail(
             symbol = symbol,
             orderSide = getOrderSide(),
-            orderType = getOrderType()
+            orderType = getOrderType(),
+            currentPrice = indicatorUseCase.getLastPrice(symbol)
         )
         return simpleOrderDetail
     }

@@ -13,7 +13,7 @@ class SimpleStrategySpecRepository : StrategySpecRepository<StrategySpec.SimpleS
             symbols = listOf<Symbol>(Symbol.BTCUSDT),
             strategyKey = "simple",
             asset = Asset.USDT,
-            hammerRatio = 2.0,
+            hammerRatio = 0.1,
             allocatedRatio = 0.25,
             simpleCloseReferenceData = CloseReferenceData.SimpleCloseReferenceData(
                 price = 0.0

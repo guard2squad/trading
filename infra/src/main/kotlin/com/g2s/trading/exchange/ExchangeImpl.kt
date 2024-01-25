@@ -8,14 +8,12 @@ import com.g2s.trading.Exchange
 import com.g2s.trading.ObjectMapperProvider
 import com.g2s.trading.Symbol
 import com.g2s.trading.account.Account
+import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Order
-import com.g2s.trading.position.CloseReferenceData
-import com.g2s.trading.position.Position
-import com.g2s.trading.position.PositionMode
-import com.g2s.trading.position.PositionSide
+import com.g2s.trading.position.*
 import com.g2s.trading.util.BinanceParameter
 import org.springframework.stereotype.Component
 
@@ -26,8 +24,8 @@ class ExchangeImpl(
 ) : Exchange {
     private val om = ObjectMapperProvider.get()
 
-    private lateinit var positionMode: PositionMode
-    private lateinit var positionSide: PositionSide
+    private var positionMode = PositionMode.ONE_WAY_MODE
+    private var positionSide = PositionSide.BOTH
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -43,16 +41,16 @@ class ExchangeImpl(
         val bodyString = binanceClient.account().accountInformation(parameters)
         val bodyJson = om.readTree(bodyString)
 
-        val assetWallets = (bodyJson.get("asset") as ArrayNode).map {
-            om.convertValue(it, AssetWallet::class.java)
-        }
-        val positions = (bodyJson.get("position") as ArrayNode).map {
-            om.convertValue(it, Position::class.java)
-        }
+
+        val assetWallets = (bodyJson.get("assets") as ArrayNode)
+            .filter { jsonNode ->
+                Asset.entries.map { it.name }.contains(jsonNode.get("asset").textValue())
+            }.map {
+                om.convertValue(it, AssetWallet::class.java)
+            }
 
         return Account(
             assetWallets = assetWallets,
-            positions = positions,
         )
     }
 
@@ -69,7 +67,37 @@ class ExchangeImpl(
     }
 
     override fun getPositions(symbol: List<Symbol>): List<Position> {
-        TODO("Not yet implemented")
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val positions = (bodyJson.get("positions") as ArrayNode)
+            .filter { jsonNode ->
+                symbol.map { it.name }.contains(jsonNode.get("symbol").textValue())
+            }
+            .map {
+                om.convertValue(it, Position::class.java)
+            }
+        return positions
+    }
+
+    override fun getAllPositions(): List<Position> {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val positions = (bodyJson.get("positions") as ArrayNode)
+            .filter { jsonNode ->
+                Symbol.entries.map { it.name }.contains(jsonNode.get("symbol").textValue())
+            }
+            .map {
+                om.convertValue(it, Position::class.java)
+            }
+        return positions
     }
 
     override fun closePosition(
@@ -79,13 +107,11 @@ class ExchangeImpl(
         binanceClient.account().newOrder(params)
     }
 
-    // TODO(position detail 만들까?)
     override fun openPosition(order: Order, closeReferenceData: CloseReferenceData): Position {
         val params = BinanceParameter.toBinanceOrderParameter(order, positionMode, positionSide)
         binanceClient.account().newOrder(params)
         val position = getPosition(order.symbol)!!
-        val updatedCloseReferenceData = CloseReferenceDataInterpreter().interpret(order.symbol, closeReferenceData)
-        position.closeReferenceData = updatedCloseReferenceData
+        position.closeReferenceData = CloseReferenceDataInterpreter().interpret(order.symbol, closeReferenceData)
         return position
     }
 
@@ -101,7 +127,7 @@ class ExchangeImpl(
         limit: Int
     ): List<CandleStick> {
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol
+        parameters["symbol"] = symbol.name
         parameters["interval"] = interval.value
         parameters["limit"] = limit
         val jsonString = binanceClient.market().klines(parameters)
