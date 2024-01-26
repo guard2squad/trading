@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.Exchange
 import com.g2s.trading.ObjectMapperProvider
-import com.g2s.trading.Symbol
+import com.g2s.trading.order.Symbol
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
@@ -100,18 +100,15 @@ class ExchangeImpl(
         return positions
     }
 
-    override fun closePosition(
-        position: Position
-    ) {
+    override fun closePosition(position: Position) {
         val params = linkedMapOf<String, Any>()
         binanceClient.account().newOrder(params)
     }
 
-    override fun openPosition(order: Order, closeReferenceData: CloseReferenceData): Position {
+    override fun openPosition(order: Order): Position {
         val params = BinanceParameter.toBinanceOrderParameter(order, positionMode, positionSide)
         binanceClient.account().newOrder(params)
         val position = getPosition(order.symbol)!!
-        position.closeReferenceData = CloseReferenceDataInterpreter().interpret(order.symbol, closeReferenceData)
         return position
     }
 
@@ -157,17 +154,4 @@ class ExchangeImpl(
 
         return jsonNode.get("price").asDouble()
     }
-
-    inner class CloseReferenceDataInterpreter {
-        fun interpret(symbol: Symbol, closeReferenceData: CloseReferenceData): CloseReferenceData {
-            when (closeReferenceData) {
-                is CloseReferenceData.SimpleCloseReferenceData -> {
-                    return CloseReferenceData.SimpleCloseReferenceData(
-                        price = getLastPrice(symbol)
-                    )
-                }
-            }
-        }
-    }
-
 }

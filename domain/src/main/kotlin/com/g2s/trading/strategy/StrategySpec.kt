@@ -1,18 +1,13 @@
 package com.g2s.trading.strategy
 
-import com.g2s.trading.Symbol
+import com.fasterxml.jackson.databind.JsonNode
+import com.g2s.trading.order.Symbol
 import com.g2s.trading.account.Asset
-import com.g2s.trading.position.CloseReferenceData
 
-sealed class StrategySpec {
-
-    data class SimpleStrategySpec(
-        val symbols : List<Symbol>,
-        val strategyKey : String, // simple
-        val asset : Asset,
-        val hammerRatio: Double,
-        val allocatedRatio: Double,
-        val simpleCloseReferenceData: CloseReferenceData.SimpleCloseReferenceData
-    ) : StrategySpec()
-
-}
+data class StrategySpec (
+    val symbols: List<Symbol>,
+    val strategyKey: String,
+    val asset: Asset,
+    val allocatedRatio: Double,
+    val op: JsonNode
+)

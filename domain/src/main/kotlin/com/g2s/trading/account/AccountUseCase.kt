@@ -14,20 +14,12 @@ class AccountUseCase(
         this.localAccount = exchangeImpl.getAccount()
     }
 
-    @Synchronized
-    fun getAccount(): Account {
-        syncAccount()
-        return this.localAccount
-    }
-
     fun getAllocatedBalancePerStrategy(asset: Asset, availableRatio: Double): BigDecimal {
-        syncAccount()
         val assetWallet = this.localAccount.assetWallets.first { it.asset == asset }
         return BigDecimal(assetWallet.walletBalance).multiply(BigDecimal(availableRatio))
     }
 
     fun getAvailableBalance(asset: Asset): BigDecimal {
-        syncAccount()
         val assetWallet = localAccount.assetWallets.first { it.asset == asset }
         return BigDecimal(assetWallet.availableBalance)
     }

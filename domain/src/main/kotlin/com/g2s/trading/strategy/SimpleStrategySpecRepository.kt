@@ -1,6 +1,6 @@
 package com.g2s.trading.strategy
 
-import com.g2s.trading.Symbol
+import com.g2s.trading.order.Symbol
 import com.g2s.trading.account.Asset
 import com.g2s.trading.position.CloseReferenceData
 import org.springframework.stereotype.Repository
