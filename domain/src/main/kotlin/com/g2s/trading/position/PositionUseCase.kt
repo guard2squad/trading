@@ -13,23 +13,30 @@ class PositionUseCase(
     val strategyPositionMap: MutableMap<String, Position> = ConcurrentHashMap()
 
     fun openPosition(order: Order): Position {
-
+        return exchangeImpl.openPosition(order)
     }
 
     fun closePosition(position: Position) {
-
+        exchangeImpl.closePosition(position)
     }
 
-
     fun hasPosition(strategyKey: String): Boolean {
-        return strategyPositionMap.containsKey(strategyKey)
+        return strategyPositionMap[strategyKey] != null
     }
 
     fun getAllUsedSymbols(): Set<Symbol> {
         return strategyPositionMap.values.map { it.symbol }.toSet()
     }
 
-    fun registerPosition(strategyKey: String ,position: Position) {
+    fun addPosition(strategyKey: String, position: Position) {
         strategyPositionMap[strategyKey] = position
+    }
+
+    fun removePosition(strategyKey: String) {
+        strategyPositionMap.remove(strategyKey)
+    }
+
+    fun getPosition(strategyKey: String): Position? {
+        return strategyPositionMap[strategyKey]
     }
 }

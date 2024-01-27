@@ -61,7 +61,7 @@ class ExchangeImpl(
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
 
-        val position = om.readValue<List<Position>>(jsonString)[0]
+        val position =  om.readValue<List<Position>>(jsonString).first()
 
         return if (position.positionAmt != 0.0) position else null
     }
@@ -101,12 +101,12 @@ class ExchangeImpl(
     }
 
     override fun closePosition(position: Position) {
-        val params = linkedMapOf<String, Any>()
+        val params = BinanceParameter.toBinanceClosePositionParam(position, positionMode, positionSide)
         binanceClient.account().newOrder(params)
     }
 
     override fun openPosition(order: Order): Position {
-        val params = BinanceParameter.toBinanceOrderParameter(order, positionMode, positionSide)
+        val params = BinanceParameter.toBinanceOpenPositionParam(order, positionMode, positionSide)
         binanceClient.account().newOrder(params)
         val position = getPosition(order.symbol)!!
         return position

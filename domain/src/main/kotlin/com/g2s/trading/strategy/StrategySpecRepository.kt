@@ -1,5 +1,8 @@
 package com.g2s.trading.strategy
 
-interface StrategySpecRepository<T : StrategySpec> {
-    fun findAll(): List<T>
+import org.springframework.stereotype.Repository
+
+@Repository
+interface StrategySpecRepository {
+    fun findStrategySpecByKey(strategyKey: String): StrategySpec
 }
