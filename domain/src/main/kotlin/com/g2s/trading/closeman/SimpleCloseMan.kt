@@ -7,7 +7,6 @@ import com.g2s.trading.strategy.StrategySpec
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
-import java.math.RoundingMode
 
 @Component
 class SimpleCloseMan(
@@ -33,7 +32,7 @@ class SimpleCloseMan(
             OrderSide.LONG -> {
                 // 손절
                 if (BigDecimal(position.referenceData["low"].asDouble()) > lastPrice) {
-                    logger.debug(
+                    logger.info(
                         "롱 손절: lastPrice: $lastPrice, 오픈시 꼬리 최저값: ${position.referenceData["low"].asDouble()}"
                     )
                     shouldClose = true
@@ -41,7 +40,7 @@ class SimpleCloseMan(
                 }
                 // 익절
                 if (lastPrice > entryPrice.plus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
-                    logger.debug(
+                    logger.info(
                         "롱 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true
@@ -52,7 +51,7 @@ class SimpleCloseMan(
             OrderSide.SHORT -> {
                 // 손절
                 if (BigDecimal(position.referenceData["high"].asDouble()) < lastPrice){
-                    logger.debug(
+                    logger.info(
                         "숏 손절: lastPrice: $lastPrice, 오픈시 꼬리 최대값: ${position.referenceData["high"].asDouble()}"
                     )
                     shouldClose = true
@@ -60,7 +59,7 @@ class SimpleCloseMan(
                 }
                 // 익절
                 if (lastPrice < entryPrice.minus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
-                    logger.debug(
+                    logger.info(
                         "숏 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true
@@ -70,8 +69,8 @@ class SimpleCloseMan(
         }
 
         if (shouldClose) {
-            logger.debug("포지션 청산: $position")
-            logger.debug("익절: $cntProfit, 손절: $cntLoss")
+            logger.info("포지션 청산: $position")
+            logger.info("익절: $cntProfit, 손절: $cntLoss")
             positionUseCase.closePosition(position)
             positionUseCase.removePosition(strategySpec.strategyKey)
         }

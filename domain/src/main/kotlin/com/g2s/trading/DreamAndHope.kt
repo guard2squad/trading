@@ -29,8 +29,14 @@ class DreamAndHope(
         )
 
         scheduler.schedule(
-            {closeMan.close(spec)},
+            { closeMan.close(spec) },
             CronTrigger("0/1 * * * * ?")
         )
+    }
+
+    fun dbTest() : String {
+        // read
+        val res = mongoStrategySpecRepository.findStrategySpecByKey("simple")
+        return "key : " + res.strategyKey + " " + "type : " + res.strategyType
     }
 }
