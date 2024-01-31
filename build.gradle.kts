@@ -75,6 +75,8 @@ project(":infra") {
         "implementation"("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.15.3")
         "implementation"("io.github.binance:binance-connector-java:3.2.0")
         "implementation"("io.github.binance:binance-futures-connector-java:3.0.3")
+        "implementation"("org.springframework.data:spring-data-mongodb:4.1.8")
+        "implementation"("org.mongodb:mongodb-driver-kotlin-sync:4.11.0")
     }
 }
 
