@@ -37,7 +37,7 @@ class SimpleOpenMan(
     override fun open(strategySpec: StrategySpec) {
         // 이미 포지션 있는지 확인
         if (positionUseCase.hasPosition(strategySpec.strategyKey)) return
-        logger.info("no position")
+        logger.debug("no position")
 
         // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
         val unUsedSymbols = strategySpec.symbols - positionUseCase.getAllUsedSymbols()
@@ -48,9 +48,9 @@ class SimpleOpenMan(
         val allocatedBalance =
             accountUseCase.getAllocatedBalancePerStrategy(strategySpec.asset, strategySpec.allocatedRatio)
         val availableBalance = accountUseCase.getAvailableBalance(strategySpec.asset)
-        logger.info("allocated: $allocatedBalance, available: $availableBalance")
+        logger.debug("allocated: $allocatedBalance, available: $availableBalance")
         if (allocatedBalance > availableBalance) {
-            logger.info("not enough money")
+            logger.debug("not enough money")
             return
         }
 
@@ -61,7 +61,7 @@ class SimpleOpenMan(
             .filterIsInstance<MatchingReport>()
             .take(1)
             .firstOrNull() ?: return
-        logger.info("analyzeReport: $analyzeReport")
+        logger.debug("analyzeReport: $analyzeReport")
 
         val lastPrice = indicatorUseCase.getLastPrice(analyzeReport.symbol)
         val order = orderUseCase.createOrder(
@@ -72,7 +72,7 @@ class SimpleOpenMan(
             analyzeReport.orderSide,
             OrderType.MARKET
         )
-        logger.info("order: $order, lastPrice: $lastPrice")
+        logger.debug("order: $order, lastPrice: $lastPrice")
 
         val position = orderUseCase.openOrder(order)
             .apply {
@@ -80,7 +80,7 @@ class SimpleOpenMan(
                 orderType = order.orderType
                 referenceData = analyzeReport.referenceData
             }
-        logger.info("position: $position")
+        logger.debug("position: $position")
         positionUseCase.addPosition(strategySpec.strategyKey, position)
     }
 
@@ -104,7 +104,7 @@ class SimpleOpenMan(
             if(topTailLength > bottomTailLength ) {
                 val candleHammerRatio = if(bottomTailLength != BigDecimal.ZERO) topTailLength / bottomTailLength else MAXIMUM_HAMMER_RATIO
                 if(candleHammerRatio > decimalHammerRatio) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(topTailLength.toDouble()))
                     return MatchingReport(symbol, OrderSide.SHORT, referenceData)
@@ -112,7 +112,7 @@ class SimpleOpenMan(
             } else {
                 val candleHammerRatio = if(topTailLength != BigDecimal.ZERO) bottomTailLength / topTailLength else MAXIMUM_HAMMER_RATIO
                 if(candleHammerRatio > decimalHammerRatio) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(bottomTailLength.toDouble()))
                     return MatchingReport(symbol, OrderSide.LONG, referenceData)
@@ -123,7 +123,7 @@ class SimpleOpenMan(
             val tailLength = tailTop - bodyTop
             val candleHammerRatio = tailLength / bodyLength
             if (candleHammerRatio > decimalHammerRatio) {
-                logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                 (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
                 return MatchingReport(symbol, OrderSide.SHORT, referenceData)
@@ -133,7 +133,7 @@ class SimpleOpenMan(
             val tailLength = bodyBottom - tailBottom
             val candleHammerRatio = tailLength / bodyLength
             if (candleHammerRatio > decimalHammerRatio) {
-                logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                 (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
                 return MatchingReport(symbol, OrderSide.LONG, referenceData)
@@ -147,7 +147,7 @@ class SimpleOpenMan(
                 println("middle high tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
                 val candleHammerRatio = highTailLength / bodyLength
                 if (candleHammerRatio > decimalHammerRatio) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(highTailLength.toDouble()))
                     return MatchingReport(symbol, OrderSide.SHORT, referenceData)
@@ -156,7 +156,7 @@ class SimpleOpenMan(
                 println("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
                 val candleHammerRatio = highTailLength / bodyLength
                 if (candleHammerRatio > decimalHammerRatio) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(lastCandleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(lowTailLength.toDouble()))
                     return MatchingReport(symbol, OrderSide.LONG, referenceData)

@@ -32,7 +32,7 @@ class SimpleCloseMan(
             OrderSide.LONG -> {
                 // 손절
                 if (BigDecimal(position.referenceData["low"].asDouble()) > lastPrice) {
-                    logger.info(
+                    logger.debug(
                         "롱 손절: lastPrice: $lastPrice, 오픈시 꼬리 최저값: ${position.referenceData["low"].asDouble()}"
                     )
                     shouldClose = true
@@ -40,7 +40,7 @@ class SimpleCloseMan(
                 }
                 // 익절
                 if (lastPrice > entryPrice.plus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
-                    logger.info(
+                    logger.debug(
                         "롱 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true
@@ -51,7 +51,7 @@ class SimpleCloseMan(
             OrderSide.SHORT -> {
                 // 손절
                 if (BigDecimal(position.referenceData["high"].asDouble()) < lastPrice){
-                    logger.info(
+                    logger.debug(
                         "숏 손절: lastPrice: $lastPrice, 오픈시 꼬리 최대값: ${position.referenceData["high"].asDouble()}"
                     )
                     shouldClose = true
@@ -59,7 +59,7 @@ class SimpleCloseMan(
                 }
                 // 익절
                 if (lastPrice < entryPrice.minus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
-                    logger.info(
+                    logger.debug(
                         "숏 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true

@@ -16,7 +16,6 @@ class MongoConfig(
     }
 
     @Bean
-    @Throws(Exception::class)
     fun mongoTemplate(): MongoTemplate {
         return MongoTemplate(mongoClient(), "dev")
     }

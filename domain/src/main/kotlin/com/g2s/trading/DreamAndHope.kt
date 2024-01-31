@@ -1,7 +1,10 @@
 package com.g2s.trading
 
+import com.g2s.trading.account.Asset
 import com.g2s.trading.closeman.CloseMan
 import com.g2s.trading.openman.OpenMan
+import com.g2s.trading.order.Symbol
+import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.scheduling.support.CronTrigger
@@ -34,7 +37,7 @@ class DreamAndHope(
         )
     }
 
-    fun dbTest() : String {
+    fun dbTest(): String {
         // read
         val res = mongoStrategySpecRepository.findStrategySpecByKey("simple")
         return "key : " + res.strategyKey + " " + "type : " + res.strategyType
