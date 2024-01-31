@@ -1,10 +1,7 @@
 package com.g2s.trading
 
-import com.g2s.trading.account.Asset
 import com.g2s.trading.closeman.CloseMan
 import com.g2s.trading.openman.OpenMan
-import com.g2s.trading.order.Symbol
-import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.scheduling.support.CronTrigger
@@ -37,26 +34,9 @@ class DreamAndHope(
         )
     }
 
-    fun dbTest() {
-        // insert
-        val simpleStrategySpec = StrategySpec(
-            symbols = listOf(Symbol.BTCUSDT),
-            strategyKey = "simple",
-            strategyType = "simple",
-            asset = Asset.USDT,
-            allocatedRatio = 0.25,
-            op = ObjectMapperProvider.get().readTree(
-                """
-                {
-                    "hammerRatio": 1.5,
-                    "profitRatio": 0.05
-                }
-                """.trimIndent()
-            ),
-            trigger = "0/1 * * * * ?"
-        )
-        mongoStrategySpecRepository.saveStrategySpec(simpleStrategySpec)
+    fun dbTest() : String {
         // read
-        mongoStrategySpecRepository.findStrategySpecByKey(simpleStrategySpec.strategyKey)
+        val res = mongoStrategySpecRepository.findStrategySpecByKey("simple")
+        return "key : " + res.strategyKey + " " + "type : " + res.strategyType
     }
 }

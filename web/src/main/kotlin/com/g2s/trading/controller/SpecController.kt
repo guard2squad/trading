@@ -10,7 +10,7 @@ class SpecController(
 ) {
 
     @GetMapping("/spec")
-    fun dbTest() {
-        dreamAndHope.dbTest()
+    fun dbTest() : String{
+        return dreamAndHope.dbTest()
     }
 }

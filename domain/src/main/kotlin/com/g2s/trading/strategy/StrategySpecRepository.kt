@@ -4,8 +4,6 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface StrategySpecRepository {
-    fun saveStrategySpec(strategySpec: StrategySpec)
     fun findStrategySpecByKey(strategyKey: String): StrategySpec
-    fun updateStrategySpec(strategySpec: StrategySpec)
-    fun deleteStrategySpec(strategyKey: String)
+    fun findAllStrategySpec(strategyKey: String): List<StrategySpec>
 }
