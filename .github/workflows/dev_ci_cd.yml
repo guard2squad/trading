@@ -11,6 +11,9 @@ jobs:
   build:
     # define the type of machine(runner) to run the job on.
     runs-on: ubuntu-latest
+    # set env variable
+    env:
+      DOCKER_IMAGE: ${{ secrets.DEV_DOCKER_IMAGE }}
     # A job contains a sequence of tasks called "steps". Steps can run commands,
     steps:
     # step 1 : check-out
@@ -44,9 +47,23 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push Docker image
+    - name: Build and Push Docker image
       uses: docker/build-push-action@v5
       with:
         push: true
-        tags: satanmoo/trading:latest # my_docker_hub_user_name/my_app_name:tag
+        tags: ${{ env.DOCKER_IMAGE }}
+    # step 8 : deploy
+    - name: connect to ec2 and deploy
+      env:
+        DEV_SSH_PEM_KEY: ${{ secrets.DEV_SSH_PEM_KEY }}
+      run: |
+        echo "$DEV_SSH_PEM_KEY" >> $HOME/key.pem
+        chmod 400 $HOME/key.pem
+        export DOCKER_IMAGE=${{ env.DOCKER_IMAGE }}
+        ssh -i $HOME/key.pem -o StrictHostKeyChecking=no ${secrets.DEV_SSH_USER}@${secrets.DEV_SSH_HOST} << 'EOF'
+          sudo yum install -y docker
+          sudo systemctl start docker
+          sudo docker pull $DOCKER_IMAGE
+          sudo docker run -d -p 80:8080 $DOCKER_IMAGE --network="host"
+        EOF
       
