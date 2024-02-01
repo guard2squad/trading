@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.exchange
 
 import com.g2s.trading.account.Account
 import com.g2s.trading.indicator.indicator.CandleStick

@@ -1,6 +1,6 @@
 package com.g2s.trading.indicator
 
-import com.g2s.trading.Exchange
+import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.order.Symbol
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval

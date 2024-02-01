@@ -3,7 +3,7 @@ package com.g2s.trading.openman
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.g2s.trading.ObjectMapperProvider
+import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.indicator.IndicatorUseCase
 import com.g2s.trading.indicator.indicator.Interval
