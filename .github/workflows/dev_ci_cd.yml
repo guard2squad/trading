@@ -25,16 +25,13 @@ jobs:
         java-version: '17'
     # step 3: set up application.properties
     - name: set up application.properties
-      run: echo "${{secrets.APPLICATION}}" >> web/src/main/resources/application.properties 
+      run: echo "${{secrets.APPLICATION}}" > web/src/main/resources/application.properties 
     # step 4: build with gradle
     - name: build with gradle
       run: | # pipe character in is used to define multiline string
         chmod +x ./gradlew
         ./gradlew clean build -x test
-    # step 5,6,7 : build and push the docker image
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
+    # step 5,6 : build and push the docker image
     - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
@@ -46,7 +43,7 @@ jobs:
       with:
         push: true
         tags: ${{ secrets.DEV_DOCKER_IMAGE }}
-    # step 8 : deploy
+    # step 7 : deploy
     - name: connect to ec2 and deploy
       env:
         # specify environment variable at Github Action Runner machine for the duration of step 8
