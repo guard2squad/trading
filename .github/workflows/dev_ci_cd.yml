@@ -2,9 +2,9 @@ name: dev ci/cd
 # To automatically trigger a workflow, use "on" to define which events can cause the workflow to run
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "ci_cd" ]
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "ci_cd" ]
 # A workflow run is made up of one or more "jobs", which run in parallel by default. 
 jobs:
   # "build" is job_id it is unique identifier
