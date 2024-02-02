@@ -11,9 +11,6 @@ jobs:
   build:
     # define the type of machine(runner) to run the job on.
     runs-on: ubuntu-latest
-    # set env variable
-    env:
-      DOCKER_IMAGE: ${{ secrets.DEV_DOCKER_IMAGE }}
     # A job contains a sequence of tasks called "steps". Steps can run commands,
     steps:
     # step 1 : check-out
@@ -51,19 +48,16 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         push: true
-        tags: ${{ env.DOCKER_IMAGE }}
+        tags: ${{ secrets.DEV_DOCKER_IMAGE }}
     # step 8 : deploy
     - name: connect to ec2 and deploy
       env:
+        # specify environment variable at Github Action Runner machine for the duration of step 8
         DEV_SSH_PEM_KEY: ${{ secrets.DEV_SSH_PEM_KEY }}
+        DEV_SSH_USER: ${secrets.DEV_SSH_USER}
+        DEV_SSH_HOST: ${secrets.DEV_SSH_HOST}
       run: |
         echo "$DEV_SSH_PEM_KEY" >> $HOME/key.pem
         chmod 400 $HOME/key.pem
-        export DOCKER_IMAGE=${{ env.DOCKER_IMAGE }}
-        ssh -i $HOME/key.pem -o StrictHostKeyChecking=no ${secrets.DEV_SSH_USER}@${secrets.DEV_SSH_HOST} << 'EOF'
-          sudo yum install -y docker
-          sudo systemctl start docker
-          sudo docker pull $DOCKER_IMAGE
-          sudo docker run -d -p 80:8080 $DOCKER_IMAGE --network="host"
-        EOF
+        ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $DEV_SSH_USER@$DEV_SSH_HOST
       
