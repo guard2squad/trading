@@ -25,13 +25,10 @@ jobs:
         java-version: '17'
     # step 3: set up application.properties
     - name: set up application.properties
-      run: | # pipe character in is used to define multiline string
-        sed -i 's/API_KEY_PLACEHOLDER/${{ secrets.BINANCE_API_KEY }}/g' web/src/main/resources/application.properties
-        sed -i 's/API_SECRET_PLACEHOLDER/${{ secrets.BINANCE_API_SECRET }}/g' web/src/main/resources/application.properties
-        sed -i 's/MONGO_URI_PLACEHOLDER/${{ secrets.MONGO_URI }}/g' web/src/main/resources/application.properties
+      run: echo "${{secrets.APPLICATION}}" >> web/src/main/resources/application.properties 
     # step 4: build with gradle
     - name: build with gradle
-      run: |
+      run: | # pipe character in is used to define multiline string
         chmod +x ./gradlew
         ./gradlew clean build -x test
     # step 5,6,7 : build and push the docker image
@@ -59,5 +56,13 @@ jobs:
       run: |
         echo "$DEV_SSH_PEM_KEY" >> $HOME/key.pem
         chmod 400 $HOME/key.pem
-        ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $DEV_SSH_USER@$DEV_SSH_HOST
+        ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $DEV_SSH_USER@$DEV_SSH_HOST << 'EOF'
+          set -e
+          sudo dnf install docker -y
+          sudo systemctl start docker
+          sudo docker-compose down 
+          sudo docker-compose pull
+          sudo docker-compose up -d
+          sudo docker image prune -a -f
+        EOF
       
