@@ -54,8 +54,8 @@ jobs:
       env:
         # specify environment variable at Github Action Runner machine for the duration of step 8
         DEV_SSH_PEM_KEY: ${{ secrets.DEV_SSH_PEM_KEY }}
-        DEV_SSH_USER: ${secrets.DEV_SSH_USER}
-        DEV_SSH_HOST: ${secrets.DEV_SSH_HOST}
+        DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
+        DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
       run: |
         echo "$DEV_SSH_PEM_KEY" >> $HOME/key.pem
         chmod 400 $HOME/key.pem
