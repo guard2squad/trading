@@ -1,1 +1,16 @@
-GET localhost:8080/test
+### start
+POST localhost:8080/api/start
+Content-Type: application/json
+
+{
+  "strategyKey": "simple"
+}
+
+
+### stop
+POST localhost:8080/api/stop
+Content-Type: application/json
+
+{
+  "strategyKey": "simple"
+}

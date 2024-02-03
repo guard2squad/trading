@@ -1,6 +1,6 @@
 package com.g2s.trading.account
 
-import com.g2s.trading.Exchange
+import com.g2s.trading.exchange.Exchange
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 

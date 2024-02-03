@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.common
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper

@@ -1,6 +1,6 @@
 package com.g2s.trading.position
 
-import com.g2s.trading.Exchange
+import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.order.Order
 import com.g2s.trading.order.Symbol
 import org.springframework.stereotype.Service

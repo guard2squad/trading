@@ -1,10 +1,8 @@
 package com.g2s.trading.repository
 
-import com.g2s.trading.ObjectMapperProvider
-import com.g2s.trading.account.Asset
-import com.g2s.trading.order.Symbol
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.strategy.StrategySpecServiceStatus
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
@@ -15,30 +13,23 @@ class MongoStrategySpecRepository(
     private val mongoTemplate: MongoTemplate
 ) : StrategySpecRepository {
 
-    override fun findStrategySpecByKey(strategyKey: String): StrategySpec {
+    companion object {
+        private const val SPEC_COLLECTION_NAME = "simple"
+    }
+
+    override fun findStrategySpecByKey(strategyKey: String): StrategySpec? {
         val query = Query.query(Criteria.where("strategyKey").`is`(strategyKey))
-        val result = mongoTemplate.findOne(query, StrategySpec::class.java)
-            ?: return StrategySpec(
-                symbols = listOf(Symbol.BTCUSDT),
-                strategyKey = "simple",
-                strategyType = "simple",
-                asset = Asset.USDT,
-                allocatedRatio = 0.25,
-                op = ObjectMapperProvider.get().readTree(
-                    """
-                {
-                    "hammerRatio": 1.5,
-                    "profitRatio": 0.05
-                }
-                """.trimIndent()
-                ),
-                trigger = "0/1 * * * * ?"
-            )
+        val result = mongoTemplate.findOne(query, StrategySpec::class.java, SPEC_COLLECTION_NAME)
+
         return result
     }
 
-    override fun findAllStrategySpec(strategyKey: String): List<StrategySpec> {
-        val query = Query.query(Criteria.where("strategyKey").`is`(strategyKey))
-        return mongoTemplate.find(query, StrategySpec::class.java)
+    override fun findAllServiceStrategySpec(): List<StrategySpec> {
+        val query = Query.query(
+            Criteria.where(StrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
+        )
+        return mongoTemplate.find(
+            query, StrategySpec::class.java, SPEC_COLLECTION_NAME
+        )
     }
 }
