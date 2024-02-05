@@ -11,5 +11,6 @@ sealed class AnalyzeReport {
         val referenceData : JsonNode
     ) : AnalyzeReport()
 
-    object NonmatchingReport : AnalyzeReport()
+    object NonMatchingReport : AnalyzeReport()
+    object DuplicatedIndicatorReport : AnalyzeReport()
 }

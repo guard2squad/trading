@@ -10,7 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 class PositionUseCase(
     private val exchangeImpl: Exchange
 ) {
-    val strategyPositionMap: MutableMap<String, Position> = ConcurrentHashMap()
+    private val strategyPositionMap = mutableMapOf<String, Position>()
+    private val lastPositions = mutableMapOf<CompositeKey, Position>()
 
     fun openPosition(order: Order): Position {
         return exchangeImpl.openPosition(order)
@@ -39,4 +40,17 @@ class PositionUseCase(
     fun getPosition(strategyKey: String): Position? {
         return strategyPositionMap[strategyKey]
     }
+
+    fun updateLastPosition(strategyKey: String, position: Position) {
+        lastPositions[CompositeKey(strategyKey, position.symbol)] = position
+    }
+
+    fun findLastPosition(strategyKey: String, symbol: Symbol): Position? {
+        return lastPositions[CompositeKey(strategyKey, symbol)]
+    }
+
+    internal data class CompositeKey(
+        val strategyKey: String,
+        val symbol: Symbol
+    )
 }

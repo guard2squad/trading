@@ -1,7 +1,7 @@
 package com.g2s.trading.indicator.indicator
 
 data class CandleStick(
-    val openTime: Long,
+    val key: Long, // unique
     val open: Double,
     val high: Double,
     val low: Double,

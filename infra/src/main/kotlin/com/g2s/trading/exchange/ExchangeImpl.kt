@@ -133,7 +133,7 @@ class ExchangeImpl(
 
         return candleStickDataList.map { candleStickData ->
             CandleStick(
-                openTime = candleStickData[0].toLong(),
+                key = candleStickData[0].toLong(),
                 open = candleStickData[1].toDouble(),
                 high = candleStickData[2].toDouble(),
                 low = candleStickData[3].toDouble(),
