@@ -2,7 +2,8 @@ package com.g2s.trading.exchange
 
 enum class BinanceStreamEventType(val value: String) {
     KLINE("kline"),
-    MARK_PRICE("markPriceUpdate");
+    MARK_PRICE("markPriceUpdate"),
+    ACCOUNT_UPDATE("ACCOUNT_UPDATE");
 
     companion object {
         fun fromValue(value: String): BinanceStreamEventType {

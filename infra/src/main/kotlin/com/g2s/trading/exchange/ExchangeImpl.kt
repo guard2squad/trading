@@ -67,7 +67,7 @@ class ExchangeImpl(
         return if (position.positionAmt != 0.0) position else null
     }
 
-    override fun getPositions(symbol: List<Symbol>): List<Position> {
+    override fun getPositions(symbols: List<Symbol>): List<Position> {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to System.currentTimeMillis().toString()
         )
@@ -76,7 +76,7 @@ class ExchangeImpl(
 
         val positions = (bodyJson.get("positions") as ArrayNode)
             .filter { jsonNode ->
-                symbol.map { it.name }.contains(jsonNode.get("symbol").textValue())
+                symbols.map { it.name }.contains(jsonNode.get("symbol").textValue())
             }
             .map {
                 om.convertValue(it, Position::class.java)

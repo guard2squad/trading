@@ -11,7 +11,7 @@ import com.g2s.trading.position.PositionMode
 interface Exchange {
     fun getAccount(): Account
     fun getPosition(symbol: Symbol): Position?
-    fun getPositions(symbol: List<Symbol>): List<Position>
+    fun getPositions(symbols: List<Symbol>): List<Position>
     fun getAllPositions(): List<Position>
     fun closePosition(position: Position)
     fun openPosition(order: Order): Position

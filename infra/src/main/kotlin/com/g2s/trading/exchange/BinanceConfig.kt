@@ -30,7 +30,7 @@ class BinanceConfig(
     @Bean
     fun binanceWebSocketStreamClient(): UMWebsocketClientImpl {
 
-        val webSocketStreamClient = UMWebsocketClientImpl(DefaultUrls.USDM_WS_URL)
+        val webSocketStreamClient = UMWebsocketClientImpl(DefaultUrls.TESTNET_WSS_URL)
 
         return webSocketStreamClient
     }
