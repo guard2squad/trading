@@ -55,7 +55,7 @@ class CandlestickTest {
         }
     }
 }
-fun main() {
-    val tester = CandlestickTest()
-    tester.test()
-}
+//fun main() {
+//    val tester = CandlestickTest()
+//    tester.test()
+//}
