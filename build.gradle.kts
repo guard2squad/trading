@@ -77,6 +77,7 @@ project(":infra") {
         "implementation"("io.github.binance:binance-futures-connector-java:3.0.3")
         "implementation"("org.springframework.data:spring-data-mongodb:4.1.8")
         "implementation"("org.mongodb:mongodb-driver-kotlin-sync:4.11.0")
+        "implementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     }
 }
 
