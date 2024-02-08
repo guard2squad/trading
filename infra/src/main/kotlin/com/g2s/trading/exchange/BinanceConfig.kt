@@ -2,6 +2,7 @@ package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.enums.DefaultUrls
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
+import com.binance.connector.futures.client.impl.UMWebsocketClientImpl
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,7 +16,7 @@ class BinanceConfig(
 ) {
 
     @Bean
-    fun binanceClient(): UMFuturesClientImpl  {
+    fun binanceClient(): UMFuturesClientImpl {
 
         val client = UMFuturesClientImpl(
             apiKey,
@@ -24,5 +25,13 @@ class BinanceConfig(
         )
 
         return client
+    }
+
+    @Bean
+    fun binanceWebSocketStreamClient(): UMWebsocketClientImpl {
+
+        val webSocketStreamClient = UMWebsocketClientImpl(DefaultUrls.USDM_WS_URL)
+
+        return webSocketStreamClient
     }
 }
