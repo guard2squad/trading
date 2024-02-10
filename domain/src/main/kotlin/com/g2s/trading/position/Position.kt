@@ -5,7 +5,8 @@ import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.order.Symbol
 
-data class Position(
+data class
+Position(
     val symbol: Symbol,
     val entryPrice: Double,
     val positionAmt: Double

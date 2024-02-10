@@ -1,6 +1,8 @@
 package com.g2s.trading.closeman
 
 import com.g2s.trading.indicator.IndicatorUseCase
+import com.g2s.trading.lock.LockUsage
+import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -11,7 +13,8 @@ import java.math.BigDecimal
 @Component
 class SimpleCloseMan(
     private val positionUseCase: PositionUseCase,
-    private val indicatorUseCase: IndicatorUseCase
+    private val indicatorUseCase: IndicatorUseCase,
+    private val lockUseCase: LockUseCase
 ) : CloseMan {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -23,7 +26,14 @@ class SimpleCloseMan(
     var cntLoss = 0
 
     override fun close(strategySpec: StrategySpec) {
-        val position = positionUseCase.getPosition(strategySpec.strategyKey) ?: return
+        // lock
+        val acquired = lockUseCase.acquire(strategySpec.strategyKey, LockUsage.CLOSE)
+        if (!acquired) return
+
+        val position = positionUseCase.getPosition(strategySpec.strategyKey) ?: run {
+            lockUseCase.release(strategySpec.strategyKey, LockUsage.CLOSE)
+            return
+        }
         val lastPrice = indicatorUseCase.getLastPrice(position.symbol)
         val entryPrice = BigDecimal(position.entryPrice)
 
@@ -36,7 +46,7 @@ class SimpleCloseMan(
                         "롱 손절: lastPrice: $lastPrice, 오픈시 꼬리 최저값: ${position.referenceData["low"].asDouble()}"
                     )
                     shouldClose = true
-                    cntLoss ++
+                    cntLoss++
                 }
                 // 익절
                 if (lastPrice > entryPrice.plus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
@@ -44,18 +54,18 @@ class SimpleCloseMan(
                         "롱 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true
-                    cntProfit ++
+                    cntProfit++
                 }
             }
 
             OrderSide.SHORT -> {
                 // 손절
-                if (BigDecimal(position.referenceData["high"].asDouble()) < lastPrice){
+                if (BigDecimal(position.referenceData["high"].asDouble()) < lastPrice) {
                     logger.info(
                         "숏 손절: lastPrice: $lastPrice, 오픈시 꼬리 최대값: ${position.referenceData["high"].asDouble()}"
                     )
                     shouldClose = true
-                    cntLoss ++
+                    cntLoss++
                 }
                 // 익절
                 if (lastPrice < entryPrice.minus(BigDecimal(position.referenceData["tailLength"].asDouble()))) {
@@ -63,7 +73,7 @@ class SimpleCloseMan(
                         "숏 익절: lastPrice: $lastPrice, entryPrice: $entryPrice, 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}"
                     )
                     shouldClose = true
-                    cntProfit ++
+                    cntProfit++
                 }
             }
         }
@@ -74,6 +84,15 @@ class SimpleCloseMan(
             positionUseCase.closePosition(position)
             positionUseCase.removePosition(strategySpec.strategyKey)
         }
+
+        lockUseCase.release(strategySpec.strategyKey, LockUsage.CLOSE)
+    }
+
+    // 수수료 조건 계산
+    private fun getFeeCondition(lastPrice: BigDecimal, entryPrice: BigDecimal) {
+        val roe = (lastPrice - entryPrice).divide(entryPrice).multiply(BigDecimal(100))
+        // TODO(taker vs maker check)
+
     }
 }
 
