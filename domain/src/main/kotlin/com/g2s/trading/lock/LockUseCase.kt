@@ -1,7 +1,6 @@
 package com.g2s.trading.lock
 
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 
 @Service

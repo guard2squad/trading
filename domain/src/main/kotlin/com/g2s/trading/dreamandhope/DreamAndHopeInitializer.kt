@@ -10,6 +10,6 @@ class DreamAndHopeInitializer(
     private val dreamAndHope: DreamAndHope
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments?) {
-        dreamAndHope.init()
+//        dreamAndHope.init()
     }
 }

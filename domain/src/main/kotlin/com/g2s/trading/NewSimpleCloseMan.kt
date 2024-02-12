@@ -1,30 +1,70 @@
-package com.g2s.trading.closeman
+package com.g2s.trading
 
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
+import com.g2s.trading.strategy.StrategySpecRepository
 import org.slf4j.LoggerFactory
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
-class SimpleCloseMan(
+class NewSimpleCloseMan(
+    private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
-    private val indicatorUseCase: IndicatorUseCase,
-    private val lockUseCase: LockUseCase
-) : CloseMan {
+    private val strategySpecRepository: StrategySpecRepository
+) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
-    override fun type(): String {
-        return "simple"
+    companion object {
+        private const val TYPE = "simple"
     }
 
-    var cntProfit = 0
-    var cntLoss = 0
+    private val specs: ConcurrentHashMap<String, StrategySpec> = ConcurrentHashMap<String, StrategySpec>().also { map ->
+        map.putAll(
+            strategySpecRepository.findAllServiceStrategySpecByType(TYPE)
+                .associateBy { it.strategyKey })
+    }
 
-    override fun close(strategySpec: StrategySpec) {
+    @EventListener
+    fun handleStartStrategyEvent(event: StrategyEvent.StartStrategyEvent) {
+        specs.computeIfAbsent(event.source.strategyKey) {
+            event.source
+        }
+    }
+
+    @EventListener
+    fun handleUpdateStrategyEvent(event: StrategyEvent.UpdateStrategyEvent) {
+        specs.replace(event.source.strategyKey, event.source)
+    }
+
+    @EventListener
+    fun handleStopStrategyEvent(event: StrategyEvent.StopStrategyEvent) {
+        specs.remove(event.source.strategyKey)
+    }
+
+    @EventListener
+    fun handleOpenPositionEvent(event: PositionEvent.PositionOpenEvent) {
+        // 포지션 유스케이스에서 오픈하고 이벤트 퍼블리싱
+        // position(전략 키)
+        // 여기서 포지션, 전략키 가지고
+    }
+
+    @EventListener
+    fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
+        // Markprice(symbol, 값)
+        // MarkPrice의 심볼로 포지션 조회? 만들어야함
+        // 포지션 있으면 락
+        // sholud close 체크
+        // 트루면 클로즈 포지션
+        // 릴리즈
+    }
+
+    fun close(strategySpec: StrategySpec) {
         // lock
         val acquired = lockUseCase.acquire(strategySpec.strategyKey, LockUsage.CLOSE)
         if (!acquired) return
@@ -94,4 +134,3 @@ class SimpleCloseMan(
 
     }
 }
-
