@@ -1,10 +1,11 @@
 name: dev ci/cd
 # To automatically trigger a workflow, use "on" to define which events can cause the workflow to run
 on:
-  push:
-    branches: [ "ci_cd" ]
-  pull_request:
-    branches: [ "ci_cd" ]
+  workflow_dispatch:
+    inputs:
+      env:
+        required: true
+        type: string
 # A workflow run is made up of one or more "jobs", which run in parallel by default. 
 jobs:
   # "build" is job_id it is unique identifier
@@ -23,10 +24,7 @@ jobs:
       with:
         distribution: 'temurin' # See 'Supported distributions' for available options
         java-version: '17'
-    # step 3: set up application.properties
-    - name: set up application.properties
-      run: echo "${{secrets.APPLICATION}}" > web/src/main/resources/application.properties 
-    # step 4: build with gradle
+    # step 3: build with gradle
     - name: build with gradle
       run: | # pipe character in is used to define multiline string
         chmod +x ./gradlew
@@ -54,11 +52,13 @@ jobs:
         DEV_SSH_PEM_KEY: ${{ secrets.DEV_SSH_PEM_KEY }}
         DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
         DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+        SPRING_PROFILES_ACTIVE: ${{ github.event.inputs.env }} # Pass the profile as an environment variable
       run: |
         echo "$DEV_SSH_PEM_KEY" >> $HOME/key.pem
         chmod 400 $HOME/key.pem
         ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $DEV_SSH_USER@$DEV_SSH_HOST << 'EOF'
           set -e
+          export SPRING_PROFILES_ACTIVE=$SPRING_PROFILES_ACTIVE
           sudo dnf install docker -y
           sudo systemctl start docker
           sudo docker-compose down 
