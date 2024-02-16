@@ -75,36 +75,49 @@ class NewSimpleOpenMan(
         }
     }
 
-    private fun open(spec: StrategySpec, candleStick: CandleStick) {
+    fun open(spec: StrategySpec, candleStick: CandleStick) {
         // lock 획득
         val acquired = lockUseCase.acquire(spec.strategyKey, LockUsage.OPEN)
         if (!acquired) return
 
         // 이미 포지션 있는지 확인
         if (positionUseCase.hasPosition(spec.strategyKey)) {
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
 
         // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
         val unUsedSymbols = spec.symbols - positionUseCase.getAllUsedSymbols()
         if (unUsedSymbols.isEmpty()) {
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
 
         // account lock
         val accountAcquired = accountUseCase.acquire()
-        if (!accountAcquired) return
+        if (!accountAcquired) {
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
+            return
+        }
 
         // account sync check
         val accountSynced = accountUseCase.isSynced()
-        if (!accountSynced) return
+        if (!accountSynced) {
+            accountUseCase.release()
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
+            return
+        }
 
         // 계좌 잔고 확인
         val allocatedBalance =
             accountUseCase.getAllocatedBalancePerStrategy(spec.asset, spec.allocatedRatio)
         val availableBalance = accountUseCase.getAvailableBalance(spec.asset)
 
-        if (allocatedBalance > availableBalance) return
+        if (allocatedBalance > availableBalance) {
+            accountUseCase.release()
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
+            return
+        }
 
         // update candleStick
         val strategyCandleSticks = candleSticks[spec.strategyKey]
@@ -123,7 +136,11 @@ class NewSimpleOpenMan(
             }
         }
 
-        if (!shouldAnalyze) return
+        if (!shouldAnalyze) {
+            accountUseCase.release()
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
+            return
+        }
 
         // 오픈 가능한 symbol 확인
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
@@ -132,7 +149,11 @@ class NewSimpleOpenMan(
             .map { unUsedSymbol -> analyze(oldCandleStick, markPrice, unUsedSymbol, hammerRatio) }
             .filterIsInstance<AnalyzeReport.MatchingReport>()
             .take(1)
-            .firstOrNull() ?: return
+            .firstOrNull() ?: run {
+            accountUseCase.release()
+            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
+            return
+        }
 
         // open position
         val position = Position(
@@ -146,6 +167,7 @@ class NewSimpleOpenMan(
         )
         positionUseCase.openPosition(position)
 
+        accountUseCase.release()
         lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
     }
 
@@ -243,7 +265,8 @@ class NewSimpleOpenMan(
         taker fee : 0.045%
      */
     private fun getFeeCondition(markPrice: MarkPrice, estimatedPriceChange: BigDecimal, leverage: Int): Boolean {
-        val estimatedROE = estimatedPriceChange.divide(BigDecimal(markPrice.price))
+        val estimatedROE =
+            estimatedPriceChange.divide(BigDecimal(markPrice.price), markPrice.symbol.precision, RoundingMode.DOWN)
         return estimatedROE.multiply(BigDecimal(100)) >
                 BigDecimal(TAKER_FEE_RATE).multiply(BigDecimal(leverage)).multiply(BigDecimal(FEE_COUNT))
     }

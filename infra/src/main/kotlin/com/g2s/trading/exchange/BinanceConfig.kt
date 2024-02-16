@@ -12,9 +12,9 @@ class BinanceConfig(
     private val apiKey: String,
     @Value("\${binance.apiSecret}")
     private val apiSecret: String,
-    @Value("binance.rest.url")
+    @Value("\${binance.rest.url}")
     private val restUrl: String,
-    @Value("binance.wss.url")
+    @Value("\${binance.wss.url}")
     private val webSocketUrl: String
 ) {
 

@@ -30,16 +30,23 @@ class PositionUseCase(
         positions.forEach { position ->
             strategyPositionMap[position.strategyKey] = position
         }
+        // publish event
+        eventUseCase.publishEvent(PositionEvent.PositionsLoadEvent(positions))
     }
 
     fun openPosition(position: Position) {
         strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
             // send order
             exchangeImpl.openPosition(position)
+            // get opened position
+            val opened = exchangeImpl.getPosition(position.symbol)
+            strategyPositionMap[position.strategyKey] = opened
             // set account unsynced
             accountUseCase.setUnSynced()
             // publish event
-            eventUseCase.publishEvent(PositionEvent.PositionOpenEvent(position))
+            eventUseCase.publishEvent(PositionEvent.PositionOpenEvent(opened))
+            // update DB
+            positionRepository.savePosition(opened)
             // save map
             position
         }
@@ -54,7 +61,10 @@ class PositionUseCase(
 
             if (strategyKey != null) {
                 strategyPositionMap.computeIfPresent(strategyKey) { _, old ->
-                    Position.update(old, positionRefreshData)
+                    val updated = Position.update(old, positionRefreshData)
+                    // update DB
+                    positionRepository.savePosition(updated)
+                    updated
                 }
             }
         }
@@ -64,6 +74,8 @@ class PositionUseCase(
         exchangeImpl.closePosition(position)
         accountUseCase.setUnSynced()
         strategyPositionMap.remove(position.strategyKey)
+        // DB update
+        positionRepository.deletePosition(position)
     }
 
     fun hasPosition(strategyKey: String): Boolean {

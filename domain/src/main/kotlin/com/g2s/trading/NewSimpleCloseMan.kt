@@ -29,41 +29,58 @@ class NewSimpleCloseMan(
     var cntProfit = 0
     var cntLoss = 0
 
-    private val strategyPositionMap = ConcurrentHashMap<String, Position>()
-    private val specs: ConcurrentHashMap<String, StrategySpec> = ConcurrentHashMap<String, StrategySpec>().also { map ->
-        map.putAll(
-            strategySpecRepository.findAllServiceStrategySpecByType(TYPE)
-                .associateBy { it.strategyKey })
-    }
+    private val strategyPositionMap: ConcurrentHashMap<String, Pair<StrategySpec, Position?>> =
+        strategySpecRepository.findAllServiceStrategySpecByType(TYPE)
+            .associate { it.strategyKey to Pair(it, null) }
+            .let { ConcurrentHashMap(it) }
 
     @EventListener
     fun handleStartStrategyEvent(event: StrategyEvent.StartStrategyEvent) {
-        specs.computeIfAbsent(event.source.strategyKey) {
-            event.source
-        }
+        strategyPositionMap.putIfAbsent(event.source.strategyKey, Pair(event.source, null))
     }
 
     @EventListener
     fun handleUpdateStrategyEvent(event: StrategyEvent.UpdateStrategyEvent) {
-        specs.replace(event.source.strategyKey, event.source)
+        if (strategyPositionMap[event.source.strategyKey]?.second != null) {
+            // TODO: check this case
+        }
+        strategyPositionMap.replace(event.source.strategyKey, Pair(event.source, null))
     }
 
     @EventListener
     fun handleStopStrategyEvent(event: StrategyEvent.StopStrategyEvent) {
-        specs.remove(event.source.strategyKey)
+        strategyPositionMap.remove(event.source.strategyKey)
+    }
+
+    @EventListener
+    fun handleLoadPositionsEvent(event: PositionEvent.PositionsLoadEvent) {
+        event.source.forEach { position ->
+            strategyPositionMap[position.strategyKey]?.let { pair ->
+                strategyPositionMap[position.strategyKey] = pair.copy(second = position)
+            }
+        }
     }
 
     @EventListener
     fun handleOpenPositionEvent(event: PositionEvent.PositionOpenEvent) {
-        strategyPositionMap[event.source.strategyKey] = event.source
+        val newPosition = event.source
+        strategyPositionMap[newPosition.strategyKey]?.let { pair ->
+            strategyPositionMap[newPosition.strategyKey] = pair.copy(second = newPosition)
+        }
     }
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
+        // find matching position
         val position = strategyPositionMap.asSequence()
-            .map { it.value }
+            .map { it.value.second }
+            .filterNotNull()
             .find { it.symbol == event.source.symbol } ?: return
-        // if you find position, close
+        // position must be synced
+        if (!position.synced) {
+            return
+        }
+        // if you find position, close it
         lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
         // check should close
         val entryPrice = BigDecimal(position.entryPrice)

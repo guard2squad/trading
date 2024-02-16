@@ -18,4 +18,8 @@ sealed class PositionEvent(
     data class PositionRefreshEvent(
         val source: List<PositionRefreshData>
     ) : PositionEvent(source)
+
+    data class PositionsLoadEvent(
+        val source: List<Position>
+    ) : PositionEvent(source)
 }

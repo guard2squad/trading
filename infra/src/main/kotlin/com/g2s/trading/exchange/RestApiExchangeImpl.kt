@@ -2,17 +2,17 @@ package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.MarkPrice
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.order.Order
 import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
-import com.g2s.trading.util.BinanceParameter
+import com.g2s.trading.util.BinanceOrderParameterConverter
 import org.springframework.stereotype.Component
 
 
@@ -52,17 +52,25 @@ class RestApiExchangeImpl(
     }
 
     override fun closePosition(position: Position) {
-        val params = BinanceParameter.toBinanceClosePositionParam(position, positionMode, positionSide)
-        sendOrder(params)
-    }
-
-    override fun openPosition(order: Order) {
-        val params = BinanceParameter.toBinanceOpenPositionParam(order, positionMode, positionSide)
+        val params = BinanceOrderParameterConverter.toBinanceClosePositionParam(position, positionMode, positionSide)
         sendOrder(params)
     }
 
     override fun openPosition(position: Position) {
-        TODO("Not yet implemented")
+        val params = BinanceOrderParameterConverter.toBinanceOpenPositionParam(position, positionMode, positionSide)
+        sendOrder(params)
+    }
+
+    override fun getPosition(symbol: Symbol): Position {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "symbol" to symbol.toString(),
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val jsonString = binanceClient.account().positionInformation(parameters)
+
+        val position =  om.readValue<List<Position>>(jsonString).first()
+
+        return position
     }
 
     private fun sendOrder(params: LinkedHashMap<String, Any>) {

@@ -1,6 +1,5 @@
 package com.g2s.trading.account
 
-import com.g2s.trading.PositionEvent
 import com.g2s.trading.UserEvent
 import com.g2s.trading.exchange.Exchange
 import org.springframework.context.event.EventListener
@@ -13,15 +12,19 @@ class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
     lateinit var localAccount: Account
-    private var synced = false
+    private var synced: Boolean = false
     private val lock = AtomicBoolean(false)
+
+    init {
+        localAccount = getAccount()
+        synced = true
+    }
 
     @EventListener
     fun handleRefreshAccountEvent(event: UserEvent.AccountRefreshEvent) {
         this.localAccount = event.source
         synced = true
     }
-
 
     fun getAllocatedBalancePerStrategy(asset: Asset, availableRatio: Double): BigDecimal {
         val assetWallet = this.localAccount.assetWallets.first { it.asset == asset }
@@ -48,5 +51,9 @@ class AccountUseCase(
 
     fun release(): Boolean {
         return lock.compareAndSet(true, false)
+    }
+
+    private fun getAccount(): Account {
+        return exchangeImpl.getAccount()
     }
 }

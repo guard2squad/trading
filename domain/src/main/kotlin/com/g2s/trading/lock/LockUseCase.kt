@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 class LockUseCase {
     private val locks = ConcurrentHashMap<LockKey, Unit>()
 
+    // strategyLock
     fun acquire(strategyKey: String, usage: LockUsage): Boolean {
         val key = LockKey(strategyKey, usage)
         var result = false
