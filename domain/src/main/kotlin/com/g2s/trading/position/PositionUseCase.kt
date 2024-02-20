@@ -63,7 +63,6 @@ class PositionUseCase(
                 logger.debug("before closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
                 strategyPositionMap.remove(updated.strategyKey)
                 logger.debug("after closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
-                eventUseCase.publishEvent(PositionEvent.PositionClosedEvent(updated))
             }
             // opened position
             else {
@@ -87,6 +86,8 @@ class PositionUseCase(
 
     fun closePosition(position: Position) {
         accountUseCase.setUnSynced()
+        positionRepository.deletePosition(position)
+        strategyPositionMap.remove(position.strategyKey)
         exchangeImpl.closePosition(position)
     }
 
