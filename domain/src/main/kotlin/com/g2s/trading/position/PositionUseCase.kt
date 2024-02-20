@@ -1,22 +1,93 @@
 package com.g2s.trading.position
 
-import com.g2s.trading.Exchange
-import com.g2s.trading.order.Order
+import com.g2s.trading.EventUseCase
+import com.g2s.trading.PositionEvent
+import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.order.OrderSide
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.order.Symbol
+import org.slf4j.LoggerFactory
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.jvm.optionals.getOrNull
 
 @Service
 class PositionUseCase(
-    private val exchangeImpl: Exchange
+    private val exchangeImpl: Exchange,
+    private val accountUseCase: AccountUseCase,
+    private val eventUseCase: EventUseCase,
+    private val positionRepository: PositionRepository
 ) {
-    val strategyPositionMap: MutableMap<String, Position> = ConcurrentHashMap()
+    private val logger = LoggerFactory.getLogger(this.javaClass)
+    private val strategyPositionMap = ConcurrentHashMap<String, Position>()
 
-    fun openPosition(order: Order): Position {
-        return exchangeImpl.openPosition(order)
+    init {
+        loadPositions()
+    }
+
+    private fun loadPositions() {
+        // db 조회
+        val positions = positionRepository.findAllPositions()
+        logger.debug("load positions: ${positions.size}")
+        // map 저장
+        positions.forEach { position ->
+            strategyPositionMap[position.strategyKey] = position
+        }
+    }
+
+    fun openPosition(position: Position) {
+        strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
+            // set account unsynced
+            accountUseCase.setUnSynced()
+            // update unsynced position to DB
+            positionRepository.savePosition(position)
+            // send order
+            exchangeImpl.openPosition(position)
+            // save unsynced position to map
+            position
+        }
+    }
+
+    fun refreshPosition(positionRefreshData: PositionRefreshData) {
+        strategyPositionMap.values.find { position ->
+            position.symbol == positionRefreshData.symbol
+        }?.let { old ->
+            val updated = Position.update(old, positionRefreshData)
+            // closed position
+            if (updated.positionAmt == 0.0) {
+                logger.debug("position is closed because positionAmt is ${updated.positionAmt}")
+                positionRepository.deletePosition(updated)
+                logger.debug("before closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
+                strategyPositionMap.remove(updated.strategyKey)
+                logger.debug("after closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
+            }
+            // opened position
+            else {
+                logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
+                positionRepository.updatePosition(updated)
+                strategyPositionMap.replace(updated.strategyKey, updated)
+                eventUseCase.publishEvent(PositionEvent.PositionOpenedEvent(updated))
+            }
+        }
+    }
+
+    fun syncPosition(symbol: Symbol) {
+        val old = strategyPositionMap.values.find {
+            it.symbol == symbol
+        }?.let {
+            val updated = Position.sync(it)
+            positionRepository.updatePosition(updated)
+            strategyPositionMap.replace(updated.strategyKey, updated)
+        }
     }
 
     fun closePosition(position: Position) {
+        accountUseCase.setUnSynced()
+        positionRepository.deletePosition(position)
+        strategyPositionMap.remove(position.strategyKey)
         exchangeImpl.closePosition(position)
     }
 
@@ -28,15 +99,7 @@ class PositionUseCase(
         return strategyPositionMap.values.map { it.symbol }.toSet()
     }
 
-    fun addPosition(strategyKey: String, position: Position) {
-        strategyPositionMap[strategyKey] = position
-    }
-
-    fun removePosition(strategyKey: String) {
-        strategyPositionMap.remove(strategyKey)
-    }
-
-    fun getPosition(strategyKey: String): Position? {
-        return strategyPositionMap[strategyKey]
+    fun getAllLoadedPosition(): List<Position> {
+        return strategyPositionMap.values.toList()
     }
 }

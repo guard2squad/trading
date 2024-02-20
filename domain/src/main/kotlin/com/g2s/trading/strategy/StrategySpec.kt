@@ -11,5 +11,6 @@ data class StrategySpec (
     val asset: Asset,
     val allocatedRatio: Double,
     val op: JsonNode,
-    val trigger: String
+    val trigger: String,
+    val status: StrategySpecServiceStatus
 )
