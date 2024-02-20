@@ -18,10 +18,8 @@ import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.PositionRefreshData
 import com.g2s.trading.position.PositionUseCase
-import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 
@@ -33,8 +31,6 @@ class ExchangeStream(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase
 ) {
-    private val logger = LoggerFactory.getLogger(this.javaClass)
-
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
 
@@ -61,7 +57,7 @@ class ExchangeStream(
 
     @Scheduled(fixedRate = 23, timeUnit = TimeUnit.HOURS)
     fun scheduleRefreshSocket() {
-        // close all connections (A single connection is only valid for 24 hours; expect to be disconnected at the 24 hour mark)
+        // close all connections (A single connection is only valid for 24 hours; expect to be disconnected at the 24hour mark)
         // https://binance-docs.github.io/apidocs/futures/en/#websocket-market-streams
         socketConnectionIds.forEach { closeConnection(it) }
 
@@ -82,11 +78,11 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
-            val symbol = Symbol.valueOf(jsonKlineData.get("s").asText())
-            val interval = Interval.from(jsonKlineData.get("i").asText())
+            val symbolValue = Symbol.valueOf(jsonKlineData.get("s").asText())
+            val intervalValue = Interval.from(jsonKlineData.get("i").asText())
             val candleStick = CandleStick(
-                symbol = symbol,
-                interval = interval,
+                symbol = symbolValue,
+                interval = intervalValue,
                 key = jsonKlineData.get("t").asLong(),
                 open = jsonKlineData.get("o").asDouble(),
                 high = jsonKlineData.get("h").asDouble(),
