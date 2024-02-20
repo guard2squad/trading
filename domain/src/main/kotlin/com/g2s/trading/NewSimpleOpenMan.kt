@@ -38,9 +38,7 @@ class NewSimpleOpenMan(
     companion object {
         private val TYPE = "simple"
         private val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
-        private const val LEVERAGE = 10
-        private const val TAKER_FEE_RATE = 0.045
-        private const val FEE_COUNT = 2   // Payments on opening and closing
+        private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
 
     private val specs: ConcurrentHashMap<String, StrategySpec> = ConcurrentHashMap<String, StrategySpec>().also { map ->
@@ -145,27 +143,31 @@ class NewSimpleOpenMan(
         // 오픈 가능한 symbol 확인
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
         val hammerRatio = spec.op["hammerRatio"].asDouble()
-        val analyzeReport = unUsedSymbols.asSequence()
-            .map { unUsedSymbol -> analyze(oldCandleStick, markPrice, unUsedSymbol, hammerRatio) }
-            .filterIsInstance<AnalyzeReport.MatchingReport>()
-            .take(1)
-            .firstOrNull() ?: run {
-            accountUseCase.release()
-            lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
-            return
-        }
+        val scale = spec.op["scale"].asDouble()
+        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale)
+        when (analyzeReport) {
+            is AnalyzeReport.NonMatchingReport -> {
+                logger.debug("non matching report for symbol: ${candleStick.symbol}")
+            }
 
-        // open position
-        val position = Position(
-            strategyKey = spec.strategyKey,
-            symbol = analyzeReport.symbol,
-            orderSide = analyzeReport.orderSide,
-            orderType = OrderType.MARKET,
-            entryPrice = markPrice.price,
-            positionAmt = quantity(allocatedBalance, BigDecimal(markPrice.price), analyzeReport.symbol.precision),
-            referenceData = analyzeReport.referenceData,
-        )
-        positionUseCase.openPosition(position)
+            is AnalyzeReport.MatchingReport -> {
+                // open position
+                val position = Position(
+                    strategyKey = spec.strategyKey,
+                    symbol = analyzeReport.symbol,
+                    orderSide = analyzeReport.orderSide,
+                    orderType = OrderType.MARKET,
+                    entryPrice = markPrice.price,
+                    positionAmt = quantity(
+                        allocatedBalance,
+                        BigDecimal(markPrice.price),
+                        analyzeReport.symbol.precision
+                    ),
+                    referenceData = analyzeReport.referenceData,
+                )
+                positionUseCase.openPosition(position)
+            }
+        }
 
         accountUseCase.release()
         lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
@@ -173,82 +175,97 @@ class NewSimpleOpenMan(
 
     private fun analyze(
         candleStick: CandleStick,
-        markPrice: MarkPrice,
-        symbol: Symbol,
-        hammerRatio: Double
+        hammerRatio: Double,
+        scale: Double
     ): AnalyzeReport {
+        logger.debug("analyze... candleStick: $candleStick")
         val tailTop = BigDecimal(candleStick.high)
         val tailBottom = BigDecimal(candleStick.low)
         val bodyTop = BigDecimal(max(candleStick.open, candleStick.close))
         val bodyBottom = BigDecimal(min(candleStick.open, candleStick.close))
         val bodyLength = bodyTop - bodyBottom
         val decimalHammerRatio = BigDecimal(hammerRatio)
+        val decimalScale = BigDecimal(scale)
 
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
-            // star candle
+            logger.debug("star candle")
             val topTailLength = tailTop - bodyTop
             val bottomTailLength = bodyTop - tailBottom
             if (topTailLength > bottomTailLength) {
+                logger.debug("star top tail")
                 val candleHammerRatio =
                     if (bottomTailLength.compareTo(BigDecimal.ZERO) != 0) topTailLength / bottomTailLength else MAXIMUM_HAMMER_RATIO
-                if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, topTailLength, LEVERAGE)) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammerRatio: $candleHammerRatio, topTailLength: $topTailLength, bottomTailLength: $bottomTailLength")
+                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyTop, bodyTop.minus(topTailLength.multiply(decimalScale)))) {
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(topTailLength.toDouble()))
-                    return AnalyzeReport.MatchingReport(symbol, OrderSide.SHORT, referenceData)
+                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(topTailLength.multiply(decimalScale).toDouble()))
+                    logger.debug("scaled tailLength: ${topTailLength.multiply(decimalScale)}")
+                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
                 }
             } else {
+                logger.debug("star bottom tail")
                 val candleHammerRatio =
                     if (topTailLength.compareTo(BigDecimal.ZERO) != 0) bottomTailLength / topTailLength else MAXIMUM_HAMMER_RATIO
-                if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, bottomTailLength, LEVERAGE)) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammerRatio: $candleHammerRatio, topTailLength: $topTailLength, bottomTailLength: $bottomTailLength")
+                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyTop, bodyTop.plus(bottomTailLength.multiply(decimalScale)))) {
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(bottomTailLength.toDouble()))
-                    return AnalyzeReport.MatchingReport(symbol, OrderSide.LONG, referenceData)
+                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(bottomTailLength.multiply(decimalScale).toDouble()))
+                    logger.debug("scaled tailLength: ${bottomTailLength.multiply(decimalScale)}")
+                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
                 }
             }
         } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
-            println("top tail")
+            logger.debug("top tail")
             val tailLength = tailTop - bodyTop
             val candleHammerRatio = tailLength / bodyLength
-            if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, tailLength, LEVERAGE)) {
-                logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+            logger.debug("candleHammerRatio: $candleHammerRatio, tailLength: $tailLength, bodyLength: $bodyLength")
+            if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyTop, bodyTop.minus(tailLength.multiply(decimalScale)))) {
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
-                return AnalyzeReport.MatchingReport(symbol, OrderSide.SHORT, referenceData)
+                (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.multiply(decimalScale).toDouble()))
+                logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
+                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
             }
         } else if (tailBottom < bodyBottom && tailTop == bodyTop) {
-            println("bottom tail")
+            logger.debug("bottom tail")
             val tailLength = bodyBottom - tailBottom
             val candleHammerRatio = tailLength / bodyLength
-            if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, tailLength, LEVERAGE)) {
-                logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+            logger.debug("candleHammerRatio: $candleHammerRatio, tailLength: $tailLength, bodyLength: $bodyLength")
+            if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyBottom, bodyBottom.plus(tailLength.multiply(decimalScale)))) {
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
-                return AnalyzeReport.MatchingReport(symbol, OrderSide.LONG, referenceData)
+                (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(tailLength.multiply(decimalScale).toDouble()))
+                logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
+                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
         } else {
-            println("middle tail")
+            logger.debug("middle tail")
             val highTailLength = tailTop - bodyTop
             val lowTailLength = bodyBottom - tailBottom
 
             if (highTailLength > lowTailLength) {
-                println("middle high tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
+                logger.debug("middle high tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
                 val candleHammerRatio = highTailLength / bodyLength
-                if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, highTailLength, LEVERAGE)) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammerRatio: $candleHammerRatio")
+                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyTop, bodyTop.minus(highTailLength.multiply(decimalScale)))) {
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(highTailLength.toDouble()))
-                    return AnalyzeReport.MatchingReport(symbol, OrderSide.SHORT, referenceData)
+                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(highTailLength.multiply(decimalScale).toDouble()))
+                    logger.debug("scaled tailLength: ${highTailLength.multiply(decimalScale)}")
+                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
                 }
             } else {
-                println("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
+                logger.debug("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
                 val candleHammerRatio = highTailLength / bodyLength
-                if (candleHammerRatio > decimalHammerRatio && getFeeCondition(markPrice, lowTailLength, LEVERAGE)) {
-                    logger.info("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammerRatio: $candleHammerRatio")
+                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(bodyBottom, bodyBottom.plus(lowTailLength.multiply(decimalScale)))) {
+                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(lowTailLength.toDouble()))
-                    return AnalyzeReport.MatchingReport(symbol, OrderSide.LONG, referenceData)
+                    (referenceData as ObjectNode).set<DoubleNode>("tailLength", DoubleNode(lowTailLength.multiply(decimalScale).toDouble()))
+                    logger.debug("scaled tailLength: ${lowTailLength.multiply(decimalScale)}")
+                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
                 }
             }
         }
@@ -264,10 +281,10 @@ class NewSimpleOpenMan(
         MARKET ORDER => taker
         taker fee : 0.045%
      */
-    private fun getFeeCondition(markPrice: MarkPrice, estimatedPriceChange: BigDecimal, leverage: Int): Boolean {
-        val estimatedROE =
-            estimatedPriceChange.divide(BigDecimal(markPrice.price), markPrice.symbol.precision, RoundingMode.DOWN)
-        return estimatedROE.multiply(BigDecimal(100)) >
-                BigDecimal(TAKER_FEE_RATE).multiply(BigDecimal(leverage)).multiply(BigDecimal(FEE_COUNT))
+    private fun isPositivePnl(open: BigDecimal, close: BigDecimal): Boolean {
+        val pnl = (open - close).abs()
+        val fee = (open + close).multiply(BigDecimal(TAKER_FEE_RATE))
+        logger.debug("fee :${fee}, pnl :${pnl}")
+        return pnl > fee
     }
 }

@@ -1,8 +1,6 @@
 package com.g2s.trading.account
 
-import com.g2s.trading.UserEvent
 import com.g2s.trading.exchange.Exchange
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.util.concurrent.atomic.AtomicBoolean
@@ -16,13 +14,15 @@ class AccountUseCase(
     private val lock = AtomicBoolean(false)
 
     init {
-        localAccount = getAccount()
+        localAccount = loadAccount()
         synced = true
     }
 
-    @EventListener
-    fun handleRefreshAccountEvent(event: UserEvent.AccountRefreshEvent) {
-        this.localAccount = event.source
+    fun refreshAccount(refreshedAccount: Account) {
+        this.localAccount = refreshedAccount
+    }
+
+    fun syncAccount() {
         synced = true
     }
 
@@ -33,7 +33,7 @@ class AccountUseCase(
 
     fun getAvailableBalance(asset: Asset): BigDecimal {
         val assetWallet = localAccount.assetWallets.first { it.asset == asset }
-        return BigDecimal(assetWallet.availableBalance)
+        return BigDecimal(assetWallet.walletBalance)
     }
 
 
@@ -53,7 +53,7 @@ class AccountUseCase(
         return lock.compareAndSet(true, false)
     }
 
-    private fun getAccount(): Account {
+    private fun loadAccount(): Account {
         return exchangeImpl.getAccount()
     }
 }

@@ -20,8 +20,11 @@ data class Position(
             return old.copy(
                 entryPrice = refreshData.entryPrice,
                 positionAmt = refreshData.positionAmt,
-                synced = true
             )
+        }
+
+        fun sync(old: Position): Position {
+            return old.copy(synced = true)
         }
     }
 }

@@ -7,19 +7,11 @@ import org.springframework.context.ApplicationEvent
 sealed class PositionEvent(
     source: Any
 ) : ApplicationEvent(source) {
-    data class PositionOpenEvent(
+    data class PositionOpenedEvent(
         val source: Position
     ) : PositionEvent(source)
 
-    data class PositionCloseEvent(
+    data class PositionClosedEvent(
         val source: Position
-    ) : PositionEvent(source)
-
-    data class PositionRefreshEvent(
-        val source: List<PositionRefreshData>
-    ) : PositionEvent(source)
-
-    data class PositionsLoadEvent(
-        val source: List<Position>
     ) : PositionEvent(source)
 }

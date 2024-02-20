@@ -7,10 +7,9 @@ import com.binance.connector.futures.client.utils.JSONParser
 import com.binance.connector.futures.client.utils.RequestHandler
 import com.g2s.trading.EventUseCase
 import com.g2s.trading.MarkPrice
-import com.g2s.trading.PositionEvent
 import com.g2s.trading.TradingEvent
-import com.g2s.trading.UserEvent
 import com.g2s.trading.account.Account
+import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
@@ -18,9 +17,11 @@ import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.PositionRefreshData
+import com.g2s.trading.position.PositionUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 
@@ -28,7 +29,9 @@ import java.util.concurrent.TimeUnit
 class ExchangeStream(
     private val binanceClient: UMFuturesClientImpl,
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
-    private val eventUseCase: EventUseCase
+    private val eventUseCase: EventUseCase,
+    private val positionUseCase: PositionUseCase,
+    private val accountUseCase: AccountUseCase
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -77,7 +80,6 @@ class ExchangeStream(
 
     private fun openCandleStickStream(symbol: Symbol, interval: Interval): Int {
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
-//            logger.debug("symbol: $symbol, interval: $interval")
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
             val symbol = Symbol.valueOf(jsonKlineData.get("s").asText())
@@ -106,9 +108,9 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.markPriceStream(symbol.value, speed.value) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val lastMarkPrice = eventJson.get("p").asDouble()
-            val symbol = Symbol.valueOf(eventJson.get("s").asText())
+            val receivedSymbol = Symbol.valueOf(eventJson.get("s").asText())
 
-            val markPrice = MarkPrice(symbol, lastMarkPrice)
+            val markPrice = MarkPrice(receivedSymbol, lastMarkPrice)
             eventUseCase.publishEvent(
                 TradingEvent.MarkPriceRefreshEvent(markPrice)
             )
@@ -120,33 +122,46 @@ class ExchangeStream(
     private fun openUserStream(listenKey: String): Int {
         val connectionId = binanceWebsocketClientImpl.listenUserStream(listenKey) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
-
-            val jsonBalanceAndPosition = eventJson.get("a")
-            val jsonBalances = jsonBalanceAndPosition.get("B")
-            val assetWallets = jsonBalances.filter { jsonBalance ->
-                Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
-            }.map { node ->
-                AssetWallet(
-                    asset = Asset.valueOf(node.get("a").asText()),
-                    walletBalance = node.get("b").asDouble(),
-                    availableBalance = node.get("b").asDouble()
-                )
+            val eventType = eventJson.get("e").textValue()
+            if (eventType == BinanceUserStreamEventType.ACCOUNT_UPDATE.toString()) {
+                val jsonBalanceAndPosition = eventJson.get("a")
+                val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
+                // 계좌 변동
+                val jsonBalances = jsonBalanceAndPosition.get("B")
+                val assetWallets = jsonBalances.filter { jsonBalance ->
+                    Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
+                }.map { node ->
+                    AssetWallet(
+                        asset = Asset.valueOf(node.get("a").asText()),
+                        walletBalance = node.get("wb").asDouble()
+                    )
+                }
+                val account = Account(assetWallets)
+                accountUseCase.refreshAccount(account)
+                // Event reason type == ORDER 일 때 포지션 데이터 변동
+                if (accountUpdateEventReasonType == BinanceAccountUpdateEventReasonType.ORDER.toString()) {
+                    val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
+                        PositionRefreshData(
+                            symbol = Symbol.valueOf(node.get("s").asText()),
+                            entryPrice = node.get("ep").asDouble(),
+                            positionAmt = node.get("pa").asDouble(),
+                        )
+                    }
+                    // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
+                    val positionRefreshData = positionRefreshDataList[0]
+                    positionUseCase.refreshPosition(positionRefreshData)
+                }
             }
-            val account = Account(assetWallets)
-            val positionRefreshDatas = jsonBalanceAndPosition.get("P").filter { jsonPosition ->
-                Symbol.entries.map { it.value }.contains(jsonPosition.get("s").asText())
-            }.map { node ->
-                PositionRefreshData(
-                    symbol = Symbol.valueOf(node.get("s").asText()),
-                    entryPrice = node.get("ep").asDouble(),
-                    positionAmt = node.get("pa").asDouble()
-                )
+            if (eventType == BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString()) {
+                val jsonOrder = eventJson.get("o")
+                val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
+                // Order Status가 FILLED되면 refresh account and position
+                if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
+                    val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
+                    positionUseCase.syncPosition(symbol)
+                    accountUseCase.syncAccount()
+                }
             }
-
-            eventUseCase.publishEvent(
-                UserEvent.AccountRefreshEvent(account),
-                PositionEvent.PositionRefreshEvent(positionRefreshDatas)
-            )
         }
 
         return connectionId

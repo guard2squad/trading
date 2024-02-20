@@ -13,6 +13,7 @@ import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
 import com.g2s.trading.util.BinanceOrderParameterConverter
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component
 class RestApiExchangeImpl(
     val binanceClient: UMFuturesClientImpl
 ) : Exchange {
+    private val logger = LoggerFactory.getLogger(this.javaClass)
     private val om = ObjectMapperProvider.get()
 
     private var positionMode = PositionMode.ONE_WAY_MODE
@@ -46,9 +48,7 @@ class RestApiExchangeImpl(
                 om.convertValue(it, AssetWallet::class.java)
             }
 
-        return Account(
-            assetWallets = assetWallets,
-        )
+        return Account(assetWallets)
     }
 
     override fun closePosition(position: Position) {
