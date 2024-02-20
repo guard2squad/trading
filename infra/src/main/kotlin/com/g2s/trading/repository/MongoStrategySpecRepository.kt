@@ -32,4 +32,16 @@ class MongoStrategySpecRepository(
             query, StrategySpec::class.java, SPEC_COLLECTION_NAME
         )
     }
+
+    override fun findAllServiceStrategySpecByType(type: String): List<StrategySpec> {
+        val query = Query.query(
+            Criteria.where(StrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
+                .andOperator(
+                    Criteria.where(StrategySpec::strategyType.name).`is`(type)
+                )
+        )
+        return mongoTemplate.find(
+            query, StrategySpec::class.java, SPEC_COLLECTION_NAME
+        )
+    }
 }

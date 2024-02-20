@@ -1,13 +1,13 @@
 package com.g2s.trading.lock
 
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class LockUseCase {
     private val locks = ConcurrentHashMap<LockKey, Unit>()
 
+    // strategyLock
     fun acquire(strategyKey: String, usage: LockUsage): Boolean {
         val key = LockKey(strategyKey, usage)
         var result = false

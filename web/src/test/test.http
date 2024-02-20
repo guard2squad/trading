@@ -14,3 +14,6 @@ Content-Type: application/json
 {
   "strategyKey": "simple"
 }
+
+### test
+GET localhost:8080/test

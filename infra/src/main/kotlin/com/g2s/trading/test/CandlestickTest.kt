@@ -40,17 +40,15 @@ class CandlestickTest {
 
         return candleStickDataList.map { candleStickData ->
             CandleStick(
+                symbol = symbol,
+                interval = interval,
                 key = candleStickData[0].toLong(),
                 open = candleStickData[1].toDouble(),
                 high = candleStickData[2].toDouble(),
                 low = candleStickData[3].toDouble(),
                 close = candleStickData[4].toDouble(),
                 volume = candleStickData[5].toDouble(),
-                closeTime = candleStickData[6].toLong(),
-                quoteAssetVolume = candleStickData[7].toDouble(),
-                numberOfTrades = candleStickData[8].toInt(),
-                takerBuyBaseAssetVolume = candleStickData[9].toDouble(),
-                takerBuyQuoteAssetVolume = candleStickData[10].toDouble(),
+                numberOfTrades = candleStickData[8].toInt()
             )
         }
     }

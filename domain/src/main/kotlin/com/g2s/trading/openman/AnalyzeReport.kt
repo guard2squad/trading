@@ -12,5 +12,4 @@ sealed class AnalyzeReport {
     ) : AnalyzeReport()
 
     object NonMatchingReport : AnalyzeReport()
-    object DuplicatedIndicatorReport : AnalyzeReport()
 }
