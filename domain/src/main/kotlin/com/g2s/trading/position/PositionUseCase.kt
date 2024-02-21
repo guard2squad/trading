@@ -3,16 +3,11 @@ package com.g2s.trading.position
 import com.g2s.trading.EventUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
-import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.order.OrderSide
-import com.g2s.trading.order.OrderType
 import com.g2s.trading.order.Symbol
 import org.slf4j.LoggerFactory
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.jvm.optionals.getOrNull
 
 @Service
 class PositionUseCase(
@@ -69,18 +64,18 @@ class PositionUseCase(
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
                 strategyPositionMap.replace(updated.strategyKey, updated)
-                eventUseCase.publishEvent(PositionEvent.PositionOpenedEvent(updated))
             }
         }
     }
 
     fun syncPosition(symbol: Symbol) {
-        val old = strategyPositionMap.values.find {
+        strategyPositionMap.values.find {
             it.symbol == symbol
         }?.let {
             val updated = Position.sync(it)
             positionRepository.updatePosition(updated)
             strategyPositionMap.replace(updated.strategyKey, updated)
+            eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(updated))
         }
     }
 

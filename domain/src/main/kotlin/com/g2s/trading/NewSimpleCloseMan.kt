@@ -3,6 +3,7 @@ package com.g2s.trading
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
+import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -62,7 +63,7 @@ class NewSimpleCloseMan(
     }
 
     @EventListener
-    fun handlePositionOpenedEvent(event: PositionEvent.PositionOpenedEvent) {
+    fun handlePositionSyncedEvent(event: PositionEvent.PositionSyncedEvent) {
         val newPosition = event.source
         logger.debug("handlePositionOpenedEvent: ${newPosition.symbol}")
         strategyPositionMap.computeIfPresent(newPosition.strategyKey) { _, pair ->
@@ -148,5 +149,14 @@ class NewSimpleCloseMan(
         }
         // 릴리즈
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
+    }
+
+    fun testHandleMarkPriceEvent(symbol: Symbol) {
+        val position = strategyPositionMap.asSequence()
+            .map { it.value.second }
+            .filterNotNull()
+            .find { it.symbol == symbol } ?: return
+
+        positionUseCase.closePosition(position)
     }
 }
