@@ -145,6 +145,10 @@ class NewSimpleCloseMan(
         if (shouldClose) {
             logger.debug("포지션 청산: $position")
             logger.debug("익절: $cntProfit, 손절: $cntLoss")
+            strategyPositionMap.computeIfPresent(position.strategyKey) { _, pair ->
+                logger.debug("position deleted from strategyPositionMap: ${position.strategyKey}")
+                pair.copy(second = null)
+            }
             positionUseCase.closePosition(position)
         }
         // 릴리즈
