@@ -165,6 +165,7 @@ class NewSimpleOpenMan(
                     ),
                     referenceData = analyzeReport.referenceData,
                 )
+                logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
                 positionUseCase.openPosition(position)
             }
         }
