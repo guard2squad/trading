@@ -73,7 +73,7 @@ class NewSimpleCloseMan(
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
-        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
+//        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
         // find matching position
         val position = strategyPositionMap.asSequence()
             .map { it.value.second }
