@@ -36,7 +36,6 @@ class NewSimpleCloseMan(
             .let { ConcurrentHashMap(it) }
 
     init {
-        logger.debug("NewSimpleCloseMan init")
         val positions = positionUseCase.getAllLoadedPosition()
         positions.forEach { position ->
             strategyPositionMap[position.strategyKey]?.let { pair ->
@@ -65,11 +64,11 @@ class NewSimpleCloseMan(
     @EventListener
     fun handlePositionSyncedEvent(event: PositionEvent.PositionSyncedEvent) {
         val newPosition = event.source
-        logger.debug("handlePositionOpenedEvent: ${newPosition.symbol}")
+        logger.debug("handlePositionSyncedEvent: ${newPosition.symbol}")
         strategyPositionMap.computeIfPresent(newPosition.strategyKey) { _, pair ->
-            logger.debug("position update for key: ${newPosition.strategyKey}")
             pair.copy(second = newPosition)
         }
+        logger.debug("position update for key: ${newPosition.strategyKey}")
     }
 
     @EventListener
@@ -155,7 +154,7 @@ class NewSimpleCloseMan(
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 
-    fun testHandleMarkPriceEvent(symbol: Symbol) {
+    fun testPositionClosing(symbol: Symbol) {
         val position = strategyPositionMap.asSequence()
             .map { it.value.second }
             .filterNotNull()
