@@ -51,16 +51,8 @@ class PositionUseCase(
             position.symbol == positionRefreshData.symbol
         }?.let { old ->
             val updated = Position.update(old, positionRefreshData)
-            // closed position
-            if (updated.positionAmt == 0.0) {
-                logger.debug("position is closed because positionAmt is ${updated.positionAmt}")
-                positionRepository.deletePosition(updated)
-                logger.debug("before closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
-                strategyPositionMap.remove(updated.strategyKey)
-                logger.debug("after closed position delete from strategyPositionMap, it's size is : ${strategyPositionMap.size}")
-            }
-            // opened position
-            else {
+            // opened position일 때만 sync 처리하면 됨.
+            if (updated.positionAmt != 0.0) {
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
                 strategyPositionMap.replace(updated.strategyKey, updated)
@@ -72,10 +64,11 @@ class PositionUseCase(
         strategyPositionMap.values.find {
             it.symbol == symbol
         }?.let {
-            val updated = Position.sync(it)
-            positionRepository.updatePosition(updated)
-            strategyPositionMap.replace(updated.strategyKey, updated)
-            eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(updated))
+            val synced = Position.sync(it)
+            positionRepository.updatePosition(synced)
+            logger.debug("position synced in DB")
+            strategyPositionMap.replace(synced.strategyKey, synced)
+            eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }
 
@@ -84,6 +77,7 @@ class PositionUseCase(
         positionRepository.deletePosition(position)
         strategyPositionMap.remove(position.strategyKey)
         exchangeImpl.closePosition(position)
+        logger.debug("position closed\n")
     }
 
     fun hasPosition(strategyKey: String): Boolean {

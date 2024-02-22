@@ -18,6 +18,7 @@ import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.PositionRefreshData
 import com.g2s.trading.position.PositionUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
@@ -31,6 +32,7 @@ class ExchangeStream(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase
 ) {
+    private val logger = LoggerFactory.getLogger(this.javaClass)
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
 
@@ -146,6 +148,7 @@ class ExchangeStream(
                     // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
                     val positionRefreshData = positionRefreshDataList[0]
                     positionUseCase.refreshPosition(positionRefreshData)
+                    logger.debug("POSITION_UPDATE_EVENT, refreshedPositionAmt: ${positionRefreshData.positionAmt}")
                 }
             }
             if (eventType == BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString()) {
@@ -156,6 +159,7 @@ class ExchangeStream(
                     val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
                     positionUseCase.syncPosition(symbol)
                     accountUseCase.syncAccount()
+                    logger.debug("ORDER_TRADE_UPDATE, position & account synced")
                 }
             }
         }

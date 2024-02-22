@@ -33,6 +33,6 @@ class TestController(
 
     @GetMapping("/test/close")
     fun testClose() {
-        closeMan.testHandleMarkPriceEvent(Symbol.BTCUSDT)
+        closeMan.testPositionClosing(Symbol.BTCUSDT)
     }
 }
