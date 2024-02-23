@@ -20,12 +20,12 @@ class TestController(
     fun test() {
         val testNode = ObjectMapperProvider.get().createObjectNode()
         val position = Position(
-            strategyKey = "test",
+            strategyKey = "simple",
             symbol = Symbol.BTCUSDT,
-            entryPrice = 0.0,   // 주문 후 updated
-            positionAmt = 0.01,  // if positionAmt is 0.0 it is closed
-            orderSide = OrderSide.LONG,
+            orderSide = OrderSide.SHORT,
             orderType = OrderType.MARKET,
+            entryPrice = 0.0,   // 주문 후 updated
+            positionAmt = 0.05,  // if positionAmt is 0.0 it is closed
             referenceData = testNode
         )
         positionUseCase.openPosition(position)
