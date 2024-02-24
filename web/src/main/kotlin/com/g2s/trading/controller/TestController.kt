@@ -1,9 +1,6 @@
 package com.g2s.trading.controller
 
-<<<<<<< HEAD
-=======
 import com.g2s.trading.NewSimpleCloseMan
->>>>>>> 19b89eaba9c8af27dfb6baa43878a81025b702e9
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
