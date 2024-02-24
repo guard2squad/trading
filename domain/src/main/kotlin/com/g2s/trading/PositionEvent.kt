@@ -6,10 +6,6 @@ import org.springframework.context.ApplicationEvent
 sealed class PositionEvent(
     source: Any
 ) : ApplicationEvent(source) {
-    data class PositionOpenedEvent(
-        val source: Position
-    ) : PositionEvent(source)
-
     data class PositionSyncedEvent(
         val source: Position
     ) : PositionEvent(source)

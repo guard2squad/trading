@@ -1,6 +1,7 @@
 package com.g2s.trading.account
 
 import com.g2s.trading.exchange.Exchange
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.util.concurrent.atomic.AtomicBoolean
@@ -9,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
+    private val logger = LoggerFactory.getLogger(this.javaClass)
     lateinit var localAccount: Account
     private var synced: Boolean = false
     private val lock = AtomicBoolean(false)
@@ -23,6 +25,7 @@ class AccountUseCase(
     }
 
     fun syncAccount() {
+        logger.debug("synced account \n- asset : ${localAccount.assetWallets[0].asset} \n- balance : ${localAccount.assetWallets[0].walletBalance}\n")
         synced = true
     }
 

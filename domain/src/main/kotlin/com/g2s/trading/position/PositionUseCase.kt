@@ -61,7 +61,6 @@ class PositionUseCase(
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
                 strategyPositionMap.replace(updated.strategyKey, updated)
-                eventUseCase.publishEvent(PositionEvent.PositionOpenedEvent(updated))
             }
         }
     }

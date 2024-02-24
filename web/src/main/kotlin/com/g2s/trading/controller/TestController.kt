@@ -1,5 +1,9 @@
 package com.g2s.trading.controller
 
+<<<<<<< HEAD
+=======
+import com.g2s.trading.NewSimpleCloseMan
+>>>>>>> 19b89eaba9c8af27dfb6baa43878a81025b702e9
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
@@ -11,7 +15,8 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class TestController(
-    val positionUseCase: PositionUseCase
+    val positionUseCase: PositionUseCase,
+    val closeMan: NewSimpleCloseMan
 ) {
 
     @GetMapping("/test")
@@ -27,5 +32,10 @@ class TestController(
             referenceData = testNode
         )
         positionUseCase.openPosition(position)
+    }
+
+    @GetMapping("/test/close")
+    fun testClose() {
+        closeMan.testPositionClosing(Symbol.BTCUSDT)
     }
 }
