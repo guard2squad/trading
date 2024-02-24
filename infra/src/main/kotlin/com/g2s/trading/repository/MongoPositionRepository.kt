@@ -6,19 +6,13 @@ import com.g2s.trading.position.PositionRepository
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.ReplaceOptions
 import org.bson.Document
-import org.slf4j.LoggerFactory
 import org.springframework.data.mongodb.core.MongoTemplate
-import org.springframework.data.mongodb.core.query.Criteria
+import org.springframework.data.mongodb.core.query.Criteria.where
 import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.mongodb.core.query.Update
-import org.springframework.data.mongodb.core.query.UpdateDefinition
-
 import org.springframework.stereotype.Component
 
 @Component
 class MongoPositionRepository(val mongoTemplate: MongoTemplate) : PositionRepository {
-
-    private val logger = LoggerFactory.getLogger(this.javaClass)
 
     companion object {
         private const val POSITION_COLLECTION_NAME = "positions"
@@ -41,6 +35,6 @@ class MongoPositionRepository(val mongoTemplate: MongoTemplate) : PositionReposi
     }
 
     override fun deletePosition(position: Position) {
-        mongoTemplate.remove(position, POSITION_COLLECTION_NAME)
+        mongoTemplate.remove(Query.query(where("strategyKey").`is`(position.strategyKey)), POSITION_COLLECTION_NAME)
     }
 }

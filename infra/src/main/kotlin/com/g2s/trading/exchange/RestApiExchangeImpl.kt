@@ -53,6 +53,7 @@ class RestApiExchangeImpl(
 
     override fun closePosition(position: Position) {
         val params = BinanceOrderParameterConverter.toBinanceClosePositionParam(position, positionMode, positionSide)
+        logger.debug("position closed\n symbol: ${position.symbol}\n amount: ${position.positionAmt}")
         sendOrder(params)
     }
 
