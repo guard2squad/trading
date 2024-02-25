@@ -35,17 +35,21 @@ class PositionUseCase(
 
     fun openPosition(position: Position) {
         logger.debug("open position\n - symbol:${position.symbol}")
-        strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
+        val currentValue = strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
             logger.debug("map size = ${strategyPositionMap.size}\n")
             // set account unsynced
             accountUseCase.setUnSynced()
             // update unsynced position to DB
             positionRepository.savePosition(position)
-            // send order
-            exchangeImpl.openPosition(position)
             // save unsynced position to map
             position
         }
+
+        if (currentValue == position) {
+            // send order
+            exchangeImpl.openPosition(position)
+        }
+
         logger.debug("map size = ${strategyPositionMap.size}\n")
     }
 
@@ -55,8 +59,6 @@ class PositionUseCase(
             it.symbol == positionRefreshData.symbol
         }?.let { old ->
             val updated = Position.update(old, positionRefreshData)
-            // opened   position 때만 sync 처리하면 됨.
-            // 이 조건문에 문제가 있다.
             if (updated.positionAmt != 0.0) {
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
@@ -69,7 +71,7 @@ class PositionUseCase(
         logger.debug("syncPosition")
         strategyPositionMap.values.find {
             it.symbol == symbol
-        }?.let {old ->
+        }?.let { old ->
             val synced = Position.sync(old)
             positionRepository.updatePosition(synced)
             logger.debug("position synced in DB\n")
@@ -81,9 +83,9 @@ class PositionUseCase(
 
     fun closePosition(position: Position) {
         accountUseCase.setUnSynced()
+        exchangeImpl.closePosition(position)
         positionRepository.deletePosition(position)
         strategyPositionMap.remove(position.strategyKey)
-        exchangeImpl.closePosition(position)
         logger.debug("$position closed\n")
     }
 
