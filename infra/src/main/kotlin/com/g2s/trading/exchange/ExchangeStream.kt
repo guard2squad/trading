@@ -80,7 +80,6 @@ class ExchangeStream(
 
     private fun openCandleStickStream(symbol: Symbol, interval: Interval): Int {
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
-            logger.debug("candle stick $symbol")
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
             val symbolValue = Symbol.valueOf(jsonKlineData.get("s").asText())
