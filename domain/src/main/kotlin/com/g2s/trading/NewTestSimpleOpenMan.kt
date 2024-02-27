@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
@@ -179,7 +178,11 @@ class NewTestSimpleOpenMan(
                     orderSide = analyzeReport.orderSide,
                     orderType = OrderType.MARKET,
                     entryPrice = markPrice.price,
-                    positionAmt = analyzeReport.symbol.minQtyMarket,
+                    positionAmt = quantity(
+                        BigDecimal(analyzeReport.symbol.minNotionalValue),
+                        BigDecimal(markPrice.price),
+                        analyzeReport.symbol.quantityPrecision
+                    ),
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
@@ -333,8 +336,10 @@ class NewTestSimpleOpenMan(
         return AnalyzeReport.NonMatchingReport
     }
 
-    private fun quantity(balance: BigDecimal, markPrice: BigDecimal, precision: Int): Double {
-        return balance.divide(markPrice, precision, RoundingMode.DOWN).toDouble()
+    private fun quantity(minNotional: BigDecimal, markPrice: BigDecimal, quantityPrecision: Int): Double {
+        // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
+        // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
+        return minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
     }
 
     /*

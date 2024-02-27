@@ -181,7 +181,7 @@ class NewSimpleOpenMan(
                     positionAmt = quantity(
                         allocatedBalance,
                         BigDecimal(markPrice.price),
-                        analyzeReport.symbol.precision
+                        analyzeReport.symbol.quantityPrecision
                     ),
                     referenceData = analyzeReport.referenceData,
                 )
