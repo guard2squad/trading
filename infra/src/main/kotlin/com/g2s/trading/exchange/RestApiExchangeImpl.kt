@@ -69,7 +69,7 @@ class RestApiExchangeImpl(
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
 
-        val position =  om.readValue<List<Position>>(jsonString).first()
+        val position = om.readValue<List<Position>>(jsonString).first()
 
         return position
     }
