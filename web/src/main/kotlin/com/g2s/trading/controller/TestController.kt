@@ -8,15 +8,17 @@ import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
+@RequestMapping("/test")
 class TestController(
     val positionUseCase: PositionUseCase,
-    val closeMan: NewSimpleCloseMan
+    val closeMan: NewSimpleCloseMan,
 ) {
 
-    @GetMapping("/test")
+    @GetMapping()
     fun test() {
         val testNode = ObjectMapperProvider.get().createObjectNode()
         val position = Position(
@@ -31,8 +33,13 @@ class TestController(
         positionUseCase.openPosition(position)
     }
 
-    @GetMapping("/test/close")
+    @GetMapping("/close")
     fun testClose() {
         closeMan.testPositionClosing(Symbol.BTCUSDT)
+    }
+
+    @GetMapping("/info")
+    fun testInfo() {
+
     }
 }
