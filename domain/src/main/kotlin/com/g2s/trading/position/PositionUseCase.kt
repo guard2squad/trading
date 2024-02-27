@@ -17,7 +17,7 @@ class PositionUseCase(
     private val positionRepository: PositionRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
-    private val strategyPositionMap = ConcurrentHashMap<String, Position>()
+    private val strategyPositionMap = ConcurrentHashMap<String, Position>() // StrategyKey : Position
 
     init {
         loadPositions()
@@ -34,24 +34,31 @@ class PositionUseCase(
     }
 
     fun openPosition(position: Position) {
-        strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
+        logger.debug("open position\n - symbol:${position.symbol}")
+        val currentValue = strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
+            logger.debug("map size = ${strategyPositionMap.size}\n")
             // set account unsynced
             accountUseCase.setUnSynced()
             // update unsynced position to DB
             positionRepository.savePosition(position)
-            // send order
-            exchangeImpl.openPosition(position)
             // save unsynced position to map
             position
         }
+
+        if (currentValue == position) {
+            // send order
+            exchangeImpl.openPosition(position)
+        }
+
+        logger.debug("map size = ${strategyPositionMap.size}\n")
     }
 
     fun refreshPosition(positionRefreshData: PositionRefreshData) {
-        strategyPositionMap.values.find { position ->
-            position.symbol == positionRefreshData.symbol
+        logger.debug("refreshPosition")
+        strategyPositionMap.values.find {
+            it.symbol == positionRefreshData.symbol
         }?.let { old ->
             val updated = Position.update(old, positionRefreshData)
-            // opened position일 때만 sync 처리하면 됨.
             if (updated.positionAmt != 0.0) {
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
@@ -61,23 +68,25 @@ class PositionUseCase(
     }
 
     fun syncPosition(symbol: Symbol) {
+        logger.debug("syncPosition")
         strategyPositionMap.values.find {
             it.symbol == symbol
-        }?.let {
-            val synced = Position.sync(it)
+        }?.let { old ->
+            val synced = Position.sync(old)
             positionRepository.updatePosition(synced)
-            logger.debug("position synced in DB")
+            logger.debug("position synced in DB\n")
             strategyPositionMap.replace(synced.strategyKey, synced)
+            logger.debug("position synced in map\n")
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }
 
     fun closePosition(position: Position) {
         accountUseCase.setUnSynced()
+        exchangeImpl.closePosition(position)
         positionRepository.deletePosition(position)
         strategyPositionMap.remove(position.strategyKey)
-        exchangeImpl.closePosition(position)
-        logger.debug("position closed\n")
+        logger.debug("$position closed\n")
     }
 
     fun hasPosition(strategyKey: String): Boolean {

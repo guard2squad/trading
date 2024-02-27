@@ -32,6 +32,8 @@ class ExchangeStream(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase
 ) {
+    private val om = ObjectMapperProvider.get()
+    private val pretty = om.writerWithDefaultPrettyPrinter()
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
@@ -78,6 +80,7 @@ class ExchangeStream(
 
     private fun openCandleStickStream(symbol: Symbol, interval: Interval): Int {
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
+            logger.debug("candle stick $symbol")
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
             val symbolValue = Symbol.valueOf(jsonKlineData.get("s").asText())
@@ -121,45 +124,54 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.listenUserStream(listenKey) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val eventType = eventJson.get("e").textValue()
-            if (eventType == BinanceUserStreamEventType.ACCOUNT_UPDATE.toString()) {
-                val jsonBalanceAndPosition = eventJson.get("a")
-                val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
-                // 계좌 변동
-                val jsonBalances = jsonBalanceAndPosition.get("B")
-                val assetWallets = jsonBalances.filter { jsonBalance ->
-                    Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
-                }.map { node ->
-                    AssetWallet(
-                        asset = Asset.valueOf(node.get("a").asText()),
-                        walletBalance = node.get("wb").asDouble()
-                    )
-                }
-                val account = Account(assetWallets)
-                accountUseCase.refreshAccount(account)
-                // Event reason type == ORDER 일 때 포지션 데이터 변동
-                if (accountUpdateEventReasonType == BinanceAccountUpdateEventReasonType.ORDER.toString()) {
-                    val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
-                        PositionRefreshData(
-                            symbol = Symbol.valueOf(node.get("s").asText()),
-                            entryPrice = node.get("ep").asDouble(),
-                            positionAmt = node.get("pa").asDouble(),
+            logger.debug(pretty.writeValueAsString(eventJson))
+            when (eventType) {
+                BinanceUserStreamEventType.ACCOUNT_UPDATE.toString() -> {
+                    val jsonBalanceAndPosition = eventJson.get("a")
+                    val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
+                    // 계좌 변동
+                    val jsonBalances = jsonBalanceAndPosition.get("B")
+                    val assetWallets = jsonBalances.filter { jsonBalance ->
+                        Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
+                    }.map { node ->
+                        AssetWallet(
+                            asset = Asset.valueOf(node.get("a").asText()),
+                            walletBalance = node.get("wb").asDouble()
                         )
                     }
-                    // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
-                    val positionRefreshData = positionRefreshDataList[0]
-                    positionUseCase.refreshPosition(positionRefreshData)
-                    logger.debug("POSITION_UPDATE_EVENT, refreshedPositionAmt: ${positionRefreshData.positionAmt}")
+                    val account = Account(assetWallets)
+                    accountUseCase.refreshAccount(account)
+                    // Event reason type == ORDER 일 때 포지션 데이터 변동
+                    if (accountUpdateEventReasonType == BinanceAccountUpdateEventReasonType.ORDER.toString()) {
+                        val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
+                            PositionRefreshData(
+                                symbol = Symbol.valueOf(node.get("s").asText()),
+                                entryPrice = node.get("ep").asDouble(),
+                                positionAmt = node.get("pa").asDouble(),
+                            )
+                        }
+                        // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
+                        val positionRefreshData = positionRefreshDataList[0]
+                        positionUseCase.refreshPosition(positionRefreshData)
+                        logger.debug(
+                            "POSITION_UPDATE_EVENT" +
+                                    "\n - refreshedPositionAmt: ${positionRefreshData.positionAmt}" +
+                                    "\n - entryPrice: ${positionRefreshData.entryPrice}" +
+                                    "\n - symbol: ${positionRefreshData.symbol}"
+                        )
+                    }
                 }
-            }
-            if (eventType == BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString()) {
-                val jsonOrder = eventJson.get("o")
-                val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
-                // Order Status가 FILLED되면 refresh account and position
-                if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
-                    val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
-                    positionUseCase.syncPosition(symbol)
-                    accountUseCase.syncAccount()
-                    logger.debug("ORDER_TRADE_UPDATE, position & account synced")
+
+                BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString() -> {
+                    val jsonOrder = eventJson.get("o")
+                    val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
+                    // Order Status가 FILLED되면 refresh account and position
+                    if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
+                        val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
+                        positionUseCase.syncPosition(symbol)
+                        accountUseCase.syncAccount()
+                        logger.debug("ORDER_TRADE_UPDATE\n - position & account synced")
+                    }
                 }
             }
         }

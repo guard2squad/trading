@@ -14,7 +14,7 @@ class MongoStrategySpecRepository(
 ) : StrategySpecRepository {
 
     companion object {
-        private const val SPEC_COLLECTION_NAME = "simple"
+        private const val SPEC_COLLECTION_NAME = "strategy_spec"
     }
 
     override fun findStrategySpecByKey(strategyKey: String): StrategySpec? {
