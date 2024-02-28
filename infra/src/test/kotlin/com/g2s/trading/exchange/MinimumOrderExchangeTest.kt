@@ -9,7 +9,7 @@ import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.openman.AnalyzeReport
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -47,7 +47,7 @@ class MinimumOrderExchangeTest {
         parameters["pair"] = "BTCUSDT"
         parameters["contractType"] = "PERPETUAL"
         parameters["interval"] = "1m"
-        parameters["startTime"] = convertMilliseconds("202402280623")
+        parameters["startTime"] = convertMilliseconds("2024-02-28-0623")
         parameters["limit"] = 1
         val jsonCandleStick = om.readTree(binanceClient.market().continuousKlines(parameters))
         println(pretty.writeValueAsString(jsonCandleStick))
@@ -59,7 +59,7 @@ class MinimumOrderExchangeTest {
         val parameters = LinkedHashMap<String, Any>()
         parameters["pair"] = "BTCUSDT"
         parameters["interval"] = "1m"
-        parameters["startTime"] = convertMilliseconds("202402280623")
+        parameters["startTime"] = convertMilliseconds("2024-02-28-0623")
         parameters["limit"] = 1
         val jsonCandleStick = om.readTree(binanceClient.market().indexPriceKlines(parameters))
         println(pretty.writeValueAsString(jsonCandleStick))
@@ -71,7 +71,7 @@ class MinimumOrderExchangeTest {
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = "BTCUSDT"
         parameters["interval"] = "1m"
-        parameters["startTime"] = convertMilliseconds("202402280623")
+        parameters["startTime"] = convertMilliseconds("2024-02-28-0623")
         parameters["limit"] = 1
         val jsonCandleStick = om.readTree(binanceClient.market().markPriceKlines(parameters))
         println(pretty.writeValueAsString(jsonCandleStick))
@@ -83,7 +83,7 @@ class MinimumOrderExchangeTest {
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = "BTCUSDT"
         parameters["interval"] = "1m"
-        parameters["startTime"] = convertMilliseconds("202402280500")
+        parameters["startTime"] = convertMilliseconds("2024-02-28-0623")
         parameters["limit"] = 1
         val jsonCandleStick = om.readTree(binanceClient.market().klines(parameters))
         println(pretty.writeValueAsString(jsonCandleStick))

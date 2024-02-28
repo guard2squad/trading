@@ -5,9 +5,10 @@ import com.g2s.trading.NewSimpleCloseMan
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.symbol.SymbolUseCase
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -20,6 +21,7 @@ import java.math.RoundingMode
 class TestController(
     val positionUseCase: PositionUseCase,
     val markPriceUseCase: MarkPriceUseCase,
+    val symbolUseCase: SymbolUseCase,
     val closeMan: NewSimpleCloseMan,
 ) {
 
@@ -36,9 +38,9 @@ class TestController(
             orderType = OrderType.MARKET,
             entryPrice = markPrice,
             positionAmt = quantity(
-                BigDecimal(symbol.minNotionalValue),
+                BigDecimal(symbolUseCase.getMinNotionalValue(symbol)),
                 BigDecimal(markPrice),
-                symbol.quantityPrecision
+                symbolUseCase.getQuantityPrecision(symbol)
             ),
             referenceData = testNode
         )

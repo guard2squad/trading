@@ -3,7 +3,7 @@ package com.g2s.trading
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec

@@ -4,7 +4,7 @@ import com.g2s.trading.EventUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap

@@ -3,7 +3,7 @@ package com.g2s.trading.position
 import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 
 data class Position(
     val strategyKey: String,

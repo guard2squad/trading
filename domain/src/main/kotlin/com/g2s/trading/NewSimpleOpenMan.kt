@@ -11,11 +11,12 @@ import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.openman.AnalyzeReport
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
@@ -32,7 +33,8 @@ class NewSimpleOpenMan(
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
-    private val markPriceUseCase: MarkPriceUseCase
+    private val markPriceUseCase: MarkPriceUseCase,
+    private val symbolUseCase: SymbolUseCase
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -181,7 +183,7 @@ class NewSimpleOpenMan(
                     positionAmt = quantity(
                         allocatedBalance,
                         BigDecimal(markPrice.price),
-                        analyzeReport.symbol.quantityPrecision
+                        symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
                     referenceData = analyzeReport.referenceData,
                 )
