@@ -12,27 +12,28 @@ import com.g2s.trading.order.OrderSide
 import com.g2s.trading.symbol.Symbol
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.test.context.SpringBootTest
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
 
+@SpringBootTest(classes = [TestConfig::class])
 class MinimumOrderExchangeTest {
-    private lateinit var binanceClient: UMFuturesClientImpl
-    private val om = ObjectMapperProvider.get()
-    private val pretty = om.writerWithDefaultPrettyPrinter()
 
+    @Autowired
+    private lateinit var binanceClient: UMFuturesClientImpl
+    // ObjectMapper
+    private val om = ObjectMapperProvider.get()
+
+    private val pretty = om.writerWithDefaultPrettyPrinter()
     // const
     val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
+
     val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
-
-
-    @BeforeEach
-    fun setUp() {
-        val restUrl = Urls.USDM_PROD_URL.value
-        binanceClient = UMFuturesClientImpl(restUrl)
-    }
 
     @Test
     fun testExchangeInfo() {

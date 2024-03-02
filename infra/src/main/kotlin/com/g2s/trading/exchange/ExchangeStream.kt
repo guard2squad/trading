@@ -15,14 +15,13 @@ import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
-import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.PositionRefreshData
 import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
-
 
 @Component
 class ExchangeStream(

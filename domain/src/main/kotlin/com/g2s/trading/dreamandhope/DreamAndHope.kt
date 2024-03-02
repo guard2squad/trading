@@ -49,7 +49,7 @@ class DreamAndHope(
             logger.debug("stop: $strategyKey")
             mongoStrategySpecRepository.findStrategySpecByKey(strategyKey)
                 ?.let { spec ->
-                    if (spec.status == StrategySpecServiceStatus.SERVICE) {
+                    if (spec.status ==  StrategySpecServiceStatus.SERVICE) {
                         eventUseCase.publishEvent(StrategyEvent.UpdateStrategyEvent(spec))
                     }
                 }

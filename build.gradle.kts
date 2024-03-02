@@ -39,7 +39,9 @@ subprojects {
         "implementation"("org.jetbrains.kotlin:kotlin-reflect")
         "implementation"("com.fasterxml.jackson.module:jackson-module-kotlin")
         "implementation"("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-        "testImplementation"("org.springframework.boot:spring-boot-starter-test")
+        "testImplementation"("org.springframework.boot:spring-boot-starter-test") {
+            exclude(group = "com.vaadin.external.google", module = "android-json")
+        }
     }
 
     tasks.withType<KotlinCompile> {

@@ -81,15 +81,15 @@ class NewSimpleOpenMan(
         val acquired = lockUseCase.acquire(spec.strategyKey, LockUsage.OPEN)
         if (!acquired) return
 
-        // 이미 포지션 있는지 확인
-        if (positionUseCase.hasPosition(spec.strategyKey)) {
+        // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
+        val unUsedSymbols = spec.symbols - positionUseCase.getAllUsedSymbols()
+        if (unUsedSymbols.isEmpty()) {
             lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
 
-        // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
-        val unUsedSymbols = spec.symbols - positionUseCase.getAllUsedSymbols()
-        if (unUsedSymbols.isEmpty()) {
+        // spec에서 현재 포지션이 없는 symbol 중 인자로 넘어온 symbol(candleStick에 포함)을 취급하는지 확인
+        if (!unUsedSymbols.contains(candleStick.symbol)) {
             lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
