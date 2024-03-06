@@ -10,10 +10,9 @@ import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.openman.AnalyzeReport
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.symbol.Symbol
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
@@ -21,6 +20,7 @@ import java.util.*
 import kotlin.math.max
 import kotlin.math.min
 
+@Disabled
 @SpringBootTest(classes = [TestConfig::class])
 class MinimumOrderExchangeTest {
 

@@ -188,7 +188,7 @@ class NewTestSimpleOpenMan(
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
-                positionUseCase.openPosition(position)
+                positionUseCase.openPosition(position, spec)
             }
         }
 

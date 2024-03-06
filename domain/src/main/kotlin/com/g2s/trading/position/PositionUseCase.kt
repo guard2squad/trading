@@ -4,6 +4,8 @@ import com.g2s.trading.EventUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.history.HistoryUseCase
+import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -14,6 +16,7 @@ class PositionUseCase(
     private val exchangeImpl: Exchange,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
+    private val historyUseCase: HistoryUseCase,
     private val positionRepository: PositionRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
@@ -33,8 +36,10 @@ class PositionUseCase(
         }
     }
 
-    fun openPosition(position: Position) {
+    fun openPosition(position: Position, spec: StrategySpec) {
         logger.debug("open position\n - symbol:${position.symbol}")
+        historyUseCase.stagingSpec(position.symbol, spec)
+
         val currentValue = positionMap.computeIfAbsent(position.symbol) { _ ->
             logger.debug("map size = ${positionMap.size}\n")
             // set account unsynced
@@ -81,11 +86,12 @@ class PositionUseCase(
         }
     }
 
-    fun closePosition(position: Position) {
+    fun closePosition(position: Position, spec: StrategySpec) {
+        historyUseCase.stagingSpec(position.symbol, spec)
         accountUseCase.setUnSynced()
-        exchangeImpl.closePosition(position)
         positionRepository.deletePosition(position)
         positionMap.remove(position.symbol)
+        exchangeImpl.closePosition(position)
         logger.debug("$position closed\n")
     }
 

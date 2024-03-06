@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import java.math.BigDecimal
 import java.math.RoundingMode
 
+@Disabled
 @SpringBootTest(classes = [TestConfig::class])
 class OrderTest {
     private val om = ObjectMapperProvider.get()

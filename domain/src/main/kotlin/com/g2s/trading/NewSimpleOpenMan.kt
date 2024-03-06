@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.history.History
+import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
@@ -34,7 +36,7 @@ class NewSimpleOpenMan(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
-    private val symbolUseCase: SymbolUseCase
+    private val symbolUseCase: SymbolUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -188,7 +190,7 @@ class NewSimpleOpenMan(
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
-                positionUseCase.openPosition(position)
+                positionUseCase.openPosition(position, spec)
             }
         }
 
