@@ -13,16 +13,18 @@ import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.history.History
+import com.g2s.trading.history.HistorySide
+import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
-import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.PositionRefreshData
 import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
-
 
 @Component
 class ExchangeStream(
@@ -30,7 +32,8 @@ class ExchangeStream(
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
     private val eventUseCase: EventUseCase,
     private val positionUseCase: PositionUseCase,
-    private val accountUseCase: AccountUseCase
+    private val accountUseCase: AccountUseCase,
+    private val historyUseCase: HistoryUseCase
 ) {
     private val om = ObjectMapperProvider.get()
     private val pretty = om.writerWithDefaultPrettyPrinter()
@@ -150,6 +153,7 @@ class ExchangeStream(
                             )
                         }
                         // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
+                        assert(positionRefreshDataList.size == 1)
                         val positionRefreshData = positionRefreshDataList[0]
                         positionUseCase.refreshPosition(positionRefreshData)
                         logger.debug(
@@ -167,8 +171,18 @@ class ExchangeStream(
                     // Order Status가 FILLED되면 refresh account and position
                     if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
                         val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
+                        // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
                         positionUseCase.syncPosition(symbol)
                         accountUseCase.syncAccount()
+                        val history = History(
+                            symbol = Symbol.valueOf(jsonOrder.get("s").asText()),
+                            historySide = HistorySide.valueOf(jsonOrder.get("S").asText()),
+                            averagePrice = jsonOrder.get("ap").asDouble(),
+                            quantity = jsonOrder.get("z").asDouble(),
+                            fee = jsonOrder.get("n").asDouble(),
+                            realizedProfit = jsonOrder.get("rp").asDouble()
+                        )
+                        historyUseCase.recordHistory(history)
                         logger.debug("ORDER_TRADE_UPDATE\n - position & account synced")
                     }
                 }

@@ -3,7 +3,7 @@ package com.g2s.trading
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -30,64 +30,67 @@ class NewSimpleCloseMan(
     var cntProfit = 0
     var cntLoss = 0
 
-    private val strategyPositionMap: ConcurrentHashMap<String, Pair<StrategySpec, Position?>> =
+    // simple TYPE의 strategySpec들을 관리
+    private val specs: ConcurrentHashMap<String, StrategySpec> =
         strategySpecRepository.findAllServiceStrategySpecByType(TYPE)
-            .associate { it.strategyKey to Pair(it, null) }
+            .associateBy { it.strategyKey }
             .let { ConcurrentHashMap(it) }
 
-    init {
-        val positions = positionUseCase.getAllLoadedPosition()
-        positions.forEach { position ->
-            strategyPositionMap[position.strategyKey]?.let { pair ->
-                strategyPositionMap[position.strategyKey] = pair.copy(second = position)
-            }
-        }
-    }
+    // 열린 포지션을 관리
+    private val symbolPositionMap: ConcurrentHashMap<Symbol, Position> =
+        positionUseCase.getAllPositions()
+            .filter { position -> specs.keys.contains(position.strategyKey) }
+            .associateBy { it.symbol }
+            .let { ConcurrentHashMap(it) }
 
     @EventListener
     fun handleStartStrategyEvent(event: StrategyEvent.StartStrategyEvent) {
-        strategyPositionMap.putIfAbsent(event.source.strategyKey, Pair(event.source, null))
+        val spec = event.source
+        if (spec.strategyType != TYPE) return
+        specs[event.source.strategyKey] = event.source
     }
 
     @EventListener
     fun handleUpdateStrategyEvent(event: StrategyEvent.UpdateStrategyEvent) {
         val spec = event.source
-        val position = strategyPositionMap[spec.strategyKey]?.second
-        strategyPositionMap.replace(spec.strategyKey, Pair(spec, position))
+        if (spec.strategyType != TYPE) return
+        specs.replace(event.source.strategyKey, event.source)
     }
 
     @EventListener
     fun handleStopStrategyEvent(event: StrategyEvent.StopStrategyEvent) {
-        strategyPositionMap.remove(event.source.strategyKey)
+        val spec = event.source
+        if (spec.strategyType != TYPE) return
+        specs.remove(event.source.strategyKey)
     }
 
     @EventListener
     fun handlePositionSyncedEvent(event: PositionEvent.PositionSyncedEvent) {
         val newPosition = event.source
+        logger.debug("handlePositionSyncedEvent : position strategy key = ${newPosition.strategyKey}")
+        if (!specs.keys.contains(newPosition.strategyKey)) return
         logger.debug("handlePositionSyncedEvent: ${newPosition.symbol}")
-        strategyPositionMap.computeIfPresent(newPosition.strategyKey) { _, pair ->
-            pair.copy(second = newPosition)
-        }
+        symbolPositionMap.replace(newPosition.symbol, newPosition)
         logger.debug("position update for key: ${newPosition.strategyKey}")
     }
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
         // find matching position
-        val position = strategyPositionMap.asSequence()
-            .map { it.value.second }
-            .filterNotNull()
-            .find { it.symbol == event.source.symbol } ?: return
+        val position = symbolPositionMap.asSequence()
+            .map { it.value }
+            .find { position -> position.symbol == event.source.symbol } ?: return
         // position must be synced
         if (!position.synced) {
             return
         }
         // if you find position, close it
-        lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
+        val acquired = lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
+        if (!acquired) return
         // check should close
         val entryPrice = BigDecimal(position.entryPrice)
         val lastPrice = BigDecimal(markPriceUseCase.getMarkPrice(position.symbol).price)
-        val spec = strategyPositionMap[position.strategyKey]!!.first
+        val spec = specs[position.strategyKey]!!
         val stopLossFactor = BigDecimal(spec.op["stopLossFactor"].asDouble())
         var shouldClose = false
         when (position.orderSide) {
@@ -143,24 +146,11 @@ class NewSimpleCloseMan(
         if (shouldClose) {
             logger.debug("포지션 청산: $position")
             logger.debug("익절: $cntProfit, 손절: $cntLoss")
-            strategyPositionMap.computeIfPresent(position.strategyKey) { _, pair ->
-                logger.debug("position deleted from strategyPositionMap: ${position.strategyKey}")
-                pair.copy(second = null)
-            }
-            positionUseCase.closePosition(position)
+            symbolPositionMap.remove(position.symbol)
+            logger.debug("position deleted from symbolPositionMap: ${position.strategyKey}")
+            positionUseCase.closePosition(position, spec)
         }
         // 릴리즈
-        lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
-    }
-
-    fun testPositionClosing(symbol: Symbol) {
-        val position = strategyPositionMap.asSequence()
-            .map { it.value.second }
-            .filterNotNull()
-            .find { it.symbol == symbol } ?: return
-
-        lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
-        positionUseCase.closePosition(position)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 }

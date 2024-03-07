@@ -1,7 +1,7 @@
 package com.g2s.trading
 
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 

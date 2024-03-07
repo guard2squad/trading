@@ -5,17 +5,20 @@ import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.history.History
+import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.openman.AnalyzeReport
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
@@ -32,7 +35,8 @@ class NewSimpleOpenMan(
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
-    private val markPriceUseCase: MarkPriceUseCase
+    private val markPriceUseCase: MarkPriceUseCase,
+    private val symbolUseCase: SymbolUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -79,15 +83,15 @@ class NewSimpleOpenMan(
         val acquired = lockUseCase.acquire(spec.strategyKey, LockUsage.OPEN)
         if (!acquired) return
 
-        // 이미 포지션 있는지 확인
-        if (positionUseCase.hasPosition(spec.strategyKey)) {
+        // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
+        val unUsedSymbols = spec.symbols - positionUseCase.getAllUsedSymbols()
+        if (unUsedSymbols.isEmpty()) {
             lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
 
-        // spec에 운영된 symbol중에서 현재 포지션이 없는 symbol 확인
-        val unUsedSymbols = spec.symbols - positionUseCase.getAllUsedSymbols()
-        if (unUsedSymbols.isEmpty()) {
+        // spec에서 현재 포지션이 없는 symbol 중 인자로 넘어온 symbol(candleStick에 포함)을 취급하는지 확인
+        if (!unUsedSymbols.contains(candleStick.symbol)) {
             lockUseCase.release(spec.strategyKey, LockUsage.OPEN)
             return
         }
@@ -181,12 +185,12 @@ class NewSimpleOpenMan(
                     positionAmt = quantity(
                         allocatedBalance,
                         BigDecimal(markPrice.price),
-                        analyzeReport.symbol.quantityPrecision
+                        symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
-                positionUseCase.openPosition(position)
+                positionUseCase.openPosition(position, spec)
             }
         }
 

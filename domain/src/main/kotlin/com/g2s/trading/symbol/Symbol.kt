@@ -1,0 +1,25 @@
+package com.g2s.trading.symbol
+
+enum class Symbol(val value: String) {
+    BTCUSDT("BTCUSDT"),
+    ETHUSDT("ETHUSDT"),
+    BCHUSDT("BCHUSDT"),
+    XRPUSDT("XRPUSDT"),
+    EOSUSDT("EOSUSDT"),
+    LTCUSDT("LTCUSDT"),
+    TRXUSDT("TRXUSDT"),
+    ETCUSDT("ETCUSDT"),
+    LINKUSDT("LINKUSDT"),
+    XLMUSDT("XLMUSDT"),
+    ADAUSDT("ADAUSDT"),
+    DASHUSDT("DASHUSDT"),
+    ZECUSDT("ZECUSDT"),
+    XTZUSDT("XTZUSDT"),
+    BNBUSDT("BNBUSDT"),
+    ATOMUSDT("ATOMUSDT"),
+    ONTUSDT("ONTUSDT"),
+    IOTAUSDT("IOTAUSDT"),
+    BATUSDT("BATUSDT"),
+    VETUSDT("VETUSDT"),
+    QTUMUSDT("QTUMUSDT"),
+}
