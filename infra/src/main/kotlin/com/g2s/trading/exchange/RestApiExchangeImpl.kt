@@ -1,6 +1,7 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
+import com.binance.connector.futures.client.exceptions.BinanceClientException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -9,10 +10,11 @@ import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.symbol.Symbol
+import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.util.BinanceOrderParameterConverter
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -63,7 +65,11 @@ class RestApiExchangeImpl(
 
     override fun openPosition(position: Position) {
         val params = BinanceOrderParameterConverter.toBinanceOpenPositionParam(position, positionMode, positionSide)
-        sendOrder(params)
+        try {
+            sendOrder(params)
+        } catch (e: OrderFailException) {
+            throw e
+        }
     }
 
     override fun getPosition(symbol: Symbol): Position {
@@ -79,7 +85,12 @@ class RestApiExchangeImpl(
     }
 
     private fun sendOrder(params: LinkedHashMap<String, Any>) {
-        binanceClient.account().newOrder(params)
+        try {
+            binanceClient.account().newOrder(params)
+        } catch (e: BinanceClientException) {
+            logger.debug("$params\n" + e.errMsg)
+            throw OrderFailException("선물 주문 실패")
+        }
     }
 
     override fun getMarkPrice(symbol: Symbol): MarkPrice {

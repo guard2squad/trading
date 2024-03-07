@@ -38,7 +38,7 @@ class NewSimpleCloseMan(
 
     // 열린 포지션을 관리
     private val symbolPositionMap: ConcurrentHashMap<Symbol, Position> =
-        positionUseCase.getAllLoadedPosition()
+        positionUseCase.getAllPositions()
             .filter { position -> specs.keys.contains(position.strategyKey) }
             .associateBy { it.symbol }
             .let { ConcurrentHashMap(it) }

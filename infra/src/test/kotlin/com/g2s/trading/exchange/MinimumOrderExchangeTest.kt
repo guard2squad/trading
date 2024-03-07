@@ -135,6 +135,7 @@ class MinimumOrderExchangeTest {
         return dateInMilliseconds
     }
 
+    // 전략의 analyze 메서드를 테스트
     @Test
     fun testAnalyze() {
         val candleStick = getCandleStickData(Symbol.BTCUSDT, Interval.ONE_MINUTE, "2024-02-27-1037")

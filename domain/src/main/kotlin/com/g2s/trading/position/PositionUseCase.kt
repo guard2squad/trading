@@ -3,6 +3,7 @@ package com.g2s.trading.position
 import com.g2s.trading.EventUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -52,7 +53,13 @@ class PositionUseCase(
 
         if (currentValue == position) {
             // send order
-            exchangeImpl.openPosition(position)
+            try {
+                exchangeImpl.openPosition(position)
+            } catch (e : OrderFailException) {
+                accountUseCase.syncAccount()
+                positionRepository.deletePosition(position)
+                positionMap.remove(position.symbol)
+            }
         }
 
         logger.debug("map size = ${positionMap.size}\n")
@@ -99,7 +106,7 @@ class PositionUseCase(
         return positionMap.keys
     }
 
-    fun getAllLoadedPosition(): List<Position> {
+    fun getAllPositions(): List<Position> {
         return positionMap.values.toList()
     }
 }
