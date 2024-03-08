@@ -180,6 +180,7 @@ class ExchangeStream(
                             averagePrice = jsonOrder.get("ap").asDouble(),
                             quantity = jsonOrder.get("z").asDouble(),
                             fee = jsonOrder.get("n").asDouble(),
+                            orderTime = jsonOrder.get("T").asLong(),
                             realizedProfit = jsonOrder.get("rp").asDouble()
                         )
                         historyUseCase.recordHistory(history)

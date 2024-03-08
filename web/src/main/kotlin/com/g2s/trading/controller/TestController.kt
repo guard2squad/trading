@@ -38,8 +38,8 @@ class TestController(
         // testSpec
         val emptyJsonNode = ObjectMapperProvider.get().createArrayNode()
         val tempSpec = StrategySpec(
-            strategyKey = "test",
-            strategyType = "test",
+            strategyKey = "manual",
+            strategyType = "manual",
             symbols = Symbol.entries.toList(),
             asset = Asset.USDT,
             allocatedRatio = 0.25,
@@ -125,8 +125,8 @@ class TestController(
         // testSpec
         val emptyJsonNode = ObjectMapperProvider.get().createArrayNode()
         val tempSpec = StrategySpec(
-            strategyKey = "test",
-            strategyType = "test",
+            strategyKey = "manual",
+            strategyType = "manual",
             symbols = Symbol.entries.toList(),
             asset = Asset.USDT,
             allocatedRatio = 0.25,
