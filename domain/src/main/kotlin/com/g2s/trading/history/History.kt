@@ -10,5 +10,6 @@ data class History(
     val quantity: Double,
     val fee: Double,
     val realizedProfit: Double,
+    val orderTime : Long,
     var strategySpec: StrategySpec? = null
 )

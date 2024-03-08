@@ -24,7 +24,7 @@ class NewSimpleCloseMan(
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     companion object {
-        private const val TYPE = "simple"
+        private const val TYPE = "test"
     }
 
     var cntProfit = 0
@@ -76,6 +76,7 @@ class NewSimpleCloseMan(
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
+        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
         // find matching position
         val position = symbolPositionMap.asSequence()
             .map { it.value }
@@ -150,6 +151,7 @@ class NewSimpleCloseMan(
             logger.debug("position deleted from symbolPositionMap: ${position.strategyKey}")
             positionUseCase.closePosition(position, spec)
         }
+        logger.debug("${position.symbol} shouldClose: $shouldClose")
         // 릴리즈
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
