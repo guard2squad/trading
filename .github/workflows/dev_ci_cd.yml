@@ -67,7 +67,7 @@ jobs:
           SSH_USER: ${{ secrets[format('{0}_SSH_USER', github.event.inputs.profile)] }}
           SSH_PEM_KEY: ${{ secrets[format('{0}_SSH_PEM_KEY', github.event.inputs.profile)] }}
         run: |
-          echo "$SSH_PEM_KEY" >> $HOME/key.pem
+          echo "$SSH_PEM_KEY" > $HOME/key.pem
           chmod 400 $HOME/key.pem
           scp -i $HOME/key.pem -o StrictHostKeyChecking=no .env $SSH_USER@$SSH_HOST:~/
           rm -f key.pem
@@ -80,7 +80,7 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "$SSH_PEM_KEY" >> $HOME/key.pem
+          echo "$SSH_PEM_KEY" > $HOME/key.pem
           chmod 400 $HOME/key.pem
           ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'EOF'
             set -e
