@@ -69,11 +69,13 @@ jobs:
         run: |
           echo "$SSH_PEM_KEY" >> $HOME/key.pem
           chmod 400 $HOME/key.pem
+          echo "dockerHubPw to $DOCKERHUB_PASSWORD"
           ssh -i $HOME/key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'EOF'
             set -e
             sudo dnf install docker -y
             sudo systemctl start docker
-            echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+            echo "dockerHub pw in ec2 : $DOCKERHUB_PASSWORD"
+            echo $DOCKERHUB_PASSWORD | sudo docker login --username $DOCKERHUB_USERNAME --password-stdin
             sudo docker-compose down
             sudo docker-compose pull
             sudo docker-compose up -d
