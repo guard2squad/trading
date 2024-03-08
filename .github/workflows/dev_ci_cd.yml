@@ -58,8 +58,8 @@ jobs:
         env:
           # specify environment variable at GitHub Action Runner machine for the duration of step 8
           SSH_PEM_KEY: ${{ secrets[format('{0}_SSH_PEM_KEY', github.event.inputs.profile)] }}
-          SSH_USER: ${{ secrets[format('{0}_SSH_SSH_USER', github.event.inputs.profile)] }}
-          SSH_HOST: ${{ secrets[format('{0}_SSH_SSH_HOST', github.event.inputs.profile)] }}
+          SSH_USER: ${{ secrets[format('{0}_SSH_USER', github.event.inputs.profile)] }}
+          SSH_HOST: ${{ secrets[format('{0}_SSH_HOST', github.event.inputs.profile)] }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKER_IMAGE: ${{ secrets[format('{0}_DOCKER_IMAGE', github.event.inputs.profile)] }}
