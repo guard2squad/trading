@@ -69,7 +69,7 @@ jobs:
           username: ${{ secrets[format('{0}_SSH_USER', github.event.inputs.profile)] }}
           key: ${{ secrets[format('{0}_SSH_PEM_KEY', github.event.inputs.profile)] }}
           source: .env
-          target: ~/.env
+          target: ~/
       - name: connect to ec2 and deploy
         env:
           SSH_HOST: ${{ secrets[format('{0}_SSH_HOST', github.event.inputs.profile)] }}
