@@ -56,8 +56,8 @@ jobs:
       # step 8 : deploy
       - name: Create .env file
         run: |
-          echo "SPRING_PROFILES_ACTIVE=${{ github.event.inputs.profile }}" > .env
           echo "DOCKER_IMAGE=${{ secrets[format('{0}_DOCKER_IMAGE', github.event.inputs.profile)] }}" >> .env
+          echo "SPRING_PROFILES_ACTIVE=${{ github.event.inputs.profile }}" > .env
           echo "BINANCE_APIKEY=${{ secrets[format('{0}_BINANCE_APIKEY', github.event.inputs.profile)] }}" >> .env
           echo "BINANCE_APISECRET=${{ secrets[format('{0}_BINANCE_APISECRET', github.event.inputs.profile)] }}" >> .env
           echo "MONGODB_URI=${{ secrets[format('{0}_MONGODB_URI', github.event.inputs.profile)] }}" >> .env
