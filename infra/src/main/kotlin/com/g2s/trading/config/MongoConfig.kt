@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
 
 @Configuration
 class MongoConfig(
-    @Value("\${trading.mondob.uri}")
+    @Value("\${trading.mongodb.uri}")
     val mongoConnectionString: String,
     @Value("\${trading.mongodb.connectionPool.size}")
     val connectionPoolSize: Int,
