@@ -4,6 +4,7 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -29,6 +30,8 @@ class MongoConfig(
         private const val DATABASE_NAME = "dev"
     }
 
+    private val logger = LoggerFactory.getLogger(MongoConfig::class.java)
+
     @Bean
     fun mongoClientSettings(): MongoClientSettings {
         return MongoClientSettings.builder()
@@ -45,6 +48,7 @@ class MongoConfig(
 
     @Bean
     fun mongoClient(): MongoClient {
+        logger.debug("Connecting to MongoDB at URI: {}", mongoConnectionString);
         return MongoClients.create(mongoClientSettings())
     }
 
