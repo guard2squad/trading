@@ -61,12 +61,6 @@ jobs:
           echo "BINANCE_APIKEY=${{ secrets[format('{0}_BINANCE_APIKEY', github.event.inputs.profile)] }}" >> .env
           echo "BINANCE_APISECRET=${{ secrets[format('{0}_BINANCE_APISECRET', github.event.inputs.profile)] }}" >> .env
           echo "MONGODB_URI=${{ secrets[format('{0}_MONGODB_URI', github.event.inputs.profile)] }}" >> .env
-          echo --------------------------------
-          echo ${{ secrets[format('{0}_DOCKER_IMAGE', github.event.inputs.profile)] }}
-          echo ${{ github.event.inputs.profile }}
-          echo ${{ secrets[format('{0}_BINANCE_APIKEY', github.event.inputs.profile)] }}
-          echo ${{ secrets[format('{0}_BINANCE_APISECRET', github.event.inputs.profile)] }}
-          echo ${{ secrets[format('{0}_MONGODB_URI', github.event.inputs.profile)] }}
 
       - name: Copy .env file to EC2
         env:
