@@ -6,20 +6,20 @@ enum class Symbol(val value: String) {
     BCHUSDT("BCHUSDT"),
     XRPUSDT("XRPUSDT"),
     EOSUSDT("EOSUSDT"),
-    LTCUSDT("LTCUSDT"),
+    LTCUSDT("LTCUSDT"), // 업비트 상폐
     TRXUSDT("TRXUSDT"),
     ETCUSDT("ETCUSDT"),
     LINKUSDT("LINKUSDT"),
     XLMUSDT("XLMUSDT"),
     ADAUSDT("ADAUSDT"),
-    DASHUSDT("DASHUSDT"),
-    ZECUSDT("ZECUSDT"),
-    XTZUSDT("XTZUSDT"),
-    BNBUSDT("BNBUSDT"),
-    ATOMUSDT("ATOMUSDT"),
-    ONTUSDT("ONTUSDT"),
-    IOTAUSDT("IOTAUSDT"),
+    DASHUSDT("DASHUSDT"), // 업비트 거래X
+    ZECUSDT("ZECUSDT"),  // 업비트 거래X
+    XTZUSDT("XTZUSDT"),  // 업비트 거래X
+    BNBUSDT("BNBUSDT"), // 업비트 거래X
+    ATOMUSDT("ATOMUSDT"), // 업비트 거래X
+    ONTUSDT("ONTUSDT"),  // 업비트 거래X
+    IOTAUSDT("IOTAUSDT"), // 업비트 거래X
     BATUSDT("BATUSDT"),
-    VETUSDT("VETUSDT"),
-    QTUMUSDT("QTUMUSDT"),
+    VETUSDT("VETUSDT"),  // 업비트 거래X
+    QTUMUSDT("QTUMUSDT"),  // 업비트 거래X
 }

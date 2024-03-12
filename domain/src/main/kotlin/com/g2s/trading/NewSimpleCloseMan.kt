@@ -97,14 +97,11 @@ class NewSimpleCloseMan(
         when (position.orderSide) {
             OrderSide.LONG -> {
                 // 손절
-                if (BigDecimal(position.referenceData["low"].asDouble()).multiply(stopLossFactor) > lastPrice) {
+                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                if (stickLength.multiply(stopLossFactor) > entryPrice.minus(lastPrice)) {
                     logger.debug(
-                        "롱 손절: lastPrice: $lastPrice, 오픈시 꼬리 최저값: ${position.referenceData["low"].asDouble()}" +
-                                ", StopLossFactor 반영 후 꼬리 최저값: ${
-                                    BigDecimal(position.referenceData["low"].asDouble()).multiply(
-                                        stopLossFactor
-                                    )
-                                }"
+                        "롱 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +
+                                ", StopLossFactor 반영 후 고가 - 저가: ${stickLength.multiply(stopLossFactor)}"
                     )
                     shouldClose = true
                     cntLoss++
@@ -121,14 +118,11 @@ class NewSimpleCloseMan(
 
             OrderSide.SHORT -> {
                 // 손절
-                if (BigDecimal(position.referenceData["high"].asDouble()).multiply(stopLossFactor) < lastPrice) {
+                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                if (stickLength.multiply(stopLossFactor) < lastPrice.minus(entryPrice)) {
                     logger.debug(
-                        "숏 손절: lastPrice: $lastPrice, 오픈시 꼬리 최대값: ${position.referenceData["high"].asDouble()}" +
-                                ", StopLossFactor 반영 후 꼬리 최저값: ${
-                                    BigDecimal(position.referenceData["high"].asDouble()).multiply(
-                                        stopLossFactor
-                                    )
-                                }"
+                        "숏 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +
+                                ", StopLossFactor 반영 후 고가 - 저가: ${stickLength.multiply(stopLossFactor)}"
                     )
                     shouldClose = true
                     cntLoss++
