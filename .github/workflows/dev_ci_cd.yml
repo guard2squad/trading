@@ -56,17 +56,17 @@ jobs:
       # step 8 : deploy
       - name: Create .env file
         run: |
-          echo "DOCKER_IMAGE=${{ secrets[format('{0}_DOCKER_IMAGE', github.event.inputs.profile)] }}" >> .env
+          echo "DOCKER_IMAGE=${{ secrets[format('{0}_docker_image', github.event.inputs.profile)] }}" >> .env
           echo "SPRING_PROFILES_ACTIVE=${{ github.event.inputs.profile }}" >> .env
-          echo "BINANCE_APIKEY=${{ secrets[format('{0}_BINANCE_APIKEY', github.event.inputs.profile)] }}" >> .env
-          echo "BINANCE_APISECRET=${{ secrets[format('{0}_BINANCE_APISECRET', github.event.inputs.profile)] }}" >> .env
-          echo "MONGODB_URI=${{ secrets[format('{0}_MONGODB_URI', github.event.inputs.profile)] }}" >> .env
+          echo "BINANCE_APIKEY=${{ secrets[format('{0}_binance_apikey', github.event.inputs.profile)] }}" >> .env
+          echo "BINANCE_APISECRET=${{ secrets[format('{0}_binance_apisecret', github.event.inputs.profile)] }}" >> .env
+          echo "MONGODB_URI=${{ secrets[format('{0}_mongodb_uri', github.event.inputs.profile)] }}" >> .env
 
       - name: Copy .env file to EC2
         env:
-          SSH_HOST: ${{ secrets[format('{0}_SSH_HOST', github.event.inputs.profile)] }}
-          SSH_USER: ${{ secrets[format('{0}_SSH_USER', github.event.inputs.profile)] }}
-          SSH_PEM_KEY: ${{ secrets[format('{0}_SSH_PEM_KEY', github.event.inputs.profile)] }}
+          SSH_HOST: ${{ secrets[format('{0}_ssh_host', github.event.inputs.profile)] }}
+          SSH_USER: ${{ secrets[format('{0}_ssh_user', github.event.inputs.profile)] }}
+          SSH_PEM_KEY: ${{ secrets[format('{0}_ssh_pem_key', github.event.inputs.profile)] }}
         run: |
           echo "$SSH_PEM_KEY" > $HOME/key.pem
           chmod 400 $HOME/key.pem
@@ -75,9 +75,9 @@ jobs:
 
       - name: connect to ec2 and deploy
         env:
-          SSH_HOST: ${{ secrets[format('{0}_SSH_HOST', github.event.inputs.profile)] }}
-          SSH_USER: ${{ secrets[format('{0}_SSH_USER', github.event.inputs.profile)] }}
-          SSH_PEM_KEY: ${{ secrets[format('{0}_SSH_PEM_KEY', github.event.inputs.profile)] }}
+          SSH_HOST: ${{ secrets[format('{0}_ssh_host', github.event.inputs.profile)] }}
+          SSH_USER: ${{ secrets[format('{0}_ssh_user', github.event.inputs.profile)] }}
+          SSH_PEM_KEY: ${{ secrets[format('{0}_ssh_pem_key', github.event.inputs.profile)] }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
