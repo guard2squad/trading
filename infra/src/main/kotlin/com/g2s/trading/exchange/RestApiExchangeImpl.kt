@@ -59,8 +59,12 @@ class RestApiExchangeImpl(
 
     override fun closePosition(position: Position) {
         val params = BinanceOrderParameterConverter.toBinanceClosePositionParam(position, positionMode, positionSide)
-        logger.debug("position closed\n symbol: ${position.symbol}\n amount: ${position.positionAmt}")
-        sendOrder(params)
+        logger.debug("position closed\n symbol: ${position.symbol.value}\n amount: ${position.positionAmt}")
+        try {
+            sendOrder(params)
+        } catch (e: OrderFailException) {
+            throw e
+        }
     }
 
     override fun openPosition(position: Position) {
@@ -74,7 +78,7 @@ class RestApiExchangeImpl(
 
     override fun getPosition(symbol: Symbol): Position {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol.toString(),
+            "symbol" to symbol.value,
             "timestamp" to System.currentTimeMillis().toString()
         )
         val jsonString = binanceClient.account().positionInformation(parameters)
@@ -88,14 +92,14 @@ class RestApiExchangeImpl(
         try {
             binanceClient.account().newOrder(params)
         } catch (e: BinanceClientException) {
-            logger.debug("$params\n" + e.errMsg)
+            logger.warn("$params\n" + e.errMsg)
             throw OrderFailException("선물 주문 실패")
         }
     }
 
     override fun getMarkPrice(symbol: Symbol): MarkPrice {
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol
+        parameters["symbol"] = symbol.value
         val jsonNode = om.readTree(binanceClient.market().tickerSymbol(parameters))
 
         return MarkPrice(

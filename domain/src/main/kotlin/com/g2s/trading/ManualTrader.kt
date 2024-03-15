@@ -8,7 +8,6 @@ import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.symbol.Symbol
 import org.springframework.stereotype.Component
-import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class ManualTrader(
@@ -64,7 +63,7 @@ class ManualTrader(
         lockUseCase.release(position.strategyKey, LockUsage.OPEN)
     }
 
-    fun manuallyClosePosition(symbol: Symbol, spec : StrategySpec) {
+    fun manuallyClosePosition(symbol: Symbol, spec: StrategySpec) {
         val position = positionUseCase.getAllPositions().find { it.symbol == symbol }
         if (position == null) {
             return

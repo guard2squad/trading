@@ -19,8 +19,10 @@ import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.position.PositionRefreshData
+import com.g2s.trading.position.PositionSide
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.symbol.Symbol
+import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -33,7 +35,8 @@ class ExchangeStream(
     private val eventUseCase: EventUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
-    private val historyUseCase: HistoryUseCase
+    private val historyUseCase: HistoryUseCase,
+    private val symbolUseCase: SymbolUseCase
 ) {
     private val om = ObjectMapperProvider.get()
     private val pretty = om.writerWithDefaultPrettyPrinter()
@@ -150,6 +153,7 @@ class ExchangeStream(
                                 symbol = Symbol.valueOf(node.get("s").asText()),
                                 entryPrice = node.get("ep").asDouble(),
                                 positionAmt = node.get("pa").asDouble(),
+                                positionSide = PositionSide.valueOf(node.get("ps").asText())
                             )
                         }
                         // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
@@ -160,7 +164,7 @@ class ExchangeStream(
                             "POSITION_UPDATE_EVENT" +
                                     "\n - refreshedPositionAmt: ${positionRefreshData.positionAmt}" +
                                     "\n - entryPrice: ${positionRefreshData.entryPrice}" +
-                                    "\n - symbol: ${positionRefreshData.symbol}"
+                                    "\n - symbol: ${positionRefreshData.symbol.value}"
                         )
                     }
                 }
@@ -195,7 +199,7 @@ class ExchangeStream(
 
     private fun openMarketStreams(): List<Int> {
         val connectionIds = mutableListOf<Int>()
-        Symbol.entries.forEach { symbol ->
+        symbolUseCase.getAllSymbols().forEach { symbol ->
             Interval.entries.forEach { interval ->
                 val candleStickConnectionId = openCandleStickStream(symbol, interval)
                 connectionIds.add(candleStickConnectionId)

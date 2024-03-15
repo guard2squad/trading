@@ -27,4 +27,9 @@ class HistoryUseCase(
         specStage[symbol] = strategySpec
     }
 
+    fun undoStagingSpec(symbol: Symbol) {
+        assert(specStage.contains(symbol))
+        specStage.remove(symbol)
+    }
+
 }

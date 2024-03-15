@@ -38,9 +38,10 @@ class OrderTest {
     @Test
     fun testOpenOrder() {
         val testNode = ObjectMapperProvider.get().createObjectNode()
-        val symbol = Symbol.ETHUSDT
+        val symbol = Symbol.valueOf("ETHUSDT")
         val markPrice = markPriceUseCase.getMarkPrice(symbol).price
         val position = Position(
+            positionKey = Position.PositionKey(symbol, OrderSide.SHORT),
             strategyKey = "test",
             symbol = symbol,
             orderSide = OrderSide.SHORT,
@@ -68,9 +69,10 @@ class OrderTest {
     @Test
     fun testCloseOrder() {
         val testNode = ObjectMapperProvider.get().createObjectNode()
-        val symbol = Symbol.ETHUSDT
+        val symbol = Symbol.valueOf("ETHUSDT")
         val markPrice = markPriceUseCase.getMarkPrice(symbol).price
         val position = Position(
+            positionKey = Position.PositionKey(symbol, OrderSide.SHORT),
             strategyKey = "test",
             symbol = symbol,
             orderSide = OrderSide.SHORT,
@@ -103,7 +105,7 @@ class OrderTest {
     @Disabled
     fun changeLeverageTest() {
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = Symbol.BCHUSDT
+        parameters["symbol"] = Symbol.valueOf("BCHUSDT")
         parameters["leverage"] = 10
         println(pretty.writeValueAsString(om.readTree(clientImpl.account().changeInitialLeverage(parameters))))
     }

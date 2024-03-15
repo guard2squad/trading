@@ -2,7 +2,6 @@ package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.g2s.trading.MarkPriceUseCase
-import com.g2s.trading.symbol.SymbolUseCase
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -35,10 +34,5 @@ class TestConfig {
     @Bean
     fun markPriceUseCase(restApiExchange: Exchange): MarkPriceUseCase {
         return MarkPriceUseCase(restApiExchange)
-    }
-
-    @Bean
-    fun symbolUseCase(restApiExchange: Exchange): SymbolUseCase {
-        return SymbolUseCase(restApiExchange)
     }
 }

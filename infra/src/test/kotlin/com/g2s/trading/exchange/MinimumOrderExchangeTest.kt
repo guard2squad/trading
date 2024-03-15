@@ -92,10 +92,8 @@ class MinimumOrderExchangeTest {
 
     @Test
     fun testGetMinQtyByMarketOrder() {
-        val symbols = Symbol.entries
-        for (symbol in symbols) {
-            getMinQtyByMarketOrder(symbol)
-        }
+        val symbol = Symbol.valueOf("BTCUSDT")
+        getMinQtyByMarketOrder(symbol)
     }
 
 
@@ -138,7 +136,7 @@ class MinimumOrderExchangeTest {
     // 전략의 analyze 메서드를 테스트
     @Test
     fun testAnalyze() {
-        val candleStick = getCandleStickData(Symbol.BTCUSDT, Interval.ONE_MINUTE, "2024-02-27-1037")
+        val candleStick = getCandleStickData(Symbol.valueOf("BTCUSDT"), Interval.ONE_MINUTE, "2024-02-27-1037")
         // check report
         when (val report = analyze(candleStick, 1.5, 1.5)) {
             is AnalyzeReport.MatchingReport -> {

@@ -5,19 +5,17 @@ import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.history.History
-import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.openman.AnalyzeReport
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
-import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
@@ -177,6 +175,7 @@ class NewSimpleOpenMan(
             is AnalyzeReport.MatchingReport -> {
                 // open position
                 val position = Position(
+                    positionKey = Position.PositionKey(analyzeReport.symbol, analyzeReport.orderSide),
                     strategyKey = spec.strategyKey,
                     symbol = analyzeReport.symbol,
                     orderSide = analyzeReport.orderSide,

@@ -3,7 +3,6 @@ package com.g2s.trading
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -37,10 +36,10 @@ class NewSimpleCloseMan(
             .let { ConcurrentHashMap(it) }
 
     // 열린 포지션을 관리
-    private val symbolPositionMap: ConcurrentHashMap<Symbol, Position> =
+    private val symbolPositionMap: ConcurrentHashMap<Position.PositionKey, Position> =
         positionUseCase.getAllPositions()
             .filter { position -> specs.keys.contains(position.strategyKey) }
-            .associateBy { it.symbol }
+            .associateBy { it.positionKey }
             .let { ConcurrentHashMap(it) }
 
     @EventListener
@@ -70,7 +69,7 @@ class NewSimpleCloseMan(
         logger.debug("handlePositionSyncedEvent : position strategy key = ${newPosition.strategyKey}")
         if (!specs.keys.contains(newPosition.strategyKey)) return
         logger.debug("handlePositionSyncedEvent: ${newPosition.symbol}")
-        symbolPositionMap.replace(newPosition.symbol, newPosition)
+        symbolPositionMap.replace(newPosition.positionKey, newPosition)
         logger.debug("position update for key: ${newPosition.strategyKey}")
     }
 
@@ -141,7 +140,7 @@ class NewSimpleCloseMan(
         if (shouldClose) {
             logger.debug("포지션 청산: $position")
             logger.debug("익절: $cntProfit, 손절: $cntLoss")
-            symbolPositionMap.remove(position.symbol)
+            symbolPositionMap.remove(position.positionKey)
             logger.debug("position deleted from symbolPositionMap: ${position.strategyKey}")
             positionUseCase.closePosition(position, spec)
         }

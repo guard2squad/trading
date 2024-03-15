@@ -4,6 +4,7 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
+import org.bson.UuidRepresentation
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -43,6 +44,7 @@ class MongoConfig(
                 builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
             }
             .applyConnectionString(ConnectionString(mongoConnectionString))
+            .uuidRepresentation(UuidRepresentation.JAVA_LEGACY)
             .build()
     }
 

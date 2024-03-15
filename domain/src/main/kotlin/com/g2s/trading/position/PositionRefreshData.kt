@@ -5,5 +5,6 @@ import com.g2s.trading.symbol.Symbol
 data class PositionRefreshData(
     val symbol: Symbol,
     val entryPrice: Double,
-    val positionAmt: Double
+    val positionAmt: Double,
+    val positionSide: PositionSide,
 )

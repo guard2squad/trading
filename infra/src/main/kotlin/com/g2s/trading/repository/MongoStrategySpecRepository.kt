@@ -1,8 +1,13 @@
 package com.g2s.trading.repository
 
+import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
+import com.mongodb.client.model.Filters
+import com.mongodb.client.model.FindOneAndReplaceOptions
+import com.mongodb.client.model.ReturnDocument
+import org.bson.Document
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
@@ -43,5 +48,16 @@ class MongoStrategySpecRepository(
         return mongoTemplate.find(
             query, StrategySpec::class.java, SPEC_COLLECTION_NAME
         )
+    }
+
+    override fun updateSpec(strategySpec: StrategySpec): StrategySpec {
+        val om = ObjectMapperProvider.get()
+        val resultDocument = mongoTemplate.db.getCollection(SPEC_COLLECTION_NAME).findOneAndReplace(
+            Filters.eq(strategySpec::strategyKey.name, strategySpec.strategyKey),
+            Document.parse(om.writeValueAsString(strategySpec)),
+            FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER).upsert(true)
+        )
+
+        return om.readValue(resultDocument!!.toJson(), StrategySpec::class.java)
     }
 }
