@@ -1,10 +1,27 @@
 package com.g2s.trading.symbol
 
 import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.strategy.StrategyType
 import org.springframework.stereotype.Service
 
 @Service
-class SymbolUseCase(val exchangeImpl: Exchange) {
+class SymbolUseCase(
+    val exchangeImpl: Exchange,
+    val mongoStrategySpecRepository: StrategySpecRepository
+) {
+
+    private val symbols: MutableSet<Symbol> = StrategyType.entries
+        .flatMap { strategyType ->
+            mongoStrategySpecRepository.findAllServiceStrategySpecByType(strategyType.value)
+                .flatMap { strategySpec ->
+                    strategySpec.symbols
+                }
+        }.toMutableSet()
+
+    fun getAllSymbols() : List<Symbol> {
+        return symbols.toList()
+    }
 
     fun getQuantityPrecision(symbol: Symbol): Int {
         return exchangeImpl.getQuantityPrecision(symbol)

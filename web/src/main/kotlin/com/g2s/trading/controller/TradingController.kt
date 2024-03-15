@@ -3,6 +3,7 @@ package com.g2s.trading.controller
 import com.g2s.trading.dreamandhope.DreamAndHope
 import com.g2s.trading.dreamandhope.StartStrategyRequest
 import com.g2s.trading.dreamandhope.StopStrategyRequest
+import com.g2s.trading.dreamandhope.UpdateStrategyRequest
 import com.g2s.trading.response.ApiResponseService
 import com.g2s.trading.response.ApiResult
 import org.springframework.http.HttpEntity
@@ -30,6 +31,15 @@ class TradingController(
         @RequestBody stopStrategyRequest: StopStrategyRequest
     ): HttpEntity<ApiResult> {
         dreamAndHope.stop(stopStrategyRequest.strategyKey)
+
+        return apiResponseService.noContent().toResponseEntity()
+    }
+
+    @PostMapping("api/update")
+    fun update(
+        @RequestBody updateStrategyRequest: UpdateStrategyRequest
+    ): HttpEntity<ApiResult> {
+        dreamAndHope.update(updateStrategyRequest.strategySpec)
 
         return apiResponseService.noContent().toResponseEntity()
     }

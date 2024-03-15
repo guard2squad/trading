@@ -23,8 +23,9 @@ class SimpleCloseManTest(
     @Test
     fun closeTest() {
         val position = Position(
+            positionKey = Position.PositionKey(Symbol.valueOf("BTCUSDT"), OrderSide.SHORT),
             strategyKey = "test",
-            symbol = Symbol.BTCUSDT,
+            symbol = Symbol.valueOf("BTCUSDT"),
             orderSide = OrderSide.SHORT,
             orderType = OrderType.MARKET,
             entryPrice = 69762.3,
@@ -32,16 +33,16 @@ class SimpleCloseManTest(
             // 직접 입력 필요
             referenceData = om.readTree(
                 "{\n" +
-                        "    \"symbol\": \"BTCUSDT\",\n" +
-                        "    \"interval\": \"ONE_MINUTE\",\n" +
-                        "    \"key\": 1710087300000,\n" +
-                        "    \"open\": 69488,\n" +
-                        "    \"high\": 69820,\n" +
-                        "    \"low\": 69338.2,\n" +
-                        "    \"close\": 69499.5,\n" +
-                        "    \"volume\": 40.476,\n" +
-                        "    \"numberOfTrades\": 78,\n" +
-                        "    \"tailLength\": 480.75\n" +
+                        "  \"symbol\": \"BTCUSDT\",\n" +
+                        "  \"interval\": \"ONE_MINUTE\",\n" +
+                        "  \"key\": \"1710247680000\",\n" +
+                        "  \"open\": 71999,\n" +
+                        "  \"high\": 72380,\n" +
+                        "  \"low\": 71885,\n" +
+                        "  \"close\": 71961,\n" +
+                        "  \"volume\": 67.816,\n" +
+                        "  \"numberOfTrades\": 61,\n" +
+                        "  \"tailLength\": 571.5\n" +
                         "}"
             )
         )
@@ -51,7 +52,7 @@ class SimpleCloseManTest(
 
     @Test
     fun getLastPriceTest() {
-        println(markPriceUseCase.getMarkPrice(Symbol.BTCUSDT))
+        println(markPriceUseCase.getMarkPrice(Symbol.valueOf("BTCUSDT")))
     }
 
     private fun shouldClose(position: Position): Boolean {
@@ -61,7 +62,8 @@ class SimpleCloseManTest(
         when (position.orderSide) {
             OrderSide.LONG -> {
                 // 손절
-                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                val stickLength =
+                    BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
                 if (stickLength.multiply(stopLossFactor) > entryPrice.minus(lastPrice)) {
                     println(
                         "롱 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +
@@ -80,7 +82,8 @@ class SimpleCloseManTest(
 
             OrderSide.SHORT -> {
                 // 손절
-                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                val stickLength =
+                    BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
                 if (stickLength.multiply(stopLossFactor) < lastPrice.minus(entryPrice)) {
                     println(
                         "숏 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +

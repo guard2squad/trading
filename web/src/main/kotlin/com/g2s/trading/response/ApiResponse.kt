@@ -1,6 +1,5 @@
 package com.g2s.trading.response
 
-import com.g2s.trading.response.ApiResult
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity

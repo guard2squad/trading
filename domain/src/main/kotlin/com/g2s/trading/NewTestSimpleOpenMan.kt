@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
@@ -175,6 +176,7 @@ class NewTestSimpleOpenMan(
             is AnalyzeReport.MatchingReport -> {
                 // open position
                 val position = Position(
+                    positionKey = Position.PositionKey(analyzeReport.symbol, analyzeReport.orderSide),
                     strategyKey = spec.strategyKey,
                     symbol = analyzeReport.symbol,
                     orderSide = analyzeReport.orderSide,
