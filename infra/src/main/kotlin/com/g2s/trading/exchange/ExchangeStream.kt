@@ -13,16 +13,20 @@ import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.history.History
+import com.g2s.trading.history.HistorySide
+import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
-import com.g2s.trading.order.Symbol
 import com.g2s.trading.position.PositionRefreshData
+import com.g2s.trading.position.PositionSide
 import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.symbol.Symbol
+import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
-
 
 @Component
 class ExchangeStream(
@@ -30,7 +34,9 @@ class ExchangeStream(
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
     private val eventUseCase: EventUseCase,
     private val positionUseCase: PositionUseCase,
-    private val accountUseCase: AccountUseCase
+    private val accountUseCase: AccountUseCase,
+    private val historyUseCase: HistoryUseCase,
+    private val symbolUseCase: SymbolUseCase
 ) {
     private val om = ObjectMapperProvider.get()
     private val pretty = om.writerWithDefaultPrettyPrinter()
@@ -80,7 +86,6 @@ class ExchangeStream(
 
     private fun openCandleStickStream(symbol: Symbol, interval: Interval): Int {
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
-            logger.debug("candle stick $symbol")
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
             val symbolValue = Symbol.valueOf(jsonKlineData.get("s").asText())
@@ -148,16 +153,18 @@ class ExchangeStream(
                                 symbol = Symbol.valueOf(node.get("s").asText()),
                                 entryPrice = node.get("ep").asDouble(),
                                 positionAmt = node.get("pa").asDouble(),
+                                positionSide = PositionSide.valueOf(node.get("ps").asText())
                             )
                         }
                         // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개
+                        assert(positionRefreshDataList.size == 1)
                         val positionRefreshData = positionRefreshDataList[0]
                         positionUseCase.refreshPosition(positionRefreshData)
                         logger.debug(
                             "POSITION_UPDATE_EVENT" +
                                     "\n - refreshedPositionAmt: ${positionRefreshData.positionAmt}" +
                                     "\n - entryPrice: ${positionRefreshData.entryPrice}" +
-                                    "\n - symbol: ${positionRefreshData.symbol}"
+                                    "\n - symbol: ${positionRefreshData.symbol.value}"
                         )
                     }
                 }
@@ -168,8 +175,19 @@ class ExchangeStream(
                     // Order Status가 FILLED되면 refresh account and position
                     if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
                         val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
+                        // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
                         positionUseCase.syncPosition(symbol)
                         accountUseCase.syncAccount()
+                        val history = History(
+                            symbol = Symbol.valueOf(jsonOrder.get("s").asText()),
+                            historySide = HistorySide.valueOf(jsonOrder.get("S").asText()),
+                            averagePrice = jsonOrder.get("ap").asDouble(),
+                            quantity = jsonOrder.get("z").asDouble(),
+                            fee = jsonOrder.get("n").asDouble(),
+                            orderTime = jsonOrder.get("T").asLong(),
+                            realizedProfit = jsonOrder.get("rp").asDouble()
+                        )
+                        historyUseCase.recordHistory(history)
                         logger.debug("ORDER_TRADE_UPDATE\n - position & account synced")
                     }
                 }
@@ -181,7 +199,7 @@ class ExchangeStream(
 
     private fun openMarketStreams(): List<Int> {
         val connectionIds = mutableListOf<Int>()
-        Symbol.entries.forEach { symbol ->
+        symbolUseCase.getAllSymbols().forEach { symbol ->
             Interval.entries.forEach { interval ->
                 val candleStickConnectionId = openCandleStickStream(symbol, interval)
                 connectionIds.add(candleStickConnectionId)

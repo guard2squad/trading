@@ -3,8 +3,11 @@ package com.g2s.trading.position
 import com.g2s.trading.EventUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.history.HistoryUseCase
+import com.g2s.trading.strategy.StrategySpec
+import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
@@ -14,10 +17,11 @@ class PositionUseCase(
     private val exchangeImpl: Exchange,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
+    private val historyUseCase: HistoryUseCase,
     private val positionRepository: PositionRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
-    private val strategyPositionMap = ConcurrentHashMap<String, Position>() // StrategyKey : Position
+    private val positionMap = ConcurrentHashMap<Position.PositionKey, Position>()
 
     init {
         loadPositions()
@@ -29,75 +33,88 @@ class PositionUseCase(
         logger.debug("load positions: ${positions.size}")
         // map 저장
         positions.forEach { position ->
-            strategyPositionMap[position.strategyKey] = position
+            positionMap[position.positionKey] = position
         }
     }
 
-    fun openPosition(position: Position) {
+    fun openPosition(position: Position, spec: StrategySpec) {
         logger.debug("open position\n - symbol:${position.symbol}")
-        val currentValue = strategyPositionMap.computeIfAbsent(position.strategyKey) { _ ->
-            logger.debug("map size = ${strategyPositionMap.size}\n")
-            // set account unsynced
-            accountUseCase.setUnSynced()
-            // update unsynced position to DB
-            positionRepository.savePosition(position)
-            // save unsynced position to map
-            position
-        }
+        try {
+            historyUseCase.stagingSpec(position.symbol, spec)
 
-        if (currentValue == position) {
-            // send order
-            exchangeImpl.openPosition(position)
-        }
+            val currentValue = positionMap.computeIfAbsent(position.positionKey) { _ ->
+                logger.debug("map size = ${positionMap.size}\n")
+                accountUseCase.setUnSynced()
+                positionRepository.savePosition(position)
+                position
+            }
 
-        logger.debug("map size = ${strategyPositionMap.size}\n")
+            if (currentValue == position) {
+                exchangeImpl.openPosition(position)
+            }
+        } catch (e: OrderFailException) {
+            positionMap.remove(position.positionKey)
+            positionRepository.deletePosition(position)
+            accountUseCase.syncAccount()
+            historyUseCase.undoStagingSpec(position.symbol)
+        }
+        logger.debug("map size = ${positionMap.size}\n")
     }
 
     fun refreshPosition(positionRefreshData: PositionRefreshData) {
         logger.debug("refreshPosition")
-        strategyPositionMap.values.find {
+        positionMap.values.find {
+            // TOOD :PostionRefreshData와 postion key와 매핑
             it.symbol == positionRefreshData.symbol
         }?.let { old ->
             val updated = Position.update(old, positionRefreshData)
             if (updated.positionAmt != 0.0) {
                 logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
-                strategyPositionMap.replace(updated.strategyKey, updated)
+                positionMap.replace(updated.positionKey, updated)
             }
         }
     }
 
     fun syncPosition(symbol: Symbol) {
         logger.debug("syncPosition")
-        strategyPositionMap.values.find {
+        positionMap.values.find {
             it.symbol == symbol
         }?.let { old ->
             val synced = Position.sync(old)
             positionRepository.updatePosition(synced)
             logger.debug("position synced in DB\n")
-            strategyPositionMap.replace(synced.strategyKey, synced)
+            positionMap.replace(synced.positionKey, synced)
             logger.debug("position synced in map\n")
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }
 
-    fun closePosition(position: Position) {
-        accountUseCase.setUnSynced()
-        exchangeImpl.closePosition(position)
-        positionRepository.deletePosition(position)
-        strategyPositionMap.remove(position.strategyKey)
+    fun closePosition(position: Position, spec: StrategySpec) {
+        val originalPosition = position.copy()
+
+        try {
+            historyUseCase.stagingSpec(position.symbol, spec)
+            accountUseCase.setUnSynced()
+            positionRepository.deletePosition(position)
+            positionMap.remove(position.positionKey)
+            exchangeImpl.closePosition(position)
+        } catch (e: OrderFailException) {
+            logger.debug(e.message)
+            positionMap[originalPosition.positionKey] = originalPosition
+            positionRepository.savePosition(originalPosition)
+            accountUseCase.syncAccount()
+            historyUseCase.undoStagingSpec(position.symbol)
+            return
+        }
         logger.debug("$position closed\n")
     }
 
-    fun hasPosition(strategyKey: String): Boolean {
-        return strategyPositionMap[strategyKey] != null
-    }
-
     fun getAllUsedSymbols(): Set<Symbol> {
-        return strategyPositionMap.values.map { it.symbol }.toSet()
+        return positionMap.values.map { position -> position.symbol }.toSet()
     }
 
-    fun getAllLoadedPosition(): List<Position> {
-        return strategyPositionMap.values.toList()
+    fun getAllPositions(): List<Position> {
+        return positionMap.values.toList()
     }
 }

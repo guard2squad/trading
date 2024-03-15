@@ -2,6 +2,7 @@ package com.g2s.trading.dreamandhope
 
 import com.g2s.trading.EventUseCase
 import com.g2s.trading.StrategyEvent
+import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
 import org.slf4j.LoggerFactory
@@ -44,17 +45,16 @@ class DreamAndHope(
         }
     }
 
-    fun update(strategyKey: String) {
+    fun update(strategySpec: StrategySpec) {
         try {
-            logger.debug("stop: $strategyKey")
-            mongoStrategySpecRepository.findStrategySpecByKey(strategyKey)
-                ?.let { spec ->
-                    if (spec.status == StrategySpecServiceStatus.SERVICE) {
-                        eventUseCase.publishEvent(StrategyEvent.UpdateStrategyEvent(spec))
-                    }
-                }
+            logger.debug("update: ${strategySpec.strategyKey}")
+            mongoStrategySpecRepository.updateSpec(strategySpec)
+                .let { spec -> eventUseCase.publishEvent(StrategyEvent.UpdateStrategyEvent(spec)) }
         } catch (e: Exception) {
-            throw DreamAndHopeErrors.UPDATE_STRATEGY_ERROR.error("Failed to update strategy: $strategyKey", e)
+            throw DreamAndHopeErrors.UPDATE_STRATEGY_ERROR.error(
+                "Failed to update strategy: ${strategySpec.strategyKey}",
+                e
+            )
         }
     }
 }

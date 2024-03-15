@@ -23,23 +23,25 @@ import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
 @Component
-class NewSimpleOpenMan(
+class NewTestSimpleOpenMan(
     private val strategySpecRepository: StrategySpecRepository,
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
-    private val symbolUseCase: SymbolUseCase,
+    private val symbolUseCase: SymbolUseCase
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     companion object {
-        private val TYPE = "simple"
+        // 최소 수량 주문
+        private val TYPE = "test"
         private val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
         private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
@@ -147,8 +149,7 @@ class NewSimpleOpenMan(
                 else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
                     logger.debug("out 1 second, ${candleStick.symbol}")
                     false
-                }
-                else {
+                } else {
                     logger.debug("in 1 second, ${candleStick.symbol}")
                     oldCandleStick = old
                     true
@@ -182,7 +183,7 @@ class NewSimpleOpenMan(
                     orderType = OrderType.MARKET,
                     entryPrice = markPrice.price,
                     positionAmt = quantity(
-                        allocatedBalance,
+                        BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
                         BigDecimal(markPrice.price),
                         symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
@@ -339,8 +340,10 @@ class NewSimpleOpenMan(
         return AnalyzeReport.NonMatchingReport
     }
 
-    private fun quantity(balance: BigDecimal, markPrice: BigDecimal, precision: Int): Double {
-        return balance.divide(markPrice, precision, RoundingMode.DOWN).toDouble()
+    private fun quantity(minNotional: BigDecimal, markPrice: BigDecimal, quantityPrecision: Int): Double {
+        // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
+        // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
+        return minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
     }
 
     /*

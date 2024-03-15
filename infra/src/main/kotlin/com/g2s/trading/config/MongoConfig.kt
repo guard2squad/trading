@@ -4,6 +4,8 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
+import org.bson.UuidRepresentation
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -18,7 +20,7 @@ import java.util.concurrent.TimeUnit
 
 @Configuration
 class MongoConfig(
-    @Value("\${trading.mondob.uri}")
+    @Value("\${trading.mongodb.uri}")
     val mongoConnectionString: String,
     @Value("\${trading.mongodb.connectionPool.size}")
     val connectionPoolSize: Int,
@@ -28,6 +30,8 @@ class MongoConfig(
     companion object {
         private const val DATABASE_NAME = "dev"
     }
+
+    private val logger = LoggerFactory.getLogger(MongoConfig::class.java)
 
     @Bean
     fun mongoClientSettings(): MongoClientSettings {
@@ -40,11 +44,13 @@ class MongoConfig(
                 builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
             }
             .applyConnectionString(ConnectionString(mongoConnectionString))
+            .uuidRepresentation(UuidRepresentation.JAVA_LEGACY)
             .build()
     }
 
     @Bean
     fun mongoClient(): MongoClient {
+        logger.debug("Connecting to MongoDB at URI: {}", mongoConnectionString);
         return MongoClients.create(mongoClientSettings())
     }
 

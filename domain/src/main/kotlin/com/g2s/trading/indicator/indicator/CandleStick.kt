@@ -1,6 +1,6 @@
 package com.g2s.trading.indicator.indicator
 
-import com.g2s.trading.order.Symbol
+import com.g2s.trading.symbol.Symbol
 
 data class CandleStick(
     val symbol: Symbol,

@@ -13,7 +13,7 @@ object BinanceOrderParameterConverter {
         positionSide: PositionSide
     ): LinkedHashMap<String, Any> {
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = position.symbol.toString()
+        parameters["symbol"] = position.symbol.value
         parameters["side"] = when (position.orderSide) {
             OrderSide.LONG -> "BUY"
             OrderSide.SHORT -> "SELL"
@@ -32,7 +32,7 @@ object BinanceOrderParameterConverter {
         positionSide: PositionSide
     ): LinkedHashMap<String, Any> {
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = position.symbol.toString()
+        parameters["symbol"] = position.symbol.value
         parameters["side"] = when (position.orderSide) {
             OrderSide.LONG -> "SELL"
             OrderSide.SHORT -> "BUY"
