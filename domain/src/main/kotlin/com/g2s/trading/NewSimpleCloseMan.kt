@@ -22,6 +22,7 @@ class NewSimpleCloseMan(
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
+    // TODO: change type
     companion object {
         private const val TYPE = "test"
     }

@@ -1,4 +1,4 @@
-name: dev ci/cd
+name: deploy
 # To automatically trigger a workflow, use "on" to define which events can cause the workflow to run
 on:
   workflow_dispatch:
