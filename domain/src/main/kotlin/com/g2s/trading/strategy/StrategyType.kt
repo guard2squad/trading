@@ -1,6 +1,6 @@
 package com.g2s.trading.strategy
 
 enum class StrategyType(val value: String) {
-    TEST("test"),
-    SIMPLE("simple")
+    SIMPLE("simple"),
+    MINIMUM_SIMPLE("minimum_simple")
 }

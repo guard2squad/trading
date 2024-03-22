@@ -13,9 +13,6 @@ import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.history.History
-import com.g2s.trading.history.HistorySide
-import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.indicator.indicator.Interval
 import com.g2s.trading.position.PositionRefreshData
@@ -35,7 +32,6 @@ class ExchangeStream(
     private val eventUseCase: EventUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
-    private val historyUseCase: HistoryUseCase,
     private val symbolUseCase: SymbolUseCase
 ) {
     private val om = ObjectMapperProvider.get()
@@ -178,16 +174,6 @@ class ExchangeStream(
                         // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
                         positionUseCase.syncPosition(symbol)
                         accountUseCase.syncAccount()
-                        val history = History(
-                            symbol = Symbol.valueOf(jsonOrder.get("s").asText()),
-                            historySide = HistorySide.valueOf(jsonOrder.get("S").asText()),
-                            averagePrice = jsonOrder.get("ap").asDouble(),
-                            quantity = jsonOrder.get("z").asDouble(),
-                            fee = jsonOrder.get("n").asDouble(),
-                            orderTime = jsonOrder.get("T").asLong(),
-                            realizedProfit = jsonOrder.get("rp").asDouble()
-                        )
-                        historyUseCase.recordHistory(history)
                         logger.debug("ORDER_TRADE_UPDATE\n - position & account synced")
                     }
                 }

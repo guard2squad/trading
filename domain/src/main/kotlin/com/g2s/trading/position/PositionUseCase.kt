@@ -5,7 +5,6 @@ import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
@@ -17,7 +16,6 @@ class PositionUseCase(
     private val exchangeImpl: Exchange,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
-    private val historyUseCase: HistoryUseCase,
     private val positionRepository: PositionRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
@@ -40,7 +38,6 @@ class PositionUseCase(
     fun openPosition(position: Position, spec: StrategySpec) {
         logger.debug("포지션 오픈 - symbol:${position.symbol}")
         try {
-            historyUseCase.stagingSpec(position.symbol, spec)
 
             val currentValue = positionMap.computeIfAbsent(position.positionKey) { _ ->
                 logger.debug("openPostion 실행 전 map size = ${positionMap.size}\n")
@@ -57,7 +54,6 @@ class PositionUseCase(
             positionMap.remove(position.positionKey)
             positionRepository.deletePosition(position)
             accountUseCase.syncAccount()
-            historyUseCase.undoStagingSpec(position.symbol)
         }
         logger.debug("openPostion 실행 후 map size = ${positionMap.size}\n")
     }
@@ -95,7 +91,6 @@ class PositionUseCase(
         val originalPosition = position.copy()
 
         try {
-            historyUseCase.stagingSpec(position.symbol, spec)
             accountUseCase.setUnSynced()
             positionRepository.deletePosition(position)
             positionMap.remove(position.positionKey)
@@ -105,7 +100,6 @@ class PositionUseCase(
             positionMap[originalPosition.positionKey] = originalPosition
             positionRepository.savePosition(originalPosition)
             accountUseCase.syncAccount()
-            historyUseCase.undoStagingSpec(position.symbol)
             return
         }
         logger.debug("$position closed\n")
