@@ -120,6 +120,14 @@ class NewMinimumSizeOrderSimpleCloseMan(
                     shouldClose = true
                     cntProfit++
                 }
+                logger.debug(
+                    "롱 손절 확인 = ${(stickLength.multiply(stopLossFactor) > entryPrice.minus(lastPrice))}| lastPrice: $lastPrice | 오픈시 고가 - 저가: $stickLength" +
+                            " | StopLossFactor 반영 후 고가 - 저가: ${stickLength.multiply(stopLossFactor)}"
+                )
+                logger.debug(
+                    "롱 익절 확인 = ${(lastPrice > entryPrice.plus(BigDecimal(position.referenceData["tailLength"].asDouble())))} | lastPrice: $lastPrice | entryPrice: $entryPrice | 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}" +
+                            "entryPrice - 오픈시 꼬리 길이 = ${entryPrice.plus(BigDecimal(position.referenceData["tailLength"].asDouble()))}"
+                )
             }
 
             OrderSide.SHORT -> {
@@ -142,6 +150,14 @@ class NewMinimumSizeOrderSimpleCloseMan(
                     shouldClose = true
                     cntProfit++
                 }
+                logger.debug(
+                    "숏 손절 확인 = ${stickLength.multiply(stopLossFactor) < lastPrice.minus(entryPrice)} | lastPrice: $lastPrice | 오픈시 고가 - 저가: $stickLength" +
+                            " | StopLossFactor 반영 후 고가 - 저가: ${stickLength.multiply(stopLossFactor)}"
+                )
+                logger.debug(
+                    "숏 익절 확인 = ${lastPrice < entryPrice.minus(BigDecimal(position.referenceData["tailLength"].asDouble()))} | lastPrice: $lastPrice | entryPrice: $entryPrice | 오픈시 꼬리 길이: ${position.referenceData["tailLength"].asDouble()}" +
+                            "| entryPrice - 오픈 시 꼬리 길이 : ${entryPrice.minus(BigDecimal(position.referenceData["tailLength"].asDouble()))}"
+                )
             }
         }
         // close position

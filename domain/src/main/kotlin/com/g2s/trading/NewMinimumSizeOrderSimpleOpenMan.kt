@@ -148,8 +148,7 @@ class NewMinimumSizeOrderSimpleOpenMan(
                 else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
                     logger.debug("out 1 second, ${candleStick.symbol}")
                     false
-                }
-                else {
+                } else {
                     logger.debug("in 1 second, ${candleStick.symbol}")
                     oldCandleStick = old
                     true
