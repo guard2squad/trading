@@ -38,12 +38,12 @@ class PositionUseCase(
     }
 
     fun openPosition(position: Position, spec: StrategySpec) {
-        logger.debug("open position\n - symbol:${position.symbol}")
+        logger.debug("포지션 오픈 - symbol:${position.symbol}")
         try {
             historyUseCase.stagingSpec(position.symbol, spec)
 
             val currentValue = positionMap.computeIfAbsent(position.positionKey) { _ ->
-                logger.debug("map size = ${positionMap.size}\n")
+                logger.debug("openPostion 실행 전 map size = ${positionMap.size}\n")
                 accountUseCase.setUnSynced()
                 positionRepository.savePosition(position)
                 position
@@ -53,12 +53,13 @@ class PositionUseCase(
                 exchangeImpl.openPosition(position)
             }
         } catch (e: OrderFailException) {
+            logger.debug(e.message)
             positionMap.remove(position.positionKey)
             positionRepository.deletePosition(position)
             accountUseCase.syncAccount()
             historyUseCase.undoStagingSpec(position.symbol)
         }
-        logger.debug("map size = ${positionMap.size}\n")
+        logger.debug("openPostion 실행 후 map size = ${positionMap.size}\n")
     }
 
     fun refreshPosition(positionRefreshData: PositionRefreshData) {

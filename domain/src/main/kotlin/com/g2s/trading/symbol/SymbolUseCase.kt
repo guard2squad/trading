@@ -2,6 +2,7 @@ package com.g2s.trading.symbol
 
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.strategy.StrategySpecServiceStatus
 import com.g2s.trading.strategy.StrategyType
 import org.springframework.stereotype.Service
 
@@ -14,12 +15,11 @@ class SymbolUseCase(
     private val symbols: MutableSet<Symbol> = StrategyType.entries
         .flatMap { strategyType ->
             mongoStrategySpecRepository.findAllServiceStrategySpecByType(strategyType.value)
-                .flatMap { strategySpec ->
-                    strategySpec.symbols
-                }
+                .filter { strategySpec -> strategySpec.status == StrategySpecServiceStatus.SERVICE }
+                .flatMap { strategySpec -> strategySpec.symbols }
         }.toMutableSet()
 
-    fun getAllSymbols() : List<Symbol> {
+    fun getAllSymbols(): List<Symbol> {
         return symbols.toList()
     }
 
