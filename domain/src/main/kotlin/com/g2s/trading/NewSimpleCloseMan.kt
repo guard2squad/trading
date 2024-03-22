@@ -96,7 +96,8 @@ class NewSimpleCloseMan(
         when (position.orderSide) {
             OrderSide.LONG -> {
                 // 손절
-                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                val stickLength =
+                    BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
                 if (stickLength.multiply(stopLossFactor) > entryPrice.minus(lastPrice)) {
                     logger.debug(
                         "롱 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +
@@ -117,7 +118,8 @@ class NewSimpleCloseMan(
 
             OrderSide.SHORT -> {
                 // 손절
-                val stickLength = BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
+                val stickLength =
+                    BigDecimal(position.referenceData["high"].asDouble()).minus(BigDecimal(position.referenceData["low"].asDouble()))
                 if (stickLength.multiply(stopLossFactor) < lastPrice.minus(entryPrice)) {
                     logger.debug(
                         "숏 손절: lastPrice: $lastPrice, 오픈시 고가 - 저가: $stickLength" +
@@ -141,7 +143,6 @@ class NewSimpleCloseMan(
             logger.debug("포지션 청산: $position")
             logger.debug("익절: $cntProfit, 손절: $cntLoss")
             symbolPositionMap.remove(position.positionKey)
-            logger.debug("position deleted from symbolPositionMap: ${position.strategyKey}")
             positionUseCase.closePosition(position, spec)
         }
         logger.debug("${position.symbol} shouldClose: $shouldClose")

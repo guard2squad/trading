@@ -70,23 +70,29 @@ class NewMinimumSizeOrderSimpleCloseMan(
         symbolPositionMap.compute(newPosition.positionKey) { _, _ ->
             newPosition
         }
-        logger.debug("handlePositionSyncedEvent : position strategy key = ${newPosition.strategyKey}")
+        logger.debug("handlePositionSyncedEvent : position strategy key = ${newPosition.strategyKey}, symbol : ${newPosition.symbol.value}")
+        logger.debug("after sync positoion symbolPositionMap's mapsize is ${symbolPositionMap.size}")
     }
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
-        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
+//        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
+        logger.debug("current symbolPositionMap is ${symbolPositionMap.size}")
         // find matching position
         val position = symbolPositionMap.asSequence()
             .map { it.value }
             .find { position -> position.symbol == event.source.symbol } ?: return
         // position must be synced
         if (!position.synced) {
+            logger.debug("position not synced : ${position.symbol.value}")
             return
         }
         // if you find position, close it
         val acquired = lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
-        if (!acquired) return
+        if (!acquired) {
+            logger.debug("lock is not acquired. strategyKey : ${position.strategyKey}, symbol : ${position.symbol}")
+            return
+        }
         // check should close
         val entryPrice = BigDecimal(position.entryPrice)
         val lastPrice = BigDecimal(markPriceUseCase.getMarkPrice(position.symbol).price)
@@ -138,7 +144,6 @@ class NewMinimumSizeOrderSimpleCloseMan(
                 }
             }
         }
-        logger.debug("shouldClose check" + position.referenceData["candleStick"].asText())
         // close position
         if (shouldClose) {
             logger.debug("포지션 청산: $position")
