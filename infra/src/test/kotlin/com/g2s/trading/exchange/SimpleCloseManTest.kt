@@ -6,13 +6,14 @@ import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.symbol.Symbol
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import java.math.BigDecimal
 
-@ActiveProfiles("TEST")
+@ActiveProfiles("test")
 @SpringBootTest(classes = [TestConfig::class])
 class SimpleCloseManTest(
     @Autowired private val markPriceUseCase: MarkPriceUseCase
@@ -51,6 +52,7 @@ class SimpleCloseManTest(
     }
 
     @Test
+    @DisplayName("REST API 호출해서 정상적으로 MarkPrice 받는지 테스트")
     fun getLastPriceTest() {
         println(markPriceUseCase.getMarkPrice(Symbol.valueOf("BTCUSDT")))
     }

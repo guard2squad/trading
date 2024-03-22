@@ -23,13 +23,12 @@ import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
 @Component
-class NewTestSimpleOpenMan(
+class NewMinimumSizeOrderSimpleOpenMan(
     private val strategySpecRepository: StrategySpecRepository,
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
@@ -41,7 +40,7 @@ class NewTestSimpleOpenMan(
 
     companion object {
         // 최소 수량 주문
-        private val TYPE = "test"
+        private val TYPE = "minimum_simple"
         private val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
         private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
