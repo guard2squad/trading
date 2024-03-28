@@ -1,8 +1,11 @@
-package com.g2s.trading
+package com.g2s.trading.strategy.simple
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.g2s.trading.MarkPriceUseCase
+import com.g2s.trading.StrategyEvent
+import com.g2s.trading.TradingEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.indicator.indicator.CandleStick
@@ -28,19 +31,18 @@ import kotlin.math.max
 import kotlin.math.min
 
 @Component
-class NewMinimumSizeOrderSimpleOpenMan(
+class NewSimpleOpenMan(
     private val strategySpecRepository: StrategySpecRepository,
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
-    private val symbolUseCase: SymbolUseCase
+    private val symbolUseCase: SymbolUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     companion object {
-        // 최소 수량 주문
-        private val TYPE = "minimum_simple"
+        private val TYPE = "simple"
         private val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
         private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
@@ -148,7 +150,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                 else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
                     logger.debug("out 1 second, ${candleStick.symbol}")
                     false
-                } else {
+                }
+                else {
                     logger.debug("in 1 second, ${candleStick.symbol}")
                     oldCandleStick = old
                     true
@@ -182,7 +185,7 @@ class NewMinimumSizeOrderSimpleOpenMan(
                     orderType = OrderType.MARKET,
                     entryPrice = markPrice.price,
                     positionAmt = quantity(
-                        BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
+                        allocatedBalance,
                         BigDecimal(markPrice.price),
                         symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
@@ -317,7 +320,7 @@ class NewMinimumSizeOrderSimpleOpenMan(
                 }
             } else {
                 logger.debug("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
-                val candleHammerRatio = highTailLength / bodyLength
+                val candleHammerRatio = lowTailLength / bodyLength
                 logger.debug("calculated candleHammerRatio: $candleHammerRatio")
                 if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
                         bodyBottom,
@@ -339,10 +342,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
         return AnalyzeReport.NonMatchingReport
     }
 
-    private fun quantity(minNotional: BigDecimal, markPrice: BigDecimal, quantityPrecision: Int): Double {
-        // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
-        // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
-        return minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+    private fun quantity(balance: BigDecimal, markPrice: BigDecimal, precision: Int): Double {
+        return balance.divide(markPrice, precision, RoundingMode.DOWN).toDouble()
     }
 
     /*

@@ -14,15 +14,18 @@ data class Position(
     val orderSide: OrderSide,
     val orderType: OrderType,
     val referenceData: JsonNode,
+    val transactionTime: Long = 0,
     val synced: Boolean = false // close시 확인
 ) {
 
+    // ONE_WAY_MODE의 경우 Symbol로 만 식별 가능하지만 HEDGE_MODE인 경우 OrderSide도 포함해야함
     data class PositionKey(val symbol: Symbol, val orderSide: OrderSide)
     companion object {
         fun update(old: Position, refreshData: PositionRefreshData): Position {
             return old.copy(
                 entryPrice = refreshData.entryPrice,
                 positionAmt = refreshData.positionAmt,
+                transactionTime = refreshData.transactionTime,
             )
         }
 

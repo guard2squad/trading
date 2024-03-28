@@ -61,12 +61,10 @@ class PositionUseCase(
     fun refreshPosition(positionRefreshData: PositionRefreshData) {
         logger.debug("refreshPosition")
         positionMap.values.find {
-            // TOOD :PostionRefreshData와 postion key와 매핑
             it.symbol == positionRefreshData.symbol
         }?.let { old ->
             val updated = Position.update(old, positionRefreshData)
             if (updated.positionAmt != 0.0) {
-                logger.debug("position is opened because positionAmt is  ${updated.positionAmt}")
                 positionRepository.updatePosition(updated)
                 positionMap.replace(updated.positionKey, updated)
             }
@@ -83,6 +81,7 @@ class PositionUseCase(
             logger.debug("position synced in DB\n")
             positionMap.replace(synced.positionKey, synced)
             logger.debug("position synced in map\n")
+            // TODO: openHistory 저장
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }

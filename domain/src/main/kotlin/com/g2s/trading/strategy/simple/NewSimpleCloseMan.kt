@@ -1,5 +1,9 @@
-package com.g2s.trading
+package com.g2s.trading.strategy.simple
 
+import com.g2s.trading.MarkPriceUseCase
+import com.g2s.trading.PositionEvent
+import com.g2s.trading.StrategyEvent
+import com.g2s.trading.TradingEvent
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide

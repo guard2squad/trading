@@ -1,5 +1,9 @@
-package com.g2s.trading
+package com.g2s.trading.strategy.minimum_simple
 
+import com.g2s.trading.MarkPriceUseCase
+import com.g2s.trading.PositionEvent
+import com.g2s.trading.StrategyEvent
+import com.g2s.trading.TradingEvent
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
@@ -138,7 +142,7 @@ class NewMinimumSizeOrderSimpleCloseMan(
                 // 손절
                 // 운영 scale 반영 전 tailLength
                 val tailLength = BigDecimal(position.referenceData["tailLength"].asDouble()).divide(scale)
-                if (tailLength < lastPrice.minus(entryPrice)) {
+                if (tailLength.multiply(stopLossFactor) < lastPrice.minus(entryPrice)) {
                     logger.debug(
                         "[숏 손절] entryPrice : $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
