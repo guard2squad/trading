@@ -31,6 +31,10 @@ class ConditionUseCase {
         return positionConditionMap.get(position.positionKey)!!.closeCondition!!
     }
 
+    fun removeCondition(position: Position) {
+        positionConditionMap.remove(position.positionKey)
+    }
+
     data class PositionCondition(
         val openCondition: OpenCondition,
         var closeCondition: CloseCondition? = null,

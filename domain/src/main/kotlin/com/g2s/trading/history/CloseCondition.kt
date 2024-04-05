@@ -12,10 +12,10 @@ import java.math.BigDecimal
 */
 sealed class CloseCondition {
     data class SimpleCondition(
-        val patten : SimplePattern,
         val tailLength: BigDecimal,
         val tailLengthWithStopLossFactor: BigDecimal,
         val entryPrice: BigDecimal,
-        val lastPrice: BigDecimal
-    )
+        val lastPrice: BigDecimal,
+        val beforeBalance: Double
+    ) : CloseCondition()
 }

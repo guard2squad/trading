@@ -8,6 +8,8 @@ import com.g2s.trading.StrategyEvent
 import com.g2s.trading.TradingEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
+import com.g2s.trading.history.ConditionUseCase
+import com.g2s.trading.history.OpenCondition
 import com.g2s.trading.indicator.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
@@ -18,6 +20,7 @@ import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
+import com.g2s.trading.strategy.minimum_simple.SimplePattern
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
@@ -38,6 +41,7 @@ class NewSimpleOpenMan(
     private val accountUseCase: AccountUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
     private val symbolUseCase: SymbolUseCase,
+    private val conditionUseCase: ConditionUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
@@ -150,8 +154,7 @@ class NewSimpleOpenMan(
                 else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
                     logger.debug("out 1 second, ${candleStick.symbol}")
                     false
-                }
-                else {
+                } else {
                     logger.debug("in 1 second, ${candleStick.symbol}")
                     oldCandleStick = old
                     true
@@ -169,7 +172,7 @@ class NewSimpleOpenMan(
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
         val hammerRatio = spec.op["hammerRatio"].asDouble()
         val scale = spec.op["scale"].asDouble()
-        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale)
+        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale, availableBalance)
         when (analyzeReport) {
             is AnalyzeReport.NonMatchingReport -> {
                 logger.debug("non matching report for symbol: ${candleStick.symbol}")
@@ -189,9 +192,11 @@ class NewSimpleOpenMan(
                         BigDecimal(markPrice.price),
                         symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
+                    asset = spec.asset,
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
+                conditionUseCase.setOpenCondition(position, analyzeReport.openCondition)
                 positionUseCase.openPosition(position, spec)
             }
         }
@@ -203,7 +208,8 @@ class NewSimpleOpenMan(
     private fun analyze(
         candleStick: CandleStick,
         hammerRatio: Double,
-        scale: Double
+        scale: Double,
+        availableBalance: BigDecimal
     ): AnalyzeReport {
         logger.debug("analyze... candleStick: $candleStick")
         val tailTop = BigDecimal(candleStick.high)
@@ -235,7 +241,15 @@ class NewSimpleOpenMan(
                         DoubleNode(topTailLength.multiply(decimalScale).toDouble())
                     )
                     logger.debug("scaled tailLength: ${topTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                            patten = SimplePattern.STAR_TOP_TAIL,
+                            candleHammerRatio = candleHammerRatio,
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble()
+                        ),
+                        referenceData
+                    )
                 }
             } else {
                 logger.debug("star bottom tail")
@@ -254,7 +268,14 @@ class NewSimpleOpenMan(
                         DoubleNode(bottomTailLength.multiply(decimalScale).toDouble())
                     )
                     logger.debug("scaled tailLength: ${bottomTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                            patten = SimplePattern.STAR_BOTTOM_TAIL,
+                            candleHammerRatio = candleHammerRatio,
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble()
+                        ), referenceData
+                    )
                 }
             }
         } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
@@ -274,7 +295,14 @@ class NewSimpleOpenMan(
                     DoubleNode(tailLength.multiply(decimalScale).toDouble())
                 )
                 logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
-                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
+                return AnalyzeReport.MatchingReport(
+                    candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                        patten = SimplePattern.TOP_TAIL,
+                        candleHammerRatio = candleHammerRatio,
+                        operationalCandleHammerRatio = decimalHammerRatio,
+                        beforeBalance = availableBalance.toDouble()
+                    ), referenceData
+                )
             }
         } else if (tailBottom < bodyBottom && tailTop == bodyTop) {
             logger.debug("bottom tail")
@@ -293,7 +321,14 @@ class NewSimpleOpenMan(
                     DoubleNode(tailLength.multiply(decimalScale).toDouble())
                 )
                 logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
-                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                return AnalyzeReport.MatchingReport(
+                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                        patten = SimplePattern.BOTTOM_TAIL,
+                        candleHammerRatio = candleHammerRatio,
+                        operationalCandleHammerRatio = decimalHammerRatio,
+                        beforeBalance = availableBalance.toDouble()
+                    ), referenceData
+                )
             }
         } else {
             logger.debug("middle tail")
@@ -316,7 +351,14 @@ class NewSimpleOpenMan(
                         DoubleNode(highTailLength.multiply(decimalScale).toDouble())
                     )
                     logger.debug("scaled tailLength: ${highTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.SHORT, referenceData)
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                            patten = SimplePattern.MIDDLE_HIGH_TAIL,
+                            candleHammerRatio = candleHammerRatio,
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble()
+                        ), referenceData
+                    )
                 }
             } else {
                 logger.debug("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
@@ -334,7 +376,14 @@ class NewSimpleOpenMan(
                         DoubleNode(lowTailLength.multiply(decimalScale).toDouble())
                     )
                     logger.debug("scaled tailLength: ${lowTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                            patten = SimplePattern.MIDDLE_LOW_TAIL,
+                            candleHammerRatio = candleHammerRatio,
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble()
+                        ), referenceData
+                    )
                 }
             }
         }

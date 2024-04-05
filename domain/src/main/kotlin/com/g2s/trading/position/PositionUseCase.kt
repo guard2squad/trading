@@ -5,6 +5,7 @@ import com.g2s.trading.PositionEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
@@ -16,6 +17,7 @@ class PositionUseCase(
     private val exchangeImpl: Exchange,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
+    private val historyUseCase: HistoryUseCase,
     private val positionRepository: PositionRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
@@ -81,7 +83,7 @@ class PositionUseCase(
             logger.debug("position synced in DB\n")
             positionMap.replace(synced.positionKey, synced)
             logger.debug("position synced in map\n")
-            // TODO: openHistory 저장
+            historyUseCase.setSyncedPosition(synced)
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }
@@ -93,6 +95,7 @@ class PositionUseCase(
             accountUseCase.setUnSynced()
             positionRepository.deletePosition(position)
             positionMap.remove(position.positionKey)
+            historyUseCase.setClosedPosition(position)
             exchangeImpl.closePosition(position)
         } catch (e: OrderFailException) {
             logger.debug(e.message)

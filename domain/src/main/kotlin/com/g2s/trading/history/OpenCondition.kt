@@ -14,7 +14,8 @@ sealed class OpenCondition {
     data class SimpleCondition(
         val patten: SimplePattern,
         val candleHammerRatio: BigDecimal,
-        val operationalCandleHammerRatio: BigDecimal
+        val operationalCandleHammerRatio: BigDecimal,
+        val beforeBalance: Double
     ) : OpenCondition()
 
     data object ManualCondition : OpenCondition()

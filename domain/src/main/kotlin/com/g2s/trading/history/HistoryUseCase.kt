@@ -1,32 +1,117 @@
 package com.g2s.trading.history
 
+import com.g2s.trading.TradingEvent
+import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.Position
+import com.g2s.trading.strategy.StrategySpecRepository
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class HistoryUseCase(
     val conditionUseCase: ConditionUseCase,
-
+    val accountUseCase: AccountUseCase,
+    val strategySpecRepository: StrategySpecRepository,
+    val exchangeImpl: Exchange
 ) {
+    private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
+    private val syncedPositions = ConcurrentHashMap<String, Position>()
+    private val closedPositions = ConcurrentHashMap<String, Position>()
 
-    // TODO: History를 관리하는 자료구조 Open, Close 나눠서 관리
+    init {
+        loadStrategySpecKey()
+        strategyHistoryToggleMap.compute("manual") { _, _ ->
+            true
+        }
+    }
 
-    fun recordOpenHistory(position: Position) {
-        val openHistory = History.Open(
+    fun setSyncedPosition(position: Position) {
+        val clientId = exchangeImpl.getClientIdAtOpen(position)
+        syncedPositions.compute(clientId) { _, _ ->
+            position
+        }
+    }
+
+    fun setClosedPosition(position: Position) {
+        val clientId = exchangeImpl.getClientIdAtClose(position)
+        closedPositions.compute(clientId) { _, _ ->
+            position
+        }
+    }
+
+    @EventListener
+    fun recordOpenHistory(event: TradingEvent.CommissionEvent) {
+        val position = syncedPositions[event.source.clientId]!!
+        if (strategyHistoryToggleMap[position.strategyKey]!!) {
+            val openHistory = History.Open(
+                historyKey = History.HistoryKey.from(position),
+                position = position,
+                strategyKey = position.strategyKey,
+                openCondition = conditionUseCase.getOpenCondition(position),
+                orderSide = position.orderSide,
+                orderType = position.orderType,
+                transactionTime = position.openTransactionTime,
+                commission = event.source.commission,
+                afterBalance = accountUseCase.getBalance(position.asset, position.openTransactionTime),
+            )
+            // TODO(DB에 저장)
+            println(openHistory)
+        }
+    }
+
+    @EventListener
+    fun recordCloseHistory(event: TradingEvent.RealizedProfitAndCommissionEvent) {
+        val position = closedPositions[event.source.first.clientId]!!
+        val closeTransactionTime = exchangeImpl.getPositionClosingTime(position)
+
+        val closeHistory = History.Close(
+            historyKey = History.HistoryKey.from(position),
             position = position,
             strategyKey = position.strategyKey,
-            openCondition = conditionUseCase.getOpenCondition(position),
+            closeCondition = conditionUseCase.getCloseCondition(position),
             orderSide = position.orderSide,
             orderType = position.orderType,
-            transactionTime = 0,
-            commission = 0.0,
-            balance = 0.0
+            transactionTime = closeTransactionTime,
+            realizedPnL = event.source.second.realizedProfit,
+            commission = event.source.first.commission,
+            afterBalance = accountUseCase.getBalance(position.asset, closeTransactionTime),
         )
-        // openCondtiion : openMan에서 알 수 있음 -> ConditionUseCase를 통해 확인
-        // ----------------------------- infra
-        // transcationTime : synced 후 알 수 있음
-        // orderInfo : openMan에서 알 수 있음, synced 후 알 수 있음
-        // commission : synced 후 알 수 있음
-        // balance : synced 직전 마지막 ACCOUNT_UPDATE에서 알 수 있음
+        conditionUseCase.removeCondition(position)
+        // TODO(DB에 저장)
+        println(closeHistory)
+    }
+
+    fun turnOnHistoryFeature(strategyKey: String) {
+        strategyHistoryToggleMap.compute(strategyKey) { _, _ ->
+            true
+        }
+    }
+
+    fun turnOnAllHistoryFeature() {
+        for (entry in strategyHistoryToggleMap) {
+            entry.setValue(true)
+        }
+    }
+
+    fun turnOffHistoryFeature(strategyKey: String) {
+        strategyHistoryToggleMap.compute(strategyKey) { _, _ ->
+            false
+        }
+    }
+
+    fun turnOffAllHistoryFeature() {
+        for (entry in strategyHistoryToggleMap) {
+            entry.setValue(false)
+        }
+    }
+
+    private fun loadStrategySpecKey() {
+        strategySpecRepository.findAllServiceStrategySpec().forEach {
+            strategyHistoryToggleMap.computeIfAbsent(it.strategyKey) {
+                true
+            }
+        }
     }
 }

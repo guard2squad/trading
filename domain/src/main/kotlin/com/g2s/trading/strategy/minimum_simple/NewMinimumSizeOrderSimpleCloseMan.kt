@@ -4,6 +4,9 @@ import com.g2s.trading.MarkPriceUseCase
 import com.g2s.trading.PositionEvent
 import com.g2s.trading.StrategyEvent
 import com.g2s.trading.TradingEvent
+import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.history.CloseCondition
+import com.g2s.trading.history.ConditionUseCase
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
@@ -22,6 +25,8 @@ class NewMinimumSizeOrderSimpleCloseMan(
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
+    private val conditionUseCase: ConditionUseCase,
+    private val accountUseCase: AccountUseCase,
     private val strategySpecRepository: StrategySpecRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
@@ -80,8 +85,6 @@ class NewMinimumSizeOrderSimpleCloseMan(
 
     @EventListener
     fun handleMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
-//        logger.debug("handleMarkPriceEvent: ${event.source.symbol}")
-        logger.debug("current symbolPositionMap is ${symbolPositionMap.size}")
         // find matching position
         val position = symbolPositionMap.asSequence()
             .map { it.value }
@@ -98,6 +101,7 @@ class NewMinimumSizeOrderSimpleCloseMan(
             return
         }
         // check should close
+        val availableBalance = accountUseCase.getAvailableBalance(position.asset)
         val entryPrice = BigDecimal(position.entryPrice)
         val lastPrice = BigDecimal(markPriceUseCase.getMarkPrice(position.symbol).price)
         val spec = specs[position.strategyKey]!!
@@ -118,6 +122,13 @@ class NewMinimumSizeOrderSimpleCloseMan(
                         "| specKey : ${spec.strategyKey}"
                     )
                     shouldClose = true
+                    conditionUseCase.setCloseCondition(position, CloseCondition.SimpleCondition(
+                        tailLength = tailLength,
+                        tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor),
+                        entryPrice = entryPrice,
+                        lastPrice = lastPrice,
+                        beforeBalance =availableBalance.toDouble()
+                    ))
                     cntLoss++
                 }
                 // 익절
@@ -129,6 +140,13 @@ class NewMinimumSizeOrderSimpleCloseMan(
                         "| specKey : ${spec.strategyKey}"
                     )
                     shouldClose = true
+                    conditionUseCase.setCloseCondition(position, CloseCondition.SimpleCondition(
+                        tailLength = tailLength,
+                        tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor),
+                        entryPrice = entryPrice,
+                        lastPrice = lastPrice,
+                        beforeBalance =availableBalance.toDouble()
+                    ))
                     cntProfit++
                 }
                 logger.debug(
@@ -151,6 +169,13 @@ class NewMinimumSizeOrderSimpleCloseMan(
                                 "| specKey : ${spec.strategyKey}"
                     )
                     shouldClose = true
+                    conditionUseCase.setCloseCondition(position, CloseCondition.SimpleCondition(
+                        tailLength = tailLength,
+                        tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor),
+                        entryPrice = entryPrice,
+                        lastPrice = lastPrice,
+                        beforeBalance =availableBalance.toDouble()
+                    ))
                     cntLoss++
                 }
                 // 익절
@@ -162,6 +187,13 @@ class NewMinimumSizeOrderSimpleCloseMan(
                                 "| specKey : ${spec.strategyKey}"
                     )
                     shouldClose = true
+                    conditionUseCase.setCloseCondition(position, CloseCondition.SimpleCondition(
+                        tailLength = tailLength,
+                        tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor),
+                        entryPrice = entryPrice,
+                        lastPrice = lastPrice,
+                        beforeBalance =availableBalance.toDouble()
+                    ))
                     cntProfit++
                 }
                 logger.debug(

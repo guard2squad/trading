@@ -172,7 +172,7 @@ class NewMinimumSizeOrderSimpleOpenMan(
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
         val hammerRatio = spec.op["hammerRatio"].asDouble()
         val scale = spec.op["scale"].asDouble()
-        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale)
+        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale, availableBalance)
         when (analyzeReport) {
             is AnalyzeReport.NonMatchingReport -> {
                 logger.debug("non matching report for symbol: ${candleStick.symbol}")
@@ -192,6 +192,7 @@ class NewMinimumSizeOrderSimpleOpenMan(
                         BigDecimal(markPrice.price),
                         symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
+                    asset = spec.asset,
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
@@ -207,7 +208,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
     private fun analyze(
         candleStick: CandleStick,
         hammerRatio: Double,
-        scale: Double
+        scale: Double,
+        availableBalance: BigDecimal
     ): AnalyzeReport {
         logger.debug("analyze... candleStick: $candleStick")
         val tailTop = BigDecimal(candleStick.high)
@@ -243,7 +245,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                         candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
                             patten = SimplePattern.STAR_TOP_TAIL,
                             candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble(),
                         ),
                         referenceData
                     )
@@ -269,7 +272,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                         candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                             patten = SimplePattern.STAR_BOTTOM_TAIL,
                             candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble(),
                         ), referenceData
                     )
                 }
@@ -295,7 +299,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                     candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
                         patten = SimplePattern.TOP_TAIL,
                         candleHammerRatio = candleHammerRatio,
-                        operationalCandleHammerRatio = decimalHammerRatio
+                        operationalCandleHammerRatio = decimalHammerRatio,
+                        beforeBalance = availableBalance.toDouble(),
                     ), referenceData
                 )
             }
@@ -320,7 +325,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                     candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                         patten = SimplePattern.BOTTOM_TAIL,
                         candleHammerRatio = candleHammerRatio,
-                        operationalCandleHammerRatio = decimalHammerRatio
+                        operationalCandleHammerRatio = decimalHammerRatio,
+                        beforeBalance = availableBalance.toDouble(),
                     ), referenceData
                 )
             }
@@ -349,7 +355,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                         candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
                             patten = SimplePattern.MIDDLE_HIGH_TAIL,
                             candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble(),
                         ), referenceData
                     )
                 }
@@ -373,7 +380,8 @@ class NewMinimumSizeOrderSimpleOpenMan(
                         candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                             patten = SimplePattern.MIDDLE_LOW_TAIL,
                             candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio
+                            operationalCandleHammerRatio = decimalHammerRatio,
+                            beforeBalance = availableBalance.toDouble(),
                         ), referenceData
                     )
                 }

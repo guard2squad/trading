@@ -56,6 +56,7 @@ class ManualController(
                 symbolUseCase.getQuantityPrecision(symbol),
                 RoundingMode.CEILING
             ).toDouble(),
+            asset = Asset.USDT,
             referenceData = testNode
         )
         manualTrader.manuallyOpenPosition(position, tempSpec)

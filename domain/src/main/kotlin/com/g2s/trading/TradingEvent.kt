@@ -13,4 +13,12 @@ sealed class TradingEvent(
     data class MarkPriceRefreshEvent(
         val source: MarkPrice
     ) : TradingEvent(source)
+
+    data class CommissionEvent(
+        val source: Commission
+    ) : TradingEvent(source)
+
+    data class RealizedProfitAndCommissionEvent(
+        val source: Pair<Commission, RealizedProfit>
+    ) : TradingEvent(source)
 }

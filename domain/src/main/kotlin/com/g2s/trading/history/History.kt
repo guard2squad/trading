@@ -6,10 +6,9 @@ import com.g2s.trading.position.Position
 
 sealed class History() {
 
-    // TODO : Open과 Close를 pairing 할 수 있는 HistoryKey가 필요함.
-    // Position 정보로 Key genereate
-
+    // Open과 Close를 pairing 할 수 있도록 HistoryKey를 활용
     data class Open(
+        val historyKey: HistoryKey,
         val position: Position,
         val strategyKey: String,
         val openCondition: OpenCondition,
@@ -17,26 +16,26 @@ sealed class History() {
         val orderType: OrderType,
         val transactionTime: Long,
         val commission: Double,
-        val balance: Double,    // 주문 완료 후 잔고
+        val afterBalance: Double,
     ) : History()
 
     data class Close(
+        val historyKey: HistoryKey,
         val position: Position,
         val strategyKey: String,
         val closeCondition: CloseCondition,
-        val transactionTime: Long,
         val orderSide: OrderSide,
         val orderType: OrderType,
+        val transactionTime: Long,
         val realizedPnL: Double,
         val commission: Double,
-        val balance: Double,    // 주문 완료 후 잔고
+        val afterBalance: Double,
     ) : History()
 
     data class HistoryKey(val value: String) {
         companion object {
-            fun generate(position: Position): HistoryKey {
-                // TODO : position을 기반으로 keygenerate
-                return HistoryKey("TODO")
+            fun from(position: Position): HistoryKey {
+                return HistoryKey("${position.positionKey}-${position.strategyKey}-${position.openTransactionTime}")
             }
         }
     }
