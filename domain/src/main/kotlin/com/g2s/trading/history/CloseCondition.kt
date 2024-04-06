@@ -17,5 +17,11 @@ sealed class CloseCondition {
         val entryPrice: BigDecimal,
         val lastPrice: BigDecimal,
         val beforeBalance: Double
-    ) : CloseCondition()
+    ) : CloseCondition() {
+        override fun toString(): String {
+            return "SimpleCondition(tailLength=$tailLength, tailLengthWithStopLossFactor=$tailLengthWithStopLossFactor, entryPrice=$entryPrice, lastPrice=$lastPrice, beforeBalance=$beforeBalance)"
+        }
+    }
+
+    data object ManualCondition : CloseCondition()
 }

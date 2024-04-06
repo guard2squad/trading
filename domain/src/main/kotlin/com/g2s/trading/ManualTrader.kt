@@ -1,6 +1,9 @@
 package com.g2s.trading
 
 import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.history.CloseCondition
+import com.g2s.trading.history.ConditionUseCase
+import com.g2s.trading.history.OpenCondition
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.position.Position
@@ -13,7 +16,8 @@ import org.springframework.stereotype.Component
 class ManualTrader(
     val lockUseCase: LockUseCase,
     val accountUseCase: AccountUseCase,
-    val positionUseCase: PositionUseCase
+    val positionUseCase: PositionUseCase,
+    val conditionUseCase: ConditionUseCase,
 ) {
 
     fun manuallyOpenPosition(position: Position, spec: StrategySpec) {
@@ -57,7 +61,7 @@ class ManualTrader(
         } catch (e: RuntimeException) {
             println(e.message)
         }
-
+        conditionUseCase.setOpenCondition(position, OpenCondition.ManualCondition)
         positionUseCase.openPosition(position, spec)
         accountUseCase.release()
         lockUseCase.release(position.strategyKey, LockUsage.OPEN)
@@ -75,6 +79,7 @@ class ManualTrader(
             lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
             return
         }
+        conditionUseCase.setCloseCondition(position, CloseCondition.ManualCondition)
         positionUseCase.closePosition(position, spec)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }

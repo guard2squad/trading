@@ -95,8 +95,8 @@ class PositionUseCase(
             accountUseCase.setUnSynced()
             positionRepository.deletePosition(position)
             positionMap.remove(position.positionKey)
-            historyUseCase.setClosedPosition(position)
             exchangeImpl.closePosition(position)
+            historyUseCase.setClosedPosition(position)
         } catch (e: OrderFailException) {
             logger.debug(e.message)
             positionMap[originalPosition.positionKey] = originalPosition

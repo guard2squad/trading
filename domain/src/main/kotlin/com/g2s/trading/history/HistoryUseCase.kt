@@ -5,20 +5,23 @@ import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.Position
 import com.g2s.trading.strategy.StrategySpecRepository
+import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class HistoryUseCase(
-    val conditionUseCase: ConditionUseCase,
-    val accountUseCase: AccountUseCase,
-    val strategySpecRepository: StrategySpecRepository,
-    val exchangeImpl: Exchange
+    private val conditionUseCase: ConditionUseCase,
+    private val accountUseCase: AccountUseCase,
+    private val strategySpecRepository: StrategySpecRepository,
+    private val historyRepository: HistoryRepository,
+    private val exchangeImpl: Exchange
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
     private val syncedPositions = ConcurrentHashMap<String, Position>()
     private val closedPositions = ConcurrentHashMap<String, Position>()
+    private val logger = LoggerFactory.getLogger(this.javaClass)
 
     init {
         loadStrategySpecKey()
@@ -43,7 +46,8 @@ class HistoryUseCase(
 
     @EventListener
     fun recordOpenHistory(event: TradingEvent.CommissionEvent) {
-        val position = syncedPositions[event.source.clientId]!!
+        val position = syncedPositions[event.source.clientId] ?: return
+
         if (strategyHistoryToggleMap[position.strategyKey]!!) {
             val openHistory = History.Open(
                 historyKey = History.HistoryKey.from(position),
@@ -56,31 +60,34 @@ class HistoryUseCase(
                 commission = event.source.commission,
                 afterBalance = accountUseCase.getBalance(position.asset, position.openTransactionTime),
             )
-            // TODO(DB에 저장)
-            println(openHistory)
+            logger.debug(openHistory.toString())
+            historyRepository.saveHistory(openHistory)
         }
     }
 
     @EventListener
     fun recordCloseHistory(event: TradingEvent.RealizedProfitAndCommissionEvent) {
-        val position = closedPositions[event.source.first.clientId]!!
-        val closeTransactionTime = exchangeImpl.getPositionClosingTime(position)
+        val position = closedPositions[event.source.first.clientId] ?: return
 
-        val closeHistory = History.Close(
-            historyKey = History.HistoryKey.from(position),
-            position = position,
-            strategyKey = position.strategyKey,
-            closeCondition = conditionUseCase.getCloseCondition(position),
-            orderSide = position.orderSide,
-            orderType = position.orderType,
-            transactionTime = closeTransactionTime,
-            realizedPnL = event.source.second.realizedProfit,
-            commission = event.source.first.commission,
-            afterBalance = accountUseCase.getBalance(position.asset, closeTransactionTime),
-        )
-        conditionUseCase.removeCondition(position)
-        // TODO(DB에 저장)
-        println(closeHistory)
+        if (strategyHistoryToggleMap[position.strategyKey]!!) {
+            val closeTransactionTime = exchangeImpl.getPositionClosingTime(position)
+
+            val closeHistory = History.Close(
+                historyKey = History.HistoryKey.from(position),
+                position = position,
+                strategyKey = position.strategyKey,
+                closeCondition = conditionUseCase.getCloseCondition(position),
+                orderSide = position.orderSide,
+                orderType = position.orderType,
+                transactionTime = closeTransactionTime,
+                realizedPnL = event.source.second.realizedProfit,
+                commission = event.source.first.commission,
+                afterBalance = accountUseCase.getBalance(position.asset, closeTransactionTime),
+            )
+            conditionUseCase.removeCondition(position)
+            logger.debug(closeHistory.toString())
+            historyRepository.saveHistory(closeHistory)
+        }
     }
 
     fun turnOnHistoryFeature(strategyKey: String) {

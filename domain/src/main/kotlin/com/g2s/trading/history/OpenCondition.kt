@@ -16,7 +16,11 @@ sealed class OpenCondition {
         val candleHammerRatio: BigDecimal,
         val operationalCandleHammerRatio: BigDecimal,
         val beforeBalance: Double
-    ) : OpenCondition()
+    ) : OpenCondition() {
+        override fun toString(): String {
+            return "SimpleCondition(patten=$patten, candleHammerRatio=$candleHammerRatio, operationalCandleHammerRatio=$operationalCandleHammerRatio, beforeBalance=$beforeBalance)"
+        }
+    }
 
     data object ManualCondition : OpenCondition()
 }

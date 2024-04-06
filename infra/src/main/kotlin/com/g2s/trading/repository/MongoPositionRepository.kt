@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.stereotype.Component
 
 @Component
-class MongoPositionRepository(val mongoTemplate: MongoTemplate) : PositionRepository {
+class MongoPositionRepository(private val mongoTemplate: MongoTemplate) : PositionRepository {
 
     private val logger = LoggerFactory.getLogger(MongoStrategySpecRepository::class.java)
 
