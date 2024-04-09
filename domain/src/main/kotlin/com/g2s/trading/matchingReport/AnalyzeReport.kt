@@ -1,4 +1,4 @@
-package com.g2s.trading.openman
+package com.g2s.trading.matchingReport
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.history.OpenCondition

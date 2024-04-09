@@ -26,17 +26,20 @@ data class Position(
             return "PositionKey(symbol=$symbol, orderSide=$orderSide)"
         }
     }
+
     companion object {
         fun update(old: Position, refreshData: PositionRefreshData): Position {
             return old.copy(
                 entryPrice = refreshData.entryPrice,
                 positionAmt = refreshData.positionAmt,
-                openTransactionTime = refreshData.openTransactionTime,
             )
         }
 
-        fun sync(old: Position): Position {
-            return old.copy(synced = true)
+        fun sync(old: Position, openTransactionTime: Long): Position {
+            return old.copy(
+                synced = true,
+                openTransactionTime = openTransactionTime
+            )
         }
     }
 }

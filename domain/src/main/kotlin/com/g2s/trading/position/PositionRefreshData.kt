@@ -7,5 +7,4 @@ data class PositionRefreshData(
     val entryPrice: Double,
     val positionAmt: Double,
     val positionSide: PositionSide,
-    val openTransactionTime: Long,
 )

@@ -2,8 +2,8 @@ package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.indicator.indicator.CandleStick
-import com.g2s.trading.indicator.indicator.Interval
+import com.g2s.trading.indicator.CandleStick
+import com.g2s.trading.indicator.Interval
 import com.g2s.trading.symbol.Symbol
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test

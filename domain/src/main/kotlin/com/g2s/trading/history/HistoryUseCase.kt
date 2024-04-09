@@ -1,6 +1,6 @@
 package com.g2s.trading.history
 
-import com.g2s.trading.TradingEvent
+import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.Position
@@ -19,8 +19,8 @@ class HistoryUseCase(
     private val exchangeImpl: Exchange
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
-    private val syncedPositions = ConcurrentHashMap<String, Position>()
-    private val closedPositions = ConcurrentHashMap<String, Position>()
+    private val clientIdSyncedPositionMap = ConcurrentHashMap<String, Position>()
+    private val clientIdClosedPositions = ConcurrentHashMap<String, Position>()
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     init {
@@ -32,34 +32,42 @@ class HistoryUseCase(
 
     fun setSyncedPosition(position: Position) {
         val clientId = exchangeImpl.getClientIdAtOpen(position)
-        syncedPositions.compute(clientId) { _, _ ->
+        clientIdSyncedPositionMap.compute(clientId) { _, _ ->
             position
         }
     }
 
     fun setClosedPosition(position: Position) {
         val clientId = exchangeImpl.getClientIdAtClose(position)
-        closedPositions.compute(clientId) { _, _ ->
+        clientIdClosedPositions.compute(clientId) { _, _ ->
             position
         }
     }
 
+    fun removeClosedPosition(position: Position) {
+        clientIdClosedPositions.remove(position.strategyKey)
+    }
+
     @EventListener
     fun recordOpenHistory(event: TradingEvent.CommissionEvent) {
-        val position = syncedPositions[event.source.clientId] ?: return
+        val position = clientIdSyncedPositionMap[event.source.clientId] ?: return
 
         if (strategyHistoryToggleMap[position.strategyKey]!!) {
+            val openTransactionTime = exchangeImpl.getPositionOpeningTime(position)
+
             val openHistory = History.Open(
-                historyKey = History.HistoryKey.from(position),
+                historyKey = History.generateHistoryKey(position),
                 position = position,
                 strategyKey = position.strategyKey,
                 openCondition = conditionUseCase.getOpenCondition(position),
                 orderSide = position.orderSide,
                 orderType = position.orderType,
-                transactionTime = position.openTransactionTime,
+                transactionTime = openTransactionTime,
                 commission = event.source.commission,
-                afterBalance = accountUseCase.getBalance(position.asset, position.openTransactionTime),
+                afterBalance = accountUseCase.getBalance(position.asset, openTransactionTime),
             )
+            conditionUseCase.removeOpenCondition(position)
+            clientIdSyncedPositionMap.remove(position.strategyKey)
             logger.debug(openHistory.toString())
             historyRepository.saveHistory(openHistory)
         }
@@ -67,13 +75,13 @@ class HistoryUseCase(
 
     @EventListener
     fun recordCloseHistory(event: TradingEvent.RealizedProfitAndCommissionEvent) {
-        val position = closedPositions[event.source.first.clientId] ?: return
+        val position = clientIdClosedPositions[event.source.first.clientId] ?: return
 
         if (strategyHistoryToggleMap[position.strategyKey]!!) {
             val closeTransactionTime = exchangeImpl.getPositionClosingTime(position)
 
             val closeHistory = History.Close(
-                historyKey = History.HistoryKey.from(position),
+                historyKey = History.generateHistoryKey(position),
                 position = position,
                 strategyKey = position.strategyKey,
                 closeCondition = conditionUseCase.getCloseCondition(position),
@@ -84,7 +92,8 @@ class HistoryUseCase(
                 commission = event.source.first.commission,
                 afterBalance = accountUseCase.getBalance(position.asset, closeTransactionTime),
             )
-            conditionUseCase.removeCondition(position)
+            conditionUseCase.removeCloseCondition(position)
+            clientIdClosedPositions.remove(position.strategyKey)
             logger.debug(closeHistory.toString())
             historyRepository.saveHistory(closeHistory)
         }

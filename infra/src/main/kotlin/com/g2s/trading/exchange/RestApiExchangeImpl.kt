@@ -5,7 +5,7 @@ import com.binance.connector.futures.client.exceptions.BinanceClientException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.MarkPrice
+import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
@@ -23,8 +23,7 @@ import org.springframework.stereotype.Component
 @Component
 class RestApiExchangeImpl(
     private val binanceClient: UMFuturesClientImpl,
-    private val binanceOrderTracker: BinanceOrderTracker,
-    private val binanceCommissionAndRealizedProfitTracker: BinanceCommissionAndRealizedProfitTracker
+    private val binanceOrderInfoTracker: BinanceOrderInfoTracker,
 ) : Exchange {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val om = ObjectMapperProvider.get()
@@ -76,11 +75,42 @@ class RestApiExchangeImpl(
         return Account(assetWallets)
     }
 
+    /**
+    orderResult :
+    {
+    "clientOrderId": "testOrder",
+    "cumQty": "0",
+    "cumQuote": "0",
+    "executedQty": "0",
+    "orderId": 22542179,
+    "avgPrice": "0.00000",
+    "origQty": "10",
+    "price": "0",
+    "reduceOnly": false,
+    "side": "BUY",
+    "positionSide": "SHORT",
+    "status": "NEW",
+    "stopPrice": "9300",        // please ignore when order type is TRAILING_STOP_MARKET
+    "closePosition": false,   // if Close-All
+    "symbol": "BTCUSDT",
+    "timeInForce": "GTD",
+    "type": "TRAILING_STOP_MARKET",
+    "origType": "TRAILING_STOP_MARKET",
+    "activatePrice": "9020",    // activation price, only return with TRAILING_STOP_MARKET order
+    "priceRate": "0.3",         // callback rate, only return with TRAILING_STOP_MARKET order
+    "updateTime": 1566818724722,
+    "workingType": "CONTRACT_PRICE",
+    "priceProtect": false,      // if conditional order trigger is protected
+    "priceMatch": "NONE",              //price match mode
+    "selfTradePreventionMode": "NONE", //self trading preventation mode
+    "goodTillDate": 1693207680000      //order pre-set auot cancel time for TIF GTD order
+    }
+     */
     override fun closePosition(position: Position) {
         val params = BinanceOrderParameterConverter.toBinanceClosePositionParam(position, positionMode, positionSide)
         try {
             val orderResult = sendOrder(params)
-            binanceOrderTracker.setCloseOrderInfo(position, orderResult)
+            binanceOrderInfoTracker.setCloseOrderInfo(position, orderResult)
         } catch (e: OrderFailException) {
             throw e
         }
@@ -90,7 +120,7 @@ class RestApiExchangeImpl(
         val params = BinanceOrderParameterConverter.toBinanceOpenPositionParam(position, positionMode, positionSide)
         try {
             val orderResult = sendOrder(params)
-            binanceOrderTracker.setOpenOrderInfo(position, orderResult)
+            binanceOrderInfoTracker.setOpenOrderInfo(position, orderResult)
         } catch (e: OrderFailException) {
             throw e
         }
@@ -149,22 +179,31 @@ class RestApiExchangeImpl(
             .find { node -> node.get("filterType").asText() == "MIN_NOTIONAL" }!!.get("notional").asDouble()
     }
 
-    override fun getPositionClosingTime(position: Position): Long {
-        val orderInfo = binanceOrderTracker.getCloseOrderInfo(position)
-        val transactionTime = orderInfo.tradeTime
+    override fun getPositionOpeningTime(position: Position): Long {
+        val positionOpeningTime = binanceOrderInfoTracker.getOpenedPositionTransactionTime(position)
+        binanceOrderInfoTracker.removeOpenedPositionTransactionTime(position)
 
-        return transactionTime
+        return positionOpeningTime
+    }
+
+    override fun getPositionClosingTime(position: Position): Long {
+        val positionClosingTime = binanceOrderInfoTracker.getClosedPositionTransactionTime(position)
+        binanceOrderInfoTracker.removeClosedPositionTransactionTime(position)
+
+        return positionClosingTime
     }
 
     override fun getClientIdAtOpen(position: Position): String {
-        val orderInfo = binanceOrderTracker.getOpenOrderInfo(position)
+        val clientId = binanceOrderInfoTracker.getOpenClientId(position)
+        binanceOrderInfoTracker.removeOpenClientId(position)
 
-        return orderInfo.clientOrderId
+        return clientId
     }
 
     override fun getClientIdAtClose(position: Position): String {
-        val orderInfo = binanceOrderTracker.getCloseOrderInfo(position)
+        val clientId = binanceOrderInfoTracker.getCloseClientId(position)
+        binanceOrderInfoTracker.removeCloseClientId(position)
 
-        return orderInfo.clientOrderId
+        return clientId
     }
 }

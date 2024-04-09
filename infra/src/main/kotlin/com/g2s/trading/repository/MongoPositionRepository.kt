@@ -33,9 +33,9 @@ class MongoPositionRepository(private val mongoTemplate: MongoTemplate) : Positi
         val result = mongoTemplate.findAndReplace(query, position, options, POSITION_COLLECTION_NAME)
 
         if (result != null) {
-            logger.debug("A document was upserted or replaced.")
+            logger.debug("Position : A document was upserted or replaced.")
         } else {
-            logger.debug("No operation was performed.")
+            logger.debug("Position : No operation was performed.")
         }
     }
 

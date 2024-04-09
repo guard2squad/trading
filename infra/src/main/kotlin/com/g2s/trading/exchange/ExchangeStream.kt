@@ -5,16 +5,17 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl
 import com.binance.connector.futures.client.utils.JSONParser
 import com.binance.connector.futures.client.utils.RequestHandler
-import com.g2s.trading.EventUseCase
-import com.g2s.trading.MarkPrice
-import com.g2s.trading.TradingEvent
+
+import com.g2s.trading.indicator.MarkPrice
+import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.indicator.indicator.CandleStick
-import com.g2s.trading.indicator.indicator.Interval
+import com.g2s.trading.event.EventUseCase
+import com.g2s.trading.indicator.CandleStick
+import com.g2s.trading.indicator.Interval
 import com.g2s.trading.position.PositionRefreshData
 import com.g2s.trading.position.PositionSide
 import com.g2s.trading.position.PositionUseCase
@@ -129,11 +130,9 @@ class ExchangeStream(
             logger.debug(pretty.writeValueAsString(eventJson))
             when (eventType) {
                 BinanceUserStreamEventType.ACCOUNT_UPDATE.toString() -> {
-                    // TRANSACTION_TIME(T) ORDER_TRADE_UPDATE 식별 가능
-                    val transactionTime = eventJson.get("T").asLong()
                     val jsonBalanceAndPosition = eventJson.get("a")
                     val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
-                    // 계좌 변동
+                    // Account Update
                     val jsonBalances = jsonBalanceAndPosition.get("B")
                     val assetWallets = jsonBalances.filter { jsonBalance ->
                         Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
@@ -145,14 +144,13 @@ class ExchangeStream(
                     }
                     val account = Account(assetWallets)
                     accountUseCase.refreshAccount(account)
-                    // Position 관련 데이터 처리
+                    // Position Update
                     val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
                         PositionRefreshData(
                             symbol = Symbol.valueOf(node.get("s").asText()),
                             entryPrice = node.get("ep").asDouble(),
                             positionAmt = node.get("pa").asDouble(),
                             positionSide = PositionSide.valueOf(node.get("ps").asText()),
-                            openTransactionTime = transactionTime
                         )
                     }
                     // Event reason type == ORDER 일 때 포지션 데이터 변동
@@ -165,8 +163,7 @@ class ExchangeStream(
                             "POSITION_UPDATE_EVENT" +
                                     "\n - refreshedPositionAmt: ${positionRefreshData.positionAmt}" +
                                     "\n - entryPrice: ${positionRefreshData.entryPrice}" +
-                                    "\n - symbol: ${positionRefreshData.symbol.value}" +
-                                    "\n - transactionTime: ${positionRefreshData.openTransactionTime}"
+                                    "\n - symbol: ${positionRefreshData.symbol.value}"
                         )
                     }
                 }
@@ -179,14 +176,15 @@ class ExchangeStream(
                     binanceCommissionAndRealizedProfitTracker.updateRealizedProfit(clientId, realizedProfit)
                     val commission = jsonOrder.get("n").asDouble()
                     binanceCommissionAndRealizedProfitTracker.updateCommission(clientId, commission)
-                // Order Status가 FILLED되면 refresh account and position | publish accumulatedCommision and accumulatedRP
+                    // Order Status가 FILLED되면 refresh account and position | publish accumulatedCommision and accumulatedRP
                     if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
                         val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
                         // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
-                        positionUseCase.syncPosition(symbol)
+                        val transactionTime = jsonOrder.get("T").asLong()
+                        positionUseCase.syncPosition(symbol, transactionTime)
                         accountUseCase.syncAccount()
                         binanceCommissionAndRealizedProfitTracker.publishAccumulatedCommission(clientId)
-                        binanceCommissionAndRealizedProfitTracker.publishClosedPositionEvent(clientId)
+                        binanceCommissionAndRealizedProfitTracker.publishRealizedProfitAndCommissionEvent(clientId)
                     }
                 }
             }

@@ -25,8 +25,7 @@ class ManualTrader(
         val acquired = lockUseCase.acquire(position.strategyKey, LockUsage.OPEN)
         if (!acquired) return
 
-        // TODO: 강제로 열 때 이미 열린 포지션 덮어 씀.
-        // TODO: position이 synced 됬을 때만 덮어 쓸 수 있음
+        // TODO: 강제로 열 때 이미 열린 포지션 덮어 쓰면 close 후 새로 open으로 처리됨
         val usedSymbols = positionUseCase.getAllUsedSymbols()
         if (usedSymbols.contains(position.symbol)) {
             lockUseCase.release(position.strategyKey, LockUsage.OPEN)

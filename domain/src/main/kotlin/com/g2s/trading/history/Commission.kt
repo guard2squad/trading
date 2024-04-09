@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.history
 
 data class Commission(
     val commission: Double,

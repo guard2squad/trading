@@ -1,8 +1,8 @@
 package com.g2s.trading.position
 
-import com.g2s.trading.EventUseCase
-import com.g2s.trading.PositionEvent
+import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.history.HistoryUseCase
@@ -61,7 +61,6 @@ class PositionUseCase(
     }
 
     fun refreshPosition(positionRefreshData: PositionRefreshData) {
-        logger.debug("refreshPosition")
         positionMap.values.find {
             it.symbol == positionRefreshData.symbol
         }?.let { old ->
@@ -73,16 +72,13 @@ class PositionUseCase(
         }
     }
 
-    fun syncPosition(symbol: Symbol) {
-        logger.debug("syncPosition")
+    fun syncPosition(symbol: Symbol, openTransactionTime: Long) {
         positionMap.values.find {
             it.symbol == symbol
         }?.let { old ->
-            val synced = Position.sync(old)
+            val synced = Position.sync(old, openTransactionTime)
             positionRepository.updatePosition(synced)
-            logger.debug("position synced in DB\n")
             positionMap.replace(synced.positionKey, synced)
-            logger.debug("position synced in map\n")
             historyUseCase.setSyncedPosition(synced)
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
@@ -102,9 +98,9 @@ class PositionUseCase(
             positionMap[originalPosition.positionKey] = originalPosition
             positionRepository.savePosition(originalPosition)
             accountUseCase.syncAccount()
+            historyUseCase.removeClosedPosition(position)
             return
         }
-        logger.debug("$position closed\n")
     }
 
     fun getAllUsedSymbols(): Set<Symbol> {

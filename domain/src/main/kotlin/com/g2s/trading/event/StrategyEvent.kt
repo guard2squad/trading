@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.event
 
 import com.g2s.trading.strategy.StrategySpec
 import org.springframework.context.ApplicationEvent

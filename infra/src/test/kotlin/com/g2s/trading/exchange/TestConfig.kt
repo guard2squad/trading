@@ -1,8 +1,6 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
-import com.g2s.trading.EventUseCase
-import com.g2s.trading.MarkPriceUseCase
 import org.junit.jupiter.api.Disabled
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.TestConfiguration

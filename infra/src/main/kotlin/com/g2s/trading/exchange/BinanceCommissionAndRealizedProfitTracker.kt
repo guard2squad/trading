@@ -1,9 +1,9 @@
 package com.g2s.trading.exchange
 
-import com.g2s.trading.Commission
-import com.g2s.trading.EventUseCase
-import com.g2s.trading.RealizedProfit
-import com.g2s.trading.TradingEvent
+import com.g2s.trading.history.Commission
+import com.g2s.trading.event.EventUseCase
+import com.g2s.trading.history.RealizedProfit
+import com.g2s.trading.event.TradingEvent
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
 
@@ -45,7 +45,7 @@ class BinanceCommissionAndRealizedProfitTracker(
         }
     }
 
-    fun publishClosedPositionEvent(clientId: String) {
+    fun publishRealizedProfitAndCommissionEvent(clientId: String) {
         val realizedProfit = clientIdRealizedProfitMap[clientId]!!
         val accumulatedCommission = clientIdCommissionMap[clientId]!!
         eventUseCase.publishEvent(

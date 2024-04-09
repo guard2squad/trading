@@ -7,36 +7,34 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class ConditionUseCase {
 
-    private val positionConditionMap = ConcurrentHashMap<Position.PositionKey, PositionCondition>()
+    private val positionOpenConditionMap = ConcurrentHashMap<Position.PositionKey, OpenCondition>()
+    private val positionCloseConditionMap = ConcurrentHashMap<Position.PositionKey, CloseCondition>()
 
     fun setOpenCondition(position: Position, condition: OpenCondition) {
-        positionConditionMap.computeIfAbsent(position.positionKey) { _ ->
-            PositionCondition(openCondition = condition)
+        positionOpenConditionMap.computeIfAbsent(position.positionKey) { _ ->
+            condition
         }
     }
 
     fun setCloseCondition(position: Position, condition: CloseCondition) {
-        positionConditionMap.computeIfPresent(position.positionKey) { _, positionCondition ->
-            positionCondition.apply {
-                positionCondition.closeCondition = condition
-            }
+        positionCloseConditionMap.computeIfAbsent(position.positionKey) { _ ->
+            condition
         }
     }
 
     fun getOpenCondition(position: Position): OpenCondition {
-        return positionConditionMap.get(position.positionKey)!!.openCondition
+        return positionOpenConditionMap[position.positionKey]!!
     }
 
     fun getCloseCondition(position: Position): CloseCondition {
-        return positionConditionMap.get(position.positionKey)!!.closeCondition!!
+        return positionCloseConditionMap[position.positionKey]!!
     }
 
-    fun removeCondition(position: Position) {
-        positionConditionMap.remove(position.positionKey)
+    fun removeOpenCondition(position: Position) {
+        positionOpenConditionMap.remove(position.positionKey)
     }
 
-    data class PositionCondition(
-        val openCondition: OpenCondition,
-        var closeCondition: CloseCondition? = null,
-    )
+    fun removeCloseCondition(position: Position) {
+        positionCloseConditionMap.remove(position.positionKey)
+    }
 }

@@ -3,24 +3,24 @@ package com.g2s.trading.strategy.simple
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.g2s.trading.MarkPriceUseCase
-import com.g2s.trading.StrategyEvent
-import com.g2s.trading.TradingEvent
+import com.g2s.trading.indicator.MarkPriceUseCase
+import com.g2s.trading.event.StrategyEvent
+import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.history.ConditionUseCase
 import com.g2s.trading.history.OpenCondition
-import com.g2s.trading.indicator.indicator.CandleStick
+import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
-import com.g2s.trading.openman.AnalyzeReport
+import com.g2s.trading.matchingReport.AnalyzeReport
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.strategy.Strategy
 import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
-import com.g2s.trading.strategy.minimum_simple.SimplePattern
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
@@ -30,11 +30,12 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.IllegalArgumentException
 import kotlin.math.max
 import kotlin.math.min
 
 @Component
-class NewSimpleOpenMan(
+class SimpleOpenMan(
     private val strategySpecRepository: StrategySpecRepository,
     private val lockUseCase: LockUseCase,
     private val positionUseCase: PositionUseCase,
@@ -42,12 +43,12 @@ class NewSimpleOpenMan(
     private val markPriceUseCase: MarkPriceUseCase,
     private val symbolUseCase: SymbolUseCase,
     private val conditionUseCase: ConditionUseCase,
-) {
+) : Strategy {
     private val logger = LoggerFactory.getLogger(this.javaClass)
+    private var orderMode = OrderMode.MINIMUM_QUANTITY
 
     companion object {
-        private val TYPE = "simple"
-        private val MAXIMUM_HAMMER_RATIO = BigDecimal(9999)
+        private const val TYPE = "simple"
         private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
 
@@ -56,7 +57,7 @@ class NewSimpleOpenMan(
     }
 
     private val candleSticks: MutableMap<String, MutableMap<Symbol, CandleStick>> =
-        mutableMapOf() // strategyKey to Map<Symbol, CandleStick>
+        mutableMapOf() // strategyKey to Map<Symbol, CandleStick> | spec to Symbols mapping [1 : n]
 
     @EventListener
     fun handleStartStrategyEvent(event: StrategyEvent.StartStrategyEvent) {
@@ -81,6 +82,19 @@ class NewSimpleOpenMan(
         specs.values.parallelStream().forEach { spec ->
             open(spec, event.source)
         }
+    }
+
+    override fun changeOrderMode(modeValue: String) {
+        try {
+            val orderMode = OrderMode.valueOf(modeValue)
+            this.orderMode = orderMode
+        } catch (e: IllegalArgumentException) {
+            logger.warn(e.message + "\n유효하지 않은 OrderMode")
+        }
+    }
+
+    override fun getTypeOfStrategy(): String {
+        return TYPE
     }
 
     fun open(spec: StrategySpec, candleStick: CandleStick) {
@@ -142,20 +156,21 @@ class NewSimpleOpenMan(
             } else {
                 // 이미 가지고 있는 캔들스틱인 경우
                 if (old.key == candleStick.key) {
-                    logger.debug("same candlestick ${candleStick.symbol}")
+                    logger.debug("same candlestick {}", candleStick.symbol)
                     false
                 }
                 // 1분 차이 캔들스틱이 아닌 경우
                 else if (old.key + 60000L != candleStick.key) {
-                    logger.debug("not updated candlestick. ${candleStick.symbol}")
+                    logger.debug("not updated candlestick. {}", candleStick.symbol)
                     false
                 }
                 // 갱신된지 1초 이상된 캔들스틱인 경우
-                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
-                    logger.debug("out 1 second, ${candleStick.symbol}")
-                    false
-                } else {
-                    logger.debug("in 1 second, ${candleStick.symbol}")
+//                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
+//                    logger.debug("out 1 second, {}", candleStick.symbol)
+//                    false
+//                }
+                else {
+                    logger.debug("in 1 second, {}", candleStick.symbol)
                     oldCandleStick = old
                     true
                 }
@@ -171,11 +186,10 @@ class NewSimpleOpenMan(
         // 오픈 가능한 symbol 확인
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
         val hammerRatio = spec.op["hammerRatio"].asDouble()
-        val scale = spec.op["scale"].asDouble()
-        val analyzeReport = analyze(oldCandleStick, hammerRatio, scale, availableBalance)
-        when (analyzeReport) {
+        val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
+        when (val analyzeReport = analyze(oldCandleStick, hammerRatio, takeProfitFactor, availableBalance)) {
             is AnalyzeReport.NonMatchingReport -> {
-                logger.debug("non matching report for symbol: ${candleStick.symbol}")
+                logger.debug("non matching report for symbol: {}", candleStick.symbol)
             }
 
             is AnalyzeReport.MatchingReport -> {
@@ -189,13 +203,14 @@ class NewSimpleOpenMan(
                     entryPrice = markPrice.price,
                     positionAmt = quantity(
                         allocatedBalance,
+                        BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
                         BigDecimal(markPrice.price),
                         symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
                     ),
                     asset = spec.asset,
                     referenceData = analyzeReport.referenceData,
                 )
-                logger.debug("openPosition strategyKey: ${position.strategyKey}, symbol: ${position.symbol}")
+                logger.debug("openPosition strategyKey: {}, symbol: {}", position.strategyKey, position.symbol)
                 conditionUseCase.setOpenCondition(position, analyzeReport.openCondition)
                 positionUseCase.openPosition(position, spec)
             }
@@ -208,99 +223,52 @@ class NewSimpleOpenMan(
     private fun analyze(
         candleStick: CandleStick,
         hammerRatio: Double,
-        scale: Double,
+        takeProfitFactor: Double,
         availableBalance: BigDecimal
     ): AnalyzeReport {
-        logger.debug("analyze... candleStick: $candleStick")
+        logger.debug("analyze... candleStick: {}", candleStick)
         val tailTop = BigDecimal(candleStick.high)
         val tailBottom = BigDecimal(candleStick.low)
         val bodyTop = BigDecimal(max(candleStick.open, candleStick.close))
         val bodyBottom = BigDecimal(min(candleStick.open, candleStick.close))
+        val totalLength = tailTop - tailBottom
         val bodyLength = bodyTop - bodyBottom
-        val decimalHammerRatio = BigDecimal(hammerRatio)
-        val decimalScale = BigDecimal(scale)
+        val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
+        val operationalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
 
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
-            logger.debug("star candle")
-            val topTailLength = tailTop - bodyTop
-            val bottomTailLength = bodyTop - tailBottom
-            if (topTailLength > bottomTailLength) {
-                logger.debug("star top tail")
-                val candleHammerRatio =
-                    if (bottomTailLength.compareTo(BigDecimal.ZERO) != 0) topTailLength / bottomTailLength else MAXIMUM_HAMMER_RATIO
-                logger.debug("calculated candleHammerRatio: $candleHammerRatio, topTailLength: $topTailLength, bottomTailLength: $bottomTailLength")
-                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
-                        bodyTop,
-                        bodyTop.minus(topTailLength.multiply(decimalScale))
-                    )
-                ) {
-                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
-                    val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>(
-                        "tailLength",
-                        DoubleNode(topTailLength.multiply(decimalScale).toDouble())
-                    )
-                    logger.debug("scaled tailLength: ${topTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(
-                        candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.STAR_TOP_TAIL,
-                            candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio,
-                            beforeBalance = availableBalance.toDouble()
-                        ),
-                        referenceData
-                    )
-                }
-            } else {
-                logger.debug("star bottom tail")
-                val candleHammerRatio =
-                    if (topTailLength.compareTo(BigDecimal.ZERO) != 0) bottomTailLength / topTailLength else MAXIMUM_HAMMER_RATIO
-                logger.debug("calculated candleHammerRatio: $candleHammerRatio, topTailLength: $topTailLength, bottomTailLength: $bottomTailLength")
-                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
-                        bodyTop,
-                        bodyTop.plus(bottomTailLength.multiply(decimalScale))
-                    )
-                ) {
-                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
-                    val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                    (referenceData as ObjectNode).set<DoubleNode>(
-                        "tailLength",
-                        DoubleNode(bottomTailLength.multiply(decimalScale).toDouble())
-                    )
-                    logger.debug("scaled tailLength: ${bottomTailLength.multiply(decimalScale)}")
-                    return AnalyzeReport.MatchingReport(
-                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.STAR_BOTTOM_TAIL,
-                            candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio,
-                            beforeBalance = availableBalance.toDouble()
-                        ), referenceData
-                    )
-                }
-            }
+            logger.debug("body length : 0")
+            return AnalyzeReport.NonMatchingReport
+        } else if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
+            logger.debug("body length / total length <= 15%")
+            return AnalyzeReport.NonMatchingReport
         } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
             logger.debug("top tail")
-            val tailLength = tailTop - bodyTop
+            val tailLength = tailTop - bodyTop  // tailLength = topTailLength
             val candleHammerRatio = tailLength / bodyLength
-            logger.debug("calculated candleHammerRatio: $candleHammerRatio, tailLength: $tailLength, bodyLength: $bodyLength")
-            if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
+            logger.debug(
+                "calculated candleHammerRatio: {}, tailLength: {}, bodyLength: {}",
+                candleHammerRatio,
+                tailLength,
+                bodyLength
+            )
+            if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
                     bodyTop,
-                    bodyTop.minus(tailLength.multiply(decimalScale))
+                    bodyTop.minus(tailLength.multiply(operationalTakeProfitFactor))
                 )
             ) {
-                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
                 (referenceData as ObjectNode).set<DoubleNode>(
                     "tailLength",
-                    DoubleNode(tailLength.multiply(decimalScale).toDouble())
+                    DoubleNode(tailLength.toDouble())
                 )
-                logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
                         patten = SimplePattern.TOP_TAIL,
-                        candleHammerRatio = candleHammerRatio,
-                        operationalCandleHammerRatio = decimalHammerRatio,
-                        beforeBalance = availableBalance.toDouble()
+                        candleHammerRatio = candleHammerRatio.toString(),
+                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                        beforeBalance = availableBalance.toDouble(),
                     ), referenceData
                 )
             }
@@ -308,80 +276,89 @@ class NewSimpleOpenMan(
             logger.debug("bottom tail")
             val tailLength = bodyBottom - tailBottom
             val candleHammerRatio = tailLength / bodyLength
-            logger.debug("calculated candleHammerRatio: $candleHammerRatio, tailLength: $tailLength, bodyLength: $bodyLength")
-            if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
+            logger.debug(
+                "calculated candleHammerRatio: {}, tailLength: {}, bodyLength: {}",
+                candleHammerRatio,
+                tailLength,
+                bodyLength
+            )
+            if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
                     bodyBottom,
-                    bodyBottom.plus(tailLength.multiply(decimalScale))
+                    bodyBottom.plus(tailLength.multiply(operationalTakeProfitFactor))
                 )
             ) {
-                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
                 (referenceData as ObjectNode).set<DoubleNode>(
                     "tailLength",
-                    DoubleNode(tailLength.multiply(decimalScale).toDouble())
+                    DoubleNode(tailLength.toDouble())
                 )
-                logger.debug("scaled tailLength: ${tailLength.multiply(decimalScale)}")
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                         patten = SimplePattern.BOTTOM_TAIL,
-                        candleHammerRatio = candleHammerRatio,
-                        operationalCandleHammerRatio = decimalHammerRatio,
-                        beforeBalance = availableBalance.toDouble()
+                        candleHammerRatio = candleHammerRatio.toString(),
+                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                        beforeBalance = availableBalance.toDouble(),
                     ), referenceData
                 )
             }
         } else {
-            logger.debug("middle tail")
             val highTailLength = tailTop - bodyTop
             val lowTailLength = bodyBottom - tailBottom
 
             if (highTailLength > lowTailLength) {
-                logger.debug("middle high tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
-                val candleHammerRatio = highTailLength / bodyLength
-                logger.debug("calculated candleHammerRatio: $candleHammerRatio")
-                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
+                logger.debug(
+                    "middle high tail\nhighTail: {}, lowTail: {}, bodyTail: {}",
+                    highTailLength,
+                    lowTailLength,
+                    bodyLength
+                )
+                val calculatedHammerRatio = highTailLength / bodyLength
+                if (calculatedHammerRatio > operationalHammerRatio && isPositivePnl(
                         bodyTop,
-                        bodyTop.minus(highTailLength.multiply(decimalScale))
+                        bodyTop.minus(highTailLength.multiply(operationalTakeProfitFactor))
                     )
                 ) {
-                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("계산된HammerRatio: ${calculatedHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>(
                         "tailLength",
-                        DoubleNode(highTailLength.multiply(decimalScale).toDouble())
+                        DoubleNode(highTailLength.toDouble())
                     )
-                    logger.debug("scaled tailLength: ${highTailLength.multiply(decimalScale)}")
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
                             patten = SimplePattern.MIDDLE_HIGH_TAIL,
-                            candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio,
-                            beforeBalance = availableBalance.toDouble()
+                            candleHammerRatio = calculatedHammerRatio.toString(),
+                            operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                            beforeBalance = availableBalance.toDouble(),
                         ), referenceData
                     )
                 }
             } else {
-                logger.debug("middle low tail, highTail: $highTailLength, lowTail: $lowTailLength, bodyTail: $bodyLength")
+                logger.debug(
+                    "middle low tail\nhighTail: {}, lowTail: {}, bodyTail: {}",
+                    highTailLength,
+                    lowTailLength,
+                    bodyLength
+                )
                 val candleHammerRatio = lowTailLength / bodyLength
-                logger.debug("calculated candleHammerRatio: $candleHammerRatio")
-                if (candleHammerRatio > decimalHammerRatio && isPositivePnl(
+                if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
                         bodyBottom,
-                        bodyBottom.plus(lowTailLength.multiply(decimalScale))
+                        bodyBottom.plus(lowTailLength.multiply(operationalTakeProfitFactor))
                     )
                 ) {
-                    logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${decimalHammerRatio.toDouble()}")
+                    logger.debug("계산된HammerRatio: ${candleHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
                     (referenceData as ObjectNode).set<DoubleNode>(
                         "tailLength",
-                        DoubleNode(lowTailLength.multiply(decimalScale).toDouble())
+                        DoubleNode(lowTailLength.toDouble())
                     )
-                    logger.debug("scaled tailLength: ${lowTailLength.multiply(decimalScale)}")
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                             patten = SimplePattern.MIDDLE_LOW_TAIL,
-                            candleHammerRatio = candleHammerRatio,
-                            operationalCandleHammerRatio = decimalHammerRatio,
-                            beforeBalance = availableBalance.toDouble()
+                            candleHammerRatio = candleHammerRatio.toString(),
+                            operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                            beforeBalance = availableBalance.toDouble(),
                         ), referenceData
                     )
                 }
@@ -391,8 +368,23 @@ class NewSimpleOpenMan(
         return AnalyzeReport.NonMatchingReport
     }
 
-    private fun quantity(balance: BigDecimal, markPrice: BigDecimal, precision: Int): Double {
-        return balance.divide(markPrice, precision, RoundingMode.DOWN).toDouble()
+    private fun quantity(
+        balance: BigDecimal,
+        minNotional: BigDecimal,
+        markPrice: BigDecimal,
+        quantityPrecision: Int
+    ): Double {
+        return when (orderMode) {
+            OrderMode.MINIMUM_QUANTITY -> {
+                // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
+                // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
+                minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+            }
+
+            OrderMode.NORMAL -> {
+                balance.divide(markPrice, quantityPrecision, RoundingMode.DOWN).toDouble()
+            }
+        }
     }
 
     /*
@@ -402,7 +394,12 @@ class NewSimpleOpenMan(
     private fun isPositivePnl(open: BigDecimal, close: BigDecimal): Boolean {
         val pnl = (open - close).abs()
         val fee = (open + close).multiply(BigDecimal(TAKER_FEE_RATE))
-        logger.debug("fee :${fee}, pnl :${pnl}")
+        logger.debug("fee :{}, pnl :{}", fee, pnl)
         return pnl > fee
+    }
+
+    enum class OrderMode {
+        NORMAL,
+        MINIMUM_QUANTITY
     }
 }
