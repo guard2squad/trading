@@ -1,5 +1,6 @@
-package com.g2s.trading
+package com.g2s.trading.indicator
 
+import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.symbol.Symbol
 import org.springframework.context.event.EventListener

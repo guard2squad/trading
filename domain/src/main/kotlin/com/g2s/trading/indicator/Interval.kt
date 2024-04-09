@@ -1,4 +1,4 @@
-package com.g2s.trading.indicator.indicator
+package com.g2s.trading.indicator
 
 import java.lang.RuntimeException
 
