@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.event
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

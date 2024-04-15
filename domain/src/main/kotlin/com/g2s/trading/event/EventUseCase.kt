@@ -1,4 +1,4 @@
-package com.g2s.trading
+package com.g2s.trading.event
 
 import org.springframework.context.ApplicationEvent
 import org.springframework.context.event.ApplicationEventMulticaster
