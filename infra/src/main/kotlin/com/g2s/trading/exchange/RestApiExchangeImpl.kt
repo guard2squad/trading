@@ -31,6 +31,7 @@ class RestApiExchangeImpl(
     private var positionMode = PositionMode.ONE_WAY_MODE
     private var positionSide = PositionSide.BOTH
 
+    // TODO(UPDATE)
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
 
@@ -205,5 +206,24 @@ class RestApiExchangeImpl(
         binanceOrderInfoTracker.removeCloseClientId(position)
 
         return clientId
+    }
+
+    override fun getLeverage(symbol: Symbol): Int {
+        val parameters = java.util.LinkedHashMap<String, Any>()
+        parameters["symbol"] = symbol.value
+        val jsonResponse = om.readTree(binanceClient.account().positionInformation(parameters))
+        val leverage = jsonResponse.get(0).get("leverage").asInt()
+
+        return leverage
+    }
+
+    override fun setLeverage(symbol: Symbol, leverage: Int): Int {
+        val parameters = java.util.LinkedHashMap<String, Any>()
+        parameters["symbol"] = symbol.value
+        parameters["leverage"] = leverage
+        val jsonResponse = om.readTree(binanceClient.account().changeInitialLeverage(parameters))
+        val changedLeverage = jsonResponse.get("leverage").asInt()
+
+        return changedLeverage
     }
 }

@@ -21,4 +21,6 @@ interface Exchange {
     fun getClientIdAtClose(position: Position): String
     fun getPositionOpeningTime(position: Position): Long
     fun getPositionClosingTime(position: Position): Long
+    fun getLeverage(symbol: Symbol): Int
+    fun setLeverage(symbol: Symbol, leverage: Int): Int
 }

@@ -5,6 +5,7 @@ import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
 import com.g2s.trading.strategy.StrategyType
 import org.springframework.stereotype.Service
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class SymbolUseCase(
@@ -18,6 +19,13 @@ class SymbolUseCase(
                 .filter { strategySpec -> strategySpec.status == StrategySpecServiceStatus.SERVICE }
                 .flatMap { strategySpec -> strategySpec.symbols }
         }.toMutableSet()
+
+    private val symbolLeverageMap = ConcurrentHashMap<Symbol, Int>().apply {
+        symbols.forEach { symbol ->
+            put(symbol, exchangeImpl.getLeverage(symbol))
+        }
+    }
+
 
     fun getAllSymbols(): List<Symbol> {
         return symbols.toList()
@@ -35,5 +43,16 @@ class SymbolUseCase(
 
     fun getMinNotionalValue(symbol: Symbol): Double {
         return exchangeImpl.getMinNotionalValue(symbol)
+    }
+
+    fun getLeverage(symbol: Symbol): Int {
+        return symbolLeverageMap[symbol]!!
+    }
+
+    fun setLeverage(symbol: Symbol, leverage: Int): Int {
+        val changedLeverage = exchangeImpl.setLeverage(symbol, leverage)
+        symbolLeverageMap[symbol] = changedLeverage
+
+        return changedLeverage
     }
 }
