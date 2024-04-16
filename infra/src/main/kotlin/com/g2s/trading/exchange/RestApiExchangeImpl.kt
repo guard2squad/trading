@@ -320,7 +320,11 @@ class RestApiExchangeImpl(
             "orderId" to orderId
         )
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+        logger.debug(jsonResponse.asText())
         assert(jsonResponse.size() == 1)
+        if (jsonResponse.isEmpty || jsonResponse.size() == 0) {
+            logger.warn("No trade history available for orderId: $orderId")
+        }
         val objectNode = jsonResponse.get(0)
 
         return objectNode
