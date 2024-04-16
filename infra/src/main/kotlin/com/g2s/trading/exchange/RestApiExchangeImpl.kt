@@ -37,7 +37,7 @@ class RestApiExchangeImpl(
     // TODO(exchange Info 주기적으로 UPDATE)
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
-    private val positionOrderIdMap = ConcurrentHashMap<Position, Long>()
+    private val positionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -107,7 +107,7 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            positionOrderIdMap.computeIfAbsent(position) { _ -> orderId }
+            positionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
         } catch (e: OrderFailException) {
             throw e
         }
@@ -119,7 +119,7 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            positionOrderIdMap.computeIfAbsent(position) { _ -> orderId }
+            positionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
         } catch (e: OrderFailException) {
             throw e
         }
@@ -320,7 +320,9 @@ class RestApiExchangeImpl(
     }
 
     private fun getHistoryInfo(position: Position): JsonNode {
-        val orderId = positionOrderIdMap.remove(position)!!
+        logger.debug(position.positionKey.toString())
+        logger.debug(positionOrderIdMap[position.positionKey].toString())
+        val orderId = positionOrderIdMap.remove(position.positionKey)!!
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
             "orderId" to orderId
