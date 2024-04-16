@@ -37,7 +37,8 @@ class RestApiExchangeImpl(
     // TODO(exchange Info 주기적으로 UPDATE)
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
-    private val positionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
+    private val openPositionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
+    private val closedPositionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -107,7 +108,7 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            positionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
+            closedPositionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
         } catch (e: OrderFailException) {
             throw e
         }
@@ -119,7 +120,7 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            positionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
+            openPositionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
         } catch (e: OrderFailException) {
             throw e
         }
@@ -285,7 +286,7 @@ class RestApiExchangeImpl(
     }
 
     override fun getOpenHistory(position: Position, condition: OpenCondition): History.Open {
-        val openHistoryInfo = getHistoryInfo(position)
+        val openHistoryInfo = getHistoryInfo(position, true)
         val openHistory = History.Open(
             historyKey = History.generateHistoryKey(position),
             position = position,
@@ -302,7 +303,7 @@ class RestApiExchangeImpl(
     }
 
     override fun getCloseHistory(position: Position, condition: CloseCondition): History.Close {
-        val closeHistoryInfo = getHistoryInfo(position)
+        val closeHistoryInfo = getHistoryInfo(position, false)
         val closeHistory = History.Close(
             historyKey = History.generateHistoryKey(position),
             position = position,
@@ -319,10 +320,20 @@ class RestApiExchangeImpl(
         return closeHistory
     }
 
-    private fun getHistoryInfo(position: Position): JsonNode {
-        logger.debug(position.positionKey.toString())
-        logger.debug(positionOrderIdMap[position.positionKey].toString())
-        val orderId = positionOrderIdMap.remove(position.positionKey)!!
+    private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode {
+        val orderId: Long = if (isOpen) {
+            openPositionOrderIdMap.remove(position.positionKey)!!
+        } else {
+            closedPositionOrderIdMap.remove(position.positionKey)!!
+        }
+        logger.debug("positionKey: {}", position.positionKey)
+        logger.debug("orderId: $orderId")
+        if (isOpen) {
+            logger.debug("openPositionOrderIdMap 제거됨: " + openPositionOrderIdMap[position.positionKey].toString())
+        } else {
+            logger.debug("closedPositionOrderIdMap 제거됨: " + closedPositionOrderIdMap[position.positionKey].toString())
+        }
+
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
             "orderId" to orderId
