@@ -108,7 +108,12 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            closedPositionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
+            closedPositionOrderIdMap.compute(position.positionKey) { _, _ -> orderId }
+            logger.debug(
+                "orderId updated: {}, positionKey: {}",
+                closedPositionOrderIdMap[position.positionKey],
+                position.positionKey
+            )
         } catch (e: OrderFailException) {
             throw e
         }
@@ -119,8 +124,14 @@ class RestApiExchangeImpl(
         try {
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
+            logger.debug("orderId: $orderId")
 
-            openPositionOrderIdMap.computeIfAbsent(position.positionKey) { _ -> orderId }
+            openPositionOrderIdMap.compute(position.positionKey) { _, _ -> orderId }
+            logger.debug(
+                "orderId updated: {}, positionKey: {}",
+                openPositionOrderIdMap[position.positionKey],
+                position.positionKey
+            )
         } catch (e: OrderFailException) {
             throw e
         }
@@ -168,57 +179,32 @@ class RestApiExchangeImpl(
      * response 예시:
      * ```json
      * {
-     *     "id": "3f7df6e3-2df4-44b9-9919-d2f38f90a99a",
-     *     "status": 200,
-     *     "result": {
-     *         "orderId": 325078477,
-     *         "symbol": "BTCUSDT",
-     *         "status": "NEW",
-     *         "clientOrderId": "iCXL1BywlBaf2sesNUrVl3",
-     *         "price": "43187.00",
-     *         "avgPrice": "0.00",
-     *         "origQty": "0.100",
-     *         "executedQty": "0.000",
-     *         "cumQty": "0.000",
-     *         "cumQuote": "0.00000",
-     *         "timeInForce": "GTC",
-     *         "type": "LIMIT",
-     *         "reduceOnly": false,
-     *         "closePosition": false,
-     *         "side": "BUY",
-     *         "positionSide": "BOTH",
-     *         "stopPrice": "0.00",
-     *         "workingType": "CONTRACT_PRICE",
-     *         "priceProtect": false,
-     *         "origType": "LIMIT",
-     *         "priceMatch": "NONE",
-     *         "selfTradePreventionMode": "NONE",
-     *         "goodTillDate": 0,
-     *         "updateTime": 1702555534435
-     *     },
-     *     "rateLimits": [
-     *         {
-     *             "rateLimitType": "ORDERS",
-     *             "interval": "SECOND",
-     *             "intervalNum": 10,
-     *             "limit": 300,
-     *             "count": 1
-     *         },
-     *         {
-     *             "rateLimitType": "ORDERS",
-     *             "interval": "MINUTE",
-     *             "intervalNum": 1,
-     *             "limit": 1200,
-     *             "count": 1
-     *         },
-     *         {
-     *             "rateLimitType": "REQUEST_WEIGHT",
-     *             "interval": "MINUTE",
-     *             "intervalNum": 1,
-     *             "limit": 2400,
-     *             "count": 1
-     *         }
-     *     ]
+     *     "clientOrderId": "testOrder",
+     *     "cumQty": "0",
+     *     "cumQuote": "0",
+     *     "executedQty": "0",
+     *     "orderId": 22542179,
+     *     "avgPrice": "0.00000",
+     *     "origQty": "10",
+     *     "price": "0",
+     *     "reduceOnly": false,
+     *     "side": "BUY",
+     *     "positionSide": "SHORT",
+     *     "status": "NEW",
+     *     "stopPrice": "9300",        // please ignore when order type is TRAILING_STOP_MARKET
+     *     "closePosition": false,   // if Close-All
+     *     "symbol": "BTCUSDT",
+     *     "timeInForce": "GTD",
+     *     "type": "TRAILING_STOP_MARKET",
+     *     "origType": "TRAILING_STOP_MARKET",
+     *     "activatePrice": "9020",    // activation price, only return with TRAILING_STOP_MARKET order
+     *     "priceRate": "0.3",         // callback rate, only return with TRAILING_STOP_MARKET order
+     *     "updateTime": 1566818724722,
+     *     "workingType": "CONTRACT_PRICE",
+     *     "priceProtect": false,      // if conditional order trigger is protected
+     *     "priceMatch": "NONE",              //price match mode
+     *     "selfTradePreventionMode": "NONE", //self trading preventation mode
+     *     "goodTillDate": 1693207680000      //order pre-set auot cancel time for TIF GTD order
      * }
      * ```
      */
@@ -322,17 +308,12 @@ class RestApiExchangeImpl(
 
     private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode {
         val orderId: Long = if (isOpen) {
-            openPositionOrderIdMap.remove(position.positionKey)!!
+            openPositionOrderIdMap[position.positionKey]!!
         } else {
-            closedPositionOrderIdMap.remove(position.positionKey)!!
+            closedPositionOrderIdMap[position.positionKey]!!
         }
         logger.debug("positionKey: {}", position.positionKey)
         logger.debug("orderId: $orderId")
-        if (isOpen) {
-            logger.debug("openPositionOrderIdMap 제거됨: " + openPositionOrderIdMap[position.positionKey].toString())
-        } else {
-            logger.debug("closedPositionOrderIdMap 제거됨: " + closedPositionOrderIdMap[position.positionKey].toString())
-        }
 
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
