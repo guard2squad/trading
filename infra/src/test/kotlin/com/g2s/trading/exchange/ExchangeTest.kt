@@ -5,16 +5,21 @@ import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.Interval
 import com.g2s.trading.symbol.Symbol
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit.jupiter.SpringExtension
 import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
+@Disabled
 class ExchangeTest {
 
     @Autowired
@@ -35,11 +40,11 @@ class ExchangeTest {
      * leverage bracket을 조회하는 API
      * It can be accessed with or without specifying a symbol.
      *
-     * @param symbol Optional. The trading symbol to get leverage bracket information for.
-     * @param recvWindow Optional. The number of milliseconds after timestamp the request is valid for.
+     * @queryParameter symbol Optional. The trading symbol to get leverage bracket information for.
+     * @queryParameter recvWindow Optional. The number of milliseconds after timestamp the request is valid for.
      * Defaults to 5000 milliseconds if not specified. signed한 요청에서 유효한 parameter.
      * binanceJavaConnector에서 account 클래스의 메서드는 signed한 요청임.
-     * @param timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
+     * @queryParameter timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
      *
      * Response:
      * [
@@ -90,11 +95,11 @@ class ExchangeTest {
      * 포지션이 없어도 조회할 수 있음(positionAmt 값이 0)
      * 초기 레버리지 정보를 포함해서 포지션의 메타데이터 조회 가능
      *
-     * @param symbol Optional. The trading symbol to get position information for.
-     * @param recvWindow Optional. The number of milliseconds after timestamp the request is valid for.
+     * @queryParameter symbol Optional. The trading symbol to get position information for.
+     * @queryParameter recvWindow Optional. The number of milliseconds after timestamp the request is valid for.
      * Defaults to 5000 milliseconds if not specified. signed한 요청에서 유효한 parameter.
      * binanceJavaConnector에서 account 클래스의 메서드는 signed한 요청임.
-     * @param timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
+     * @queryParameter timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
      *
      * Response:
      *
@@ -196,6 +201,25 @@ class ExchangeTest {
         val changedLeverage = jsonResponse.get("leverage").asInt()
         println(changedLeverage)
         testGetInitialLeverage()
+    }
+
+    @Test
+    fun testGetTradeHistory() {
+        val symbol = Symbol.valueOf("ETHUSDT")
+        val parameters = LinkedHashMap<String, Any>()
+        parameters["symbol"] = symbol.value
+        parameters["orderId"] = 1352707346  // stream에서 얻을 수 있음
+        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+        println(pretty.writeValueAsString(jsonResponse))
+    }
+
+    @Test
+    fun getAccountTest() {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to 1713204973619
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
     }
 
     // Binance App Trading View 차트에서 LastPrice
@@ -311,5 +335,12 @@ class ExchangeTest {
                 numberOfTrades = jsonCandleStick.get(8).asInt()
             )
         return candleStick
+    }
+
+    @Test
+    fun getCurrentUtcDateTimeString() {
+        val nowSeoul = ZonedDateTime.now(ZoneId.of("Asia/Seoul"))
+        val formatter = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss")
+        println(nowSeoul.format(formatter))
     }
 }

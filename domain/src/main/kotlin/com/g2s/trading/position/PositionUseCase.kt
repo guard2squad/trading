@@ -50,6 +50,7 @@ class PositionUseCase(
 
             if (currentValue == position) {
                 exchangeImpl.openPosition(position)
+                historyUseCase.recordOpenHistory(position)
             }
         } catch (e: OrderFailException) {
             logger.debug(e.message)
@@ -72,14 +73,13 @@ class PositionUseCase(
         }
     }
 
-    fun syncPosition(symbol: Symbol, openTransactionTime: Long) {
+    fun syncPosition(symbol: Symbol) {
         positionMap.values.find {
             it.symbol == symbol
         }?.let { old ->
-            val synced = Position.sync(old, openTransactionTime)
+            val synced = Position.sync(old)
             positionRepository.updatePosition(synced)
             positionMap.replace(synced.positionKey, synced)
-            historyUseCase.setSyncedPosition(synced)
             eventUseCase.publishEvent(PositionEvent.PositionSyncedEvent(synced))
         }
     }
@@ -92,13 +92,12 @@ class PositionUseCase(
             positionRepository.deletePosition(position)
             positionMap.remove(position.positionKey)
             exchangeImpl.closePosition(position)
-            historyUseCase.setClosedPosition(position)
+            historyUseCase.recordCloseHistory(position)
         } catch (e: OrderFailException) {
             logger.debug(e.message)
             positionMap[originalPosition.positionKey] = originalPosition
             positionRepository.savePosition(originalPosition)
             accountUseCase.syncAccount()
-            historyUseCase.removeClosedPosition(position)
             return
         }
     }

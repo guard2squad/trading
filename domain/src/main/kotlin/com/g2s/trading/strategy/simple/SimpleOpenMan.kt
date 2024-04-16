@@ -46,6 +46,7 @@ class SimpleOpenMan(
 ) : Strategy {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private var orderMode = OrderMode.MINIMUM_QUANTITY
+    private var isTestMode = true;
 
     companion object {
         private const val TYPE = "simple"
@@ -154,25 +155,28 @@ class SimpleOpenMan(
             if (old == null) {
                 false
             } else {
-                // 이미 가지고 있는 캔들스틱인 경우
-                if (old.key == candleStick.key) {
-                    logger.debug("same candlestick {}", candleStick.symbol)
-                    false
-                }
-                // 1분 차이 캔들스틱이 아닌 경우
-                else if (old.key + 60000L != candleStick.key) {
-                    logger.debug("not updated candlestick. {}", candleStick.symbol)
-                    false
-                }
-                // 갱신된지 1초 이상된 캔들스틱인 경우
-                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
-                    logger.debug("out 1 second, {}", candleStick.symbol)
-                    false
-                } else {
-                    logger.debug("in 1 second, {}", candleStick.symbol)
-                    oldCandleStick = old
-                    true
-                }
+                // TODO: Remove
+                oldCandleStick = old
+                true
+//                // 이미 가지고 있는 캔들스틱인 경우
+//                if (old.key == candleStick.key) {
+//                    logger.debug("same candlestick {}", candleStick.symbol)
+//                    false
+//                }
+//                // 1분 차이 캔들스틱이 아닌 경우
+//                else if (old.key + 60000L != candleStick.key) {
+//                    logger.debug("not updated candlestick. {}", candleStick.symbol)
+//                    false
+//                }
+//                // 갱신된지 1초 이상된 캔들스틱인 경우
+//                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
+//                    logger.debug("out 1 second, {}", candleStick.symbol)
+//                    false
+//                } else {
+//                    logger.debug("in 1 second, {}", candleStick.symbol)
+//                    oldCandleStick = old
+//                    true
+//                }
             }
         }
 
@@ -234,6 +238,23 @@ class SimpleOpenMan(
         val bodyLength = bodyTop - bodyBottom
         val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
         val operationalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
+
+        if (isTestMode) {
+            val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
+            (referenceData as ObjectNode).set<DoubleNode>(
+                "tailLength",
+                DoubleNode(99.999)  // TEST
+            )
+
+            return AnalyzeReport.MatchingReport(
+                candleStick.symbol, OrderSide.TEST, OpenCondition.SimpleCondition(
+                    patten = SimplePattern.TEST,
+                    candleHammerRatio = "TEST",
+                    operationalCandleHammerRatio = "TEST",
+                    beforeBalance = availableBalance.toDouble(),
+                ), referenceData
+            )
+        }
 
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             logger.debug("body length : 0")
