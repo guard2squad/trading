@@ -225,20 +225,6 @@ class SimpleCloseMan(
                 }
             }
 
-            OrderSide.TEST -> {
-                shouldClose = true
-                conditionUseCase.setCloseCondition(
-                    position, CloseCondition.SimpleCondition(
-                        tailLength = tailLength.toString(),
-                        tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
-                        factor = 0.0,
-                        entryPrice = entryPrice.toString(),
-                        lastPrice = lastPrice.toString(),
-                        priceChange = "TEST",
-                        beforeBalance = availableBalance.toDouble()
-                    )
-                )
-            }
         }
         // close position
         if (shouldClose) {

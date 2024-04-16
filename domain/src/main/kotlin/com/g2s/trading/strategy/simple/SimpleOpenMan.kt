@@ -239,23 +239,6 @@ class SimpleOpenMan(
         val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
         val operationalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
 
-        if (isTestMode) {
-            val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-            (referenceData as ObjectNode).set<DoubleNode>(
-                "tailLength",
-                DoubleNode(99.999)  // TEST
-            )
-
-            return AnalyzeReport.MatchingReport(
-                candleStick.symbol, OrderSide.TEST, OpenCondition.SimpleCondition(
-                    patten = SimplePattern.TEST,
-                    candleHammerRatio = "TEST",
-                    operationalCandleHammerRatio = "TEST",
-                    beforeBalance = availableBalance.toDouble(),
-                ), referenceData
-            )
-        }
-
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             logger.debug("body length : 0")
             return AnalyzeReport.NonMatchingReport
