@@ -30,6 +30,7 @@ class SimpleCloseMan(
     private val strategySpecRepository: StrategySpecRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
+    private var testMode = true;
 
     companion object {
         private const val TYPE = "simple"
@@ -111,7 +112,7 @@ class SimpleCloseMan(
         when (position.orderSide) {
             OrderSide.LONG -> {
                 // 손절
-                if (lastPrice < entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                if (lastPrice < entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[롱 손절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -135,7 +136,7 @@ class SimpleCloseMan(
                     cntLoss++
                 }
                 // 익절
-                else if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                else if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[롱 익절] entryPrice: $entryPrice | lastPrice: $lastPrice" +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -169,7 +170,7 @@ class SimpleCloseMan(
 
             OrderSide.SHORT -> {
                 // 손절
-                if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[숏 손절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -193,7 +194,7 @@ class SimpleCloseMan(
                     cntLoss++
                 }
                 // 익절
-                else if (lastPrice < entryPrice && priceChange > tailLength.multiply(takeProfitFactor)) {
+                else if (lastPrice < entryPrice && priceChange > tailLength.multiply(takeProfitFactor) || testMode) {
                     logger.debug(
                         "[숏 익절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
