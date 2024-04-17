@@ -7,7 +7,7 @@ import com.g2s.trading.position.Position
 sealed class History() {
     companion object {
         fun generateHistoryKey(position: Position): String {
-            return "${position.positionKey}-${position.strategyKey}-${position.openTransactionTime}"
+            return "${position.positionKey}-${position.strategyKey}-${position.openTime}"
         }
     }
 

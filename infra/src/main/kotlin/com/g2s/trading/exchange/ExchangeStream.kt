@@ -33,8 +33,7 @@ class ExchangeStream(
     private val eventUseCase: EventUseCase,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
-    private val symbolUseCase: SymbolUseCase,
-    private val binanceCommissionAndRealizedProfitTracker: BinanceCommissionAndRealizedProfitTracker
+    private val symbolUseCase: SymbolUseCase
 ) {
     private val om = ObjectMapperProvider.get()
     private val pretty = om.writerWithDefaultPrettyPrinter()
@@ -171,20 +170,13 @@ class ExchangeStream(
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString() -> {
                     val jsonOrder = eventJson.get("o")
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
-                    val clientId = jsonOrder.get("c").asText()
-                    val realizedProfit = jsonOrder.get("rp").asDouble()
-                    binanceCommissionAndRealizedProfitTracker.updateRealizedProfit(clientId, realizedProfit)
-                    val commission = jsonOrder.get("n").asDouble()
-                    binanceCommissionAndRealizedProfitTracker.updateCommission(clientId, commission)
                     // Order Status가 FILLED되면 refresh account and position | publish accumulatedCommision and accumulatedRP
                     if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
                         val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
                         // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
                         val transactionTime = jsonOrder.get("T").asLong()
-                        positionUseCase.syncPosition(symbol, transactionTime)
+                        positionUseCase.syncPosition(symbol)
                         accountUseCase.syncAccount()
-                        binanceCommissionAndRealizedProfitTracker.publishAccumulatedCommission(clientId)
-                        binanceCommissionAndRealizedProfitTracker.publishRealizedProfitAndCommissionEvent(clientId)
                     }
                 }
             }

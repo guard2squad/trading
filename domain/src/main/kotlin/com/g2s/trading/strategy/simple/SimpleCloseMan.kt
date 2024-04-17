@@ -124,9 +124,11 @@ class SimpleCloseMan(
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
                             tailLength = tailLength.toString(),
-                            tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor).toString(),
+                            tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
+                            factor = stopLossFactor.toDouble(),
                             entryPrice = entryPrice.toString(),
                             lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
                             beforeBalance = availableBalance.toDouble()
                         )
                     )
@@ -145,9 +147,11 @@ class SimpleCloseMan(
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
                             tailLength = tailLength.toString(),
-                            tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor).toString(),
+                            tailLengthWithFactor = tailLength.multiply(takeProfitFactor).toString(),
+                            factor = takeProfitFactor.toDouble(),
                             entryPrice = entryPrice.toString(),
                             lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
                             beforeBalance = availableBalance.toDouble()
                         )
                     )
@@ -178,9 +182,11 @@ class SimpleCloseMan(
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
                             tailLength = tailLength.toString(),
-                            tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor).toString(),
+                            tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
+                            factor = stopLossFactor.toDouble(),
                             entryPrice = entryPrice.toString(),
                             lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
                             beforeBalance = availableBalance.toDouble()
                         )
                     )
@@ -199,9 +205,11 @@ class SimpleCloseMan(
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
                             tailLength = tailLength.toString(),
-                            tailLengthWithStopLossFactor = tailLength.multiply(stopLossFactor).toString(),
+                            tailLengthWithFactor = tailLength.multiply(takeProfitFactor).toString(),
+                            factor = takeProfitFactor.toDouble(),
                             entryPrice = entryPrice.toString(),
                             lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
                             beforeBalance = availableBalance.toDouble()
                         )
                     )
@@ -216,6 +224,7 @@ class SimpleCloseMan(
                     )
                 }
             }
+
         }
         // close position
         if (shouldClose) {
