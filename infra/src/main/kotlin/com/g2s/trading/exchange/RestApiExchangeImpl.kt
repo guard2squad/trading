@@ -281,7 +281,7 @@ class RestApiExchangeImpl(
                 openHistoryInfo.get("commission").asDouble(),
                 getCurrentBalance(openHistoryInfo.get("time").asLong())
             )
-            
+
             return openHistory
         }
         return createOpenHistory(position, condition, 0, 0.0, 0.0)
@@ -345,7 +345,7 @@ class RestApiExchangeImpl(
         }
 
         if (orderId == null) {
-            logger.warn("No order ID found for positionKey: {}", position.positionKey)
+            logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
             return null
         }
 
@@ -362,6 +362,7 @@ class RestApiExchangeImpl(
 
         if (jsonResponse == null || jsonResponse.isEmpty || jsonResponse.size() != 1) {
             logger.warn("Invalid or empty response for orderId: $orderId")
+            logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
             return null
         }
 

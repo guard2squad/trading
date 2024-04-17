@@ -46,7 +46,6 @@ class SimpleOpenMan(
 ) : Strategy {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private var orderMode = OrderMode.MINIMUM_QUANTITY
-    private var isTestMode = true;
 
     companion object {
         private const val TYPE = "simple"
@@ -155,28 +154,25 @@ class SimpleOpenMan(
             if (old == null) {
                 false
             } else {
-                // TODO: Remove
-                oldCandleStick = old
-                true
-//                // 이미 가지고 있는 캔들스틱인 경우
-//                if (old.key == candleStick.key) {
-//                    logger.debug("same candlestick {}", candleStick.symbol)
-//                    false
-//                }
-//                // 1분 차이 캔들스틱이 아닌 경우
-//                else if (old.key + 60000L != candleStick.key) {
-//                    logger.debug("not updated candlestick. {}", candleStick.symbol)
-//                    false
-//                }
-//                // 갱신된지 1초 이상된 캔들스틱인 경우
-//                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
-//                    logger.debug("out 1 second, {}", candleStick.symbol)
-//                    false
-//                } else {
-//                    logger.debug("in 1 second, {}", candleStick.symbol)
-//                    oldCandleStick = old
-//                    true
-//                }
+                // 이미 가지고 있는 캔들스틱인 경우
+                if (old.key == candleStick.key) {
+                    logger.debug("same candlestick {}", candleStick.symbol)
+                    false
+                }
+                // 1분 차이 캔들스틱이 아닌 경우
+                else if (old.key + 60000L != candleStick.key) {
+                    logger.debug("not updated candlestick. {}", candleStick.symbol)
+                    false
+                }
+                // 갱신된지 1초 이상된 캔들스틱인 경우
+                else if (Instant.now().toEpochMilli() - candleStick.key > 1000) {
+                    logger.debug("out 1 second, {}", candleStick.symbol)
+                    false
+                } else {
+                    logger.debug("in 1 second, {}", candleStick.symbol)
+                    oldCandleStick = old
+                    true
+                }
             }
         }
 
