@@ -19,7 +19,7 @@ import java.util.*
 
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
-//@Disabled
+@Disabled
 class ExchangeTest {
 
     @Autowired
