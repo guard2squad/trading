@@ -5,6 +5,9 @@ import com.g2s.trading.account.Asset
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.symbol.Symbol
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class Position(
     val positionKey: PositionKey,
@@ -15,7 +18,7 @@ data class Position(
     val orderSide: OrderSide,
     val orderType: OrderType,
     val referenceData: JsonNode,
-    val openTransactionTime: Long = 0,
+    val openTime: String = getCurrentUtcDateTimeString(),
     val asset: Asset,
     val synced: Boolean = false // close시 확인
 ) {
@@ -35,11 +38,17 @@ data class Position(
             )
         }
 
-        fun sync(old: Position, openTransactionTime: Long): Position {
+        fun sync(old: Position): Position {
             return old.copy(
-                synced = true,
-                openTransactionTime = openTransactionTime
+                synced = true
             )
+        }
+
+        private fun getCurrentUtcDateTimeString(): String {
+            val nowSeoul = ZonedDateTime.now(ZoneId.of("Asia/Seoul"))
+            val formatter = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss")
+
+            return nowSeoul.format(formatter)
         }
     }
 }

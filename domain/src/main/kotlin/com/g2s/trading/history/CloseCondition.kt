@@ -14,13 +14,15 @@ sealed class CloseCondition {
      */
     data class SimpleCondition(
         val tailLength: String,
-        val tailLengthWithStopLossFactor: String,
+        val tailLengthWithFactor: String,   // Factor: 손절 할 때 StopLossFactor, 익절할 때 takeProfitFactor
+        val factor: Double,
         val entryPrice: String,
         val lastPrice: String,
+        val priceChange: String,
         val beforeBalance: Double
     ) : CloseCondition() {
         override fun toString(): String {
-            return "SimpleCondition(tailLength=$tailLength, tailLengthWithStopLossFactor=$tailLengthWithStopLossFactor, entryPrice=$entryPrice, lastPrice=$lastPrice, beforeBalance=$beforeBalance)"
+            return "SimpleCondition(tailLength=$tailLength, tailLengthWithFactor=$tailLengthWithFactor, entryPrice=$entryPrice, lastPrice=$lastPrice, beforeBalance=$beforeBalance)"
         }
     }
 
