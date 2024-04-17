@@ -273,61 +273,99 @@ class RestApiExchangeImpl(
 
     override fun getOpenHistory(position: Position, condition: OpenCondition): History.Open {
         val openHistoryInfo = getHistoryInfo(position, true)
-        val openHistory = History.Open(
-            historyKey = History.generateHistoryKey(position),
-            position = position,
-            strategyKey = position.strategyKey,
-            openCondition = condition,
-            orderSide = position.orderSide,
-            orderType = position.orderType,
-            transactionTime = openHistoryInfo.get("time").asLong(),
-            commission = openHistoryInfo.get("commission").asDouble(),
-            afterBalance = getCurrentBalance(openHistoryInfo.get("time").asLong())
-        )
-
-        return openHistory
+        if (openHistoryInfo != null) {
+            val openHistory = createOpenHistory(
+                position,
+                condition,
+                openHistoryInfo.get("time").asLong(),
+                openHistoryInfo.get("commission").asDouble(),
+                getCurrentBalance(openHistoryInfo.get("time").asLong())
+            )
+            
+            return openHistory
+        }
+        return createOpenHistory(position, condition, 0, 0.0, 0.0)
     }
+
+    fun createOpenHistory(
+        position: Position, condition: OpenCondition, transactionTime: Long,
+        commission: Double,
+        afterBalance: Double
+    ) = History.Open(
+        historyKey = History.generateHistoryKey(position),
+        position = position,
+        strategyKey = position.strategyKey,
+        openCondition = condition,
+        orderSide = position.orderSide,
+        orderType = position.orderType,
+        transactionTime, commission, afterBalance
+    )
 
     override fun getCloseHistory(position: Position, condition: CloseCondition): History.Close {
         val closeHistoryInfo = getHistoryInfo(position, false)
-        val closeHistory = History.Close(
-            historyKey = History.generateHistoryKey(position),
-            position = position,
-            strategyKey = position.strategyKey,
-            closeCondition = condition,
-            orderSide = position.orderSide,
-            orderType = position.orderType,
-            transactionTime = closeHistoryInfo.get("time").asLong(),
-            realizedPnL = closeHistoryInfo.get("realizedPnl").asDouble(),
-            commission = closeHistoryInfo.get("commission").asDouble(),
-            afterBalance = getCurrentBalance(closeHistoryInfo.get("time").asLong())
-        )
+        if (closeHistoryInfo != null) {
 
-        return closeHistory
+            val closeHistory = createCloseHistory(
+                position,
+                condition,
+                closeHistoryInfo.get("time").asLong(),
+                closeHistoryInfo.get("realizedPnl").asDouble(),
+                closeHistoryInfo.get("commission").asDouble(),
+                getCurrentBalance(closeHistoryInfo.get("time").asLong())
+            )
+
+            return closeHistory
+        }
+
+        return createCloseHistory(position, condition, 0, 0.0, 0.0, 0.0)
     }
 
-    private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode {
-        val orderId: Long = if (isOpen) {
-            openPositionOrderIdMap[position.positionKey]!!
+    private fun createCloseHistory(
+        position: Position,
+        condition: CloseCondition,
+        transactionTime: Long,
+        realizedPnL: Double,
+        commission: Double,
+        afterBalance: Double
+    ) = History.Close(
+        historyKey = History.generateHistoryKey(position),
+        position = position,
+        strategyKey = position.strategyKey,
+        closeCondition = condition,
+        orderSide = position.orderSide,
+        orderType = position.orderType,
+        transactionTime, realizedPnL, commission, afterBalance
+    )
+
+    private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode? {
+        val orderId: Long? = if (isOpen) {
+            openPositionOrderIdMap.remove(position.positionKey)
         } else {
-            closedPositionOrderIdMap[position.positionKey]!!
+            closedPositionOrderIdMap.remove(position.positionKey)
         }
-        logger.debug("positionKey: {}", position.positionKey)
-        logger.debug("orderId: $orderId")
+
+        if (orderId == null) {
+            logger.warn("No order ID found for positionKey: {}", position.positionKey)
+            return null
+        }
+
+        logger.debug("getHistoryInfo-positionKey: {}", position.positionKey)
+        logger.debug("getHistoryInfo-orderId: $orderId")
 
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
             "orderId" to orderId
         )
-        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
-        logger.debug(jsonResponse.asText())
-        assert(jsonResponse.size() == 1)
-        if (jsonResponse.isEmpty || jsonResponse.size() == 0) {
-            logger.warn("No trade history available for orderId: $orderId")
-        }
-        val objectNode = jsonResponse.get(0)
 
-        return objectNode
+        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+        logger.debug("API response: {}", jsonResponse.asText())
+
+        if (jsonResponse == null || jsonResponse.isEmpty || jsonResponse.size() != 1) {
+            logger.warn("Invalid or empty response for orderId: $orderId")
+            return null
+        }
+
+        return jsonResponse.get(0)
     }
 
 

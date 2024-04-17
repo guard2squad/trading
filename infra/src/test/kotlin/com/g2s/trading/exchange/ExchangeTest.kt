@@ -19,7 +19,7 @@ import java.util.*
 
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
-@Disabled
+//@Disabled
 class ExchangeTest {
 
     @Autowired
@@ -205,11 +205,12 @@ class ExchangeTest {
 
     @Test
     fun testGetTradeHistory() {
-        val symbol = Symbol.valueOf("ETHUSDT")
+        val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = symbol.value
-        parameters["orderId"] = 1352707346  // stream에서 얻을 수 있음
+        parameters["orderId"] = 4008926203  // stream에서 얻을 수 있음
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+        jsonResponse[0]
         println(pretty.writeValueAsString(jsonResponse))
     }
 
