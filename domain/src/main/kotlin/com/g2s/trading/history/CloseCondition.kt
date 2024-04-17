@@ -22,7 +22,7 @@ sealed class CloseCondition {
         val beforeBalance: Double
     ) : CloseCondition() {
         override fun toString(): String {
-            return "SimpleCondition(tailLength=$tailLength, tailLengthWithStopLossFactor=$tailLengthWithFactor, entryPrice=$entryPrice, lastPrice=$lastPrice, beforeBalance=$beforeBalance)"
+            return "SimpleCondition(tailLength=$tailLength, tailLengthWithFactor=$tailLengthWithFactor, entryPrice=$entryPrice, lastPrice=$lastPrice, beforeBalance=$beforeBalance)"
         }
     }
 
