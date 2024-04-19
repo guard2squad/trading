@@ -61,7 +61,7 @@ class ManualTrader(
             println(e.message)
         }
         conditionUseCase.setOpenCondition(position, OpenCondition.ManualCondition)
-        positionUseCase.openPosition(position, spec)
+        positionUseCase.openPosition(position)
         accountUseCase.release()
         lockUseCase.release(position.strategyKey, LockUsage.OPEN)
     }
@@ -79,7 +79,7 @@ class ManualTrader(
             return
         }
         conditionUseCase.setCloseCondition(position, CloseCondition.ManualCondition)
-        positionUseCase.closePosition(position, spec)
+        positionUseCase.closePosition(position)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 
