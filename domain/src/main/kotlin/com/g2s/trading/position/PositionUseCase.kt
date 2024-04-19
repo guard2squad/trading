@@ -1,12 +1,11 @@
 package com.g2s.trading.position
 
-import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.event.EventUseCase
+import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.history.HistoryUseCase
-import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -37,7 +36,7 @@ class PositionUseCase(
         }
     }
 
-    fun openPosition(position: Position, spec: StrategySpec) {
+    fun openPosition(position: Position) {
         logger.debug("포지션 오픈 - symbol:${position.symbol}")
         try {
 
@@ -53,7 +52,7 @@ class PositionUseCase(
                 historyUseCase.recordOpenHistory(position)
             }
         } catch (e: OrderFailException) {
-            logger.debug(e.message)
+            logger.warn(e.message)
             positionMap.remove(position.positionKey)
             positionRepository.deletePosition(position)
             accountUseCase.syncAccount()
@@ -84,7 +83,13 @@ class PositionUseCase(
         }
     }
 
-    fun closePosition(position: Position, spec: StrategySpec) {
+    /**
+     *  포지션을 닫고, 주문이 실패할 경우 롤백합니다. 주문 성공 여부를 반환힙니다.
+     *
+     * @param position The trading position to close.
+     * @return [Boolean] indicating success (`true`) or failure (`false`) of the operation.
+     */
+    fun closePosition(position: Position): Boolean {
         val originalPosition = position.copy()
 
         try {
@@ -93,12 +98,13 @@ class PositionUseCase(
             positionMap.remove(position.positionKey)
             exchangeImpl.closePosition(position)
             historyUseCase.recordCloseHistory(position)
+            return true
         } catch (e: OrderFailException) {
-            logger.debug(e.message)
+            logger.warn(e.message)
             positionMap[originalPosition.positionKey] = originalPosition
             positionRepository.savePosition(originalPosition)
             accountUseCase.syncAccount()
-            return
+            return false
         }
     }
 

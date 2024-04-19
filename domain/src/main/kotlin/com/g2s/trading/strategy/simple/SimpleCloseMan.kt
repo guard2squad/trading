@@ -1,12 +1,14 @@
 package com.g2s.trading.strategy.simple
 
-import com.g2s.trading.indicator.MarkPriceUseCase
+import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.event.StrategyEvent
 import com.g2s.trading.event.TradingEvent
-import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.history.CloseCondition
 import com.g2s.trading.history.ConditionUseCase
+import com.g2s.trading.history.TradingAction.STOP_LOSS
+import com.g2s.trading.history.TradingAction.TAKE_PROFIT
+import com.g2s.trading.indicator.MarkPriceUseCase
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
@@ -123,6 +125,7 @@ class SimpleCloseMan(
                     shouldClose = true
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
+                            tradingAction = STOP_LOSS,
                             tailLength = tailLength.toString(),
                             tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
                             factor = stopLossFactor.toDouble(),
@@ -146,6 +149,7 @@ class SimpleCloseMan(
                     shouldClose = true
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
+                            tradingAction = TAKE_PROFIT,
                             tailLength = tailLength.toString(),
                             tailLengthWithFactor = tailLength.multiply(takeProfitFactor).toString(),
                             factor = takeProfitFactor.toDouble(),
@@ -181,6 +185,7 @@ class SimpleCloseMan(
                     shouldClose = true
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
+                            tradingAction = STOP_LOSS,
                             tailLength = tailLength.toString(),
                             tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
                             factor = stopLossFactor.toDouble(),
@@ -204,6 +209,7 @@ class SimpleCloseMan(
                     shouldClose = true
                     conditionUseCase.setCloseCondition(
                         position, CloseCondition.SimpleCondition(
+                            tradingAction = TAKE_PROFIT,
                             tailLength = tailLength.toString(),
                             tailLengthWithFactor = tailLength.multiply(takeProfitFactor).toString(),
                             factor = takeProfitFactor.toDouble(),
@@ -229,8 +235,10 @@ class SimpleCloseMan(
         // close position
         if (shouldClose) {
             logger.debug("익절 count: $cntProfit, 손절 count: $cntLoss")
-            symbolPositionMap.remove(position.positionKey)
-            positionUseCase.closePosition(position, spec)
+            val hasPositionClosed = positionUseCase.closePosition(position)
+            if (hasPositionClosed) {
+                symbolPositionMap.remove(position.positionKey)
+            }
         }
         // 릴리즈
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
