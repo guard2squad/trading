@@ -13,6 +13,7 @@ sealed class CloseCondition {
     Exception in thread "taskExecutor-10" java.lang.reflect.InaccessibleObjectException: Unable to make field private final java.math.BigInteger java.math.BigDecimal.intVal accessible: module java.base does not "opens java.math" to unnamed module @644baf4a
      */
     data class SimpleCondition(
+        val tradingAction: TradingAction,
         val tailLength: String,
         val tailLengthWithFactor: String,   // Factor: 손절 할 때 StopLossFactor, 익절할 때 takeProfitFactor
         val factor: Double,
