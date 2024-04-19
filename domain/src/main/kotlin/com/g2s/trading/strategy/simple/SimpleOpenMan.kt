@@ -211,7 +211,7 @@ class SimpleOpenMan(
                 )
                 logger.debug("openPosition strategyKey: {}, symbol: {}", position.strategyKey, position.symbol)
                 conditionUseCase.setOpenCondition(position, analyzeReport.openCondition)
-                positionUseCase.openPosition(position, spec)
+                positionUseCase.openPosition(position)
             }
         }
 

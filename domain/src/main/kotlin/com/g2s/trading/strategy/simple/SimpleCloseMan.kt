@@ -229,8 +229,10 @@ class SimpleCloseMan(
         // close position
         if (shouldClose) {
             logger.debug("익절 count: $cntProfit, 손절 count: $cntLoss")
-            symbolPositionMap.remove(position.positionKey)
-            positionUseCase.closePosition(position, spec)
+            val hasPositionClosed = positionUseCase.closePosition(position)
+            if (hasPositionClosed) {
+                symbolPositionMap.remove(position.positionKey)
+            }
         }
         // 릴리즈
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
