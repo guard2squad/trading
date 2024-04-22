@@ -358,7 +358,6 @@ class RestApiExchangeImpl(
         )
 
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
-        logger.debug("API response: {}", jsonResponse.asText())
 
         if (jsonResponse == null || jsonResponse.isEmpty || jsonResponse.size() != 1) {
             logger.warn("Invalid or empty response for orderId: $orderId")

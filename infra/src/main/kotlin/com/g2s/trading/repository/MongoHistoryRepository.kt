@@ -28,7 +28,6 @@ class MongoHistoryRepository(
     override fun getAllHistory(strategyKey: String): List<JsonNode> {
         val query = Query()
         query.addCriteria(Criteria.where("strategyKey").`is`(strategyKey))
-
         val histories = mongoTemplate.find(query, Map::class.java, HISTORY_COLLECTION_NAME)
 
         return histories.map { result -> om.valueToTree(result) }
@@ -36,25 +35,15 @@ class MongoHistoryRepository(
 
     override fun updateOpenHistory(history: History.Open) {
         val query = Query.query(Criteria.where("historyKey").`is`(history.historyKey))
-        val options = FindAndReplaceOptions.options().upsert().returnNew()
-        val result = mongoTemplate.findAndReplace(query, history, options, HISTORY_COLLECTION_NAME)
-
-        if (result != null) {
-            logger.debug("OpenHistory : OpenHistory was replaced.")
-        } else {
-            logger.debug("OpenHistory : No operation was performed.")
-        }
+        val options = FindAndReplaceOptions.options().upsert()
+        mongoTemplate.findAndReplace(query, history, options, HISTORY_COLLECTION_NAME)
+        logger.debug("update open history")
     }
 
     override fun updateCloseHistory(history: History.Close) {
         val query = Query.query(Criteria.where("historyKey").`is`(history.historyKey))
-        val options = FindAndReplaceOptions.options().upsert().returnNew()
-        val result = mongoTemplate.findAndReplace(query, history, options, HISTORY_COLLECTION_NAME)
-
-        if (result != null) {
-            logger.debug("CloseHistory : CloseHistory was replaced.")
-        } else {
-            logger.debug("CloseHistory : No operation was performed.")
-        }
+        val options = FindAndReplaceOptions.options().upsert()
+        mongoTemplate.findAndReplace(query, history, options, HISTORY_COLLECTION_NAME)
+        logger.debug("update close history")
     }
 }
