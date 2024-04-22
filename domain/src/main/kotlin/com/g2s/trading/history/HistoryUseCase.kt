@@ -4,6 +4,7 @@ import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.Position
 import com.g2s.trading.strategy.StrategySpecRepository
 import org.slf4j.LoggerFactory
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
@@ -15,6 +16,8 @@ class HistoryUseCase(
     private val exchangeImpl: Exchange
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
+    private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<Position, OpenCondition>()
+    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<Position, CloseCondition>()
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     init {
@@ -28,6 +31,9 @@ class HistoryUseCase(
         if (strategyHistoryToggleMap[position.strategyKey]!!) {
             val openCondition = conditionUseCase.getOpenCondition(position)
             val openHistory = exchangeImpl.getOpenHistory(position, openCondition)
+            if (openHistory.transactionTime == 0L) {
+                unsyncedOpenPositionHistoryMap.compute(position) { _, _ -> openCondition }
+            }
             conditionUseCase.removeOpenCondition(position)
             logger.debug(openHistory.toString())
             historyRepository.saveHistory(openHistory)
@@ -38,10 +44,37 @@ class HistoryUseCase(
         if (strategyHistoryToggleMap[position.strategyKey]!!) {
             val closeCondition = conditionUseCase.getCloseCondition(position)
             val closeHistory = exchangeImpl.getCloseHistory(position, closeCondition)
+            if (closeHistory.transactionTime == 0L) {
+                unsyncedClosePositionHistoryMap.compute(position) { _, _ -> closeCondition }
+            }
             conditionUseCase.removeCloseCondition(position)
             logger.debug(closeHistory.toString())
             historyRepository.saveHistory(closeHistory)
         }
+    }
+
+    @Scheduled(fixedDelay = 2000)
+    fun syncHistory() {
+        val toRemoveOpen = mutableListOf<Position>()
+        val toRemoveClose = mutableListOf<Position>()
+
+        unsyncedOpenPositionHistoryMap.forEach { entry ->
+            val openHistory = exchangeImpl.getOpenHistory(entry.key, entry.value)
+            if (openHistory.transactionTime != 0L) {
+                historyRepository.updateOpenHistory(openHistory)
+                toRemoveOpen.add(entry.key)
+            }
+        }
+        unsyncedClosePositionHistoryMap.forEach { entry ->
+            val closeHistory = exchangeImpl.getCloseHistory(entry.key, entry.value)
+            if (closeHistory.transactionTime != 0L) {
+                historyRepository.updateCloseHistory(closeHistory)
+                toRemoveClose.add(entry.key)
+            }
+        }
+
+        toRemoveOpen.forEach { unsyncedOpenPositionHistoryMap.remove(it) }
+        toRemoveClose.forEach { unsyncedClosePositionHistoryMap.remove(it) }
     }
 
     fun turnOnHistoryFeature(strategyKey: String) {

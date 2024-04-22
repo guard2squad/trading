@@ -32,6 +32,7 @@ class SimpleCloseMan(
     private val strategySpecRepository: StrategySpecRepository
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
+    private var testMode = true;
 
     companion object {
         private const val TYPE = "simple"
@@ -113,7 +114,7 @@ class SimpleCloseMan(
         when (position.orderSide) {
             OrderSide.LONG -> {
                 // 손절
-                if (lastPrice < entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                if (lastPrice < entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[롱 손절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -138,7 +139,7 @@ class SimpleCloseMan(
                     cntLoss++
                 }
                 // 익절
-                else if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                else if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[롱 익절] entryPrice: $entryPrice | lastPrice: $lastPrice" +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -173,7 +174,7 @@ class SimpleCloseMan(
 
             OrderSide.SHORT -> {
                 // 손절
-                if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor) || testMode) {
                     logger.debug(
                         "[숏 손절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -198,7 +199,7 @@ class SimpleCloseMan(
                     cntLoss++
                 }
                 // 익절
-                else if (lastPrice < entryPrice && priceChange > tailLength.multiply(takeProfitFactor)) {
+                else if (lastPrice < entryPrice && priceChange > tailLength.multiply(takeProfitFactor) || testMode) {
                     logger.debug(
                         "[숏 익절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
                                 "| 오픈 시 꼬리길이(tailLength): $tailLength" +
@@ -230,6 +231,57 @@ class SimpleCloseMan(
                     )
                 }
             }
+
+            OrderSide.TEST -> {
+                shouldClose = true
+                if (lastPrice > entryPrice && priceChange > tailLength.multiply(stopLossFactor)) {
+                    logger.debug(
+                        "[숏 손절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
+                                "| 오픈 시 꼬리길이(tailLength): $tailLength" +
+                                "| StopLossFactor: $stopLossFactor " +
+                                "| StopLossFactor 적용한 꼬리길이 : ${tailLength.multiply(stopLossFactor)}" +
+                                "| priceChange: $priceChange" +
+                                "| specKey : ${spec.strategyKey}"
+                    )
+                    shouldClose = true
+                    conditionUseCase.setCloseCondition(
+                        position, CloseCondition.SimpleCondition(
+                            tradingAction = STOP_LOSS,
+                            tailLength = tailLength.toString(),
+                            tailLengthWithFactor = tailLength.multiply(stopLossFactor).toString(),
+                            factor = stopLossFactor.toDouble(),
+                            entryPrice = entryPrice.toString(),
+                            lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
+                            beforeBalance = availableBalance.toDouble()
+                        )
+                    )
+                }
+                // 익절
+                else if (lastPrice < entryPrice && priceChange > tailLength.multiply(takeProfitFactor)) {
+                    logger.debug(
+                        "[숏 익절] entryPrice: $entryPrice | lastPrice: $lastPrice " +
+                                "| 오픈 시 꼬리길이(tailLength): $tailLength" +
+                                "| 오픈 시 takeProfitFactor 반영된 꼬리길이: ${tailLength.multiply(takeProfitFactor)}" +
+                                "| takeProfitFactor: $takeProfitFactor" +
+                                "| specKey: ${spec.strategyKey}"
+                    )
+                    shouldClose = true
+                    conditionUseCase.setCloseCondition(
+                        position, CloseCondition.SimpleCondition(
+                            tradingAction = TAKE_PROFIT,
+                            tailLength = tailLength.toString(),
+                            tailLengthWithFactor = tailLength.multiply(takeProfitFactor).toString(),
+                            factor = takeProfitFactor.toDouble(),
+                            entryPrice = entryPrice.toString(),
+                            lastPrice = lastPrice.toString(),
+                            priceChange = priceChange.toString(),
+                            beforeBalance = availableBalance.toDouble()
+                        )
+                    )
+                }
+            }
+
 
         }
         // close position

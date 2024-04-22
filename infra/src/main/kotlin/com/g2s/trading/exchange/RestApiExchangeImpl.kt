@@ -339,9 +339,9 @@ class RestApiExchangeImpl(
 
     private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode? {
         val orderId: Long? = if (isOpen) {
-            openPositionOrderIdMap.remove(position.positionKey)
+            openPositionOrderIdMap[position.positionKey]
         } else {
-            closedPositionOrderIdMap.remove(position.positionKey)
+            closedPositionOrderIdMap[position.positionKey]
         }
 
         if (orderId == null) {
@@ -364,6 +364,11 @@ class RestApiExchangeImpl(
             logger.warn("Invalid or empty response for orderId: $orderId")
             logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
             return null
+        }
+        if (isOpen) {
+            openPositionOrderIdMap.remove(position.positionKey)
+        } else {
+            closedPositionOrderIdMap.remove(position.positionKey)
         }
 
         return jsonResponse.get(0)
