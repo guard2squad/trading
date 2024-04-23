@@ -5,9 +5,7 @@ import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.history.CloseHistory
 import com.g2s.trading.history.HistoryRepository
 import com.g2s.trading.history.OpenHistory
-import com.mongodb.client.model.UpdateOptions
 import org.slf4j.LoggerFactory
-import org.springframework.data.mongodb.core.FindAndReplaceOptions
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
