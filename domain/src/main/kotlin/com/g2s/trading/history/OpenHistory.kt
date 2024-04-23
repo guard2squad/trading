@@ -11,9 +11,9 @@ data class OpenHistory(
     val openCondition: OpenCondition,
     val orderSide: OrderSide,
     val orderType: OrderType,
-    val transactionTime: Long,
-    val commission: Double,
-    val afterBalance: Double,
+    val transactionTime: Long = 0,
+    val commission: Double = 0.0,
+    val afterBalance: Double = 0.0,
 ) {
     companion object {
         fun generateHistoryKey(position: Position): String {

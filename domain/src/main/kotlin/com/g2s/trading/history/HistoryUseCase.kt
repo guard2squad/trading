@@ -16,8 +16,8 @@ class HistoryUseCase(
     private val exchangeImpl: Exchange
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
-    private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<Position, OpenCondition>()
-    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<Position, CloseCondition>()
+    private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<OpenHistory, Position>()
+    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<CloseHistory, Position>()
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     init {
@@ -28,48 +28,96 @@ class HistoryUseCase(
     }
 
     fun recordOpenHistory(position: Position) {
-        if (strategyHistoryToggleMap[position.strategyKey]!!) {
+        val toggle = strategyHistoryToggleMap[position.strategyKey]
+        if (toggle == true) {
             val openCondition = conditionUseCase.getOpenCondition(position)
-            val openHistory = exchangeImpl.getOpenHistory(position, openCondition)
-            if (openHistory.transactionTime == 0L) {
-                unsyncedOpenPositionHistoryMap.compute(position) { _, _ -> openCondition }
+            val unsyncedHistory = createUnsyncedOpenHistory(position, openCondition)
+            val historyInfo = exchangeImpl.getOpenHistoryInfo(position)
+            historyInfo?.let {
+                val transactionTime = it.first().get("time").asLong()
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    commission = commission,
+                    afterBalance = afterBalance
+                )
+                saveOpenHistory(syncedHistory)
+            } ?: run {
+                unsyncedOpenPositionHistoryMap.compute(unsyncedHistory) { _, _ -> position }
+                saveOpenHistory(unsyncedHistory)
             }
+
             conditionUseCase.removeOpenCondition(position)
-            logger.debug(openHistory.toString())
-            historyRepository.saveOpenHistory(openHistory)
         }
     }
 
     fun recordCloseHistory(position: Position) {
-        if (strategyHistoryToggleMap[position.strategyKey]!!) {
+        val toggle = strategyHistoryToggleMap[position.strategyKey]
+        if (toggle == true) {
             val closeCondition = conditionUseCase.getCloseCondition(position)
-            val closeHistory = exchangeImpl.getCloseHistory(position, closeCondition)
-            if (closeHistory.transactionTime == 0L) {
-                unsyncedClosePositionHistoryMap.compute(position) { _, _ -> closeCondition }
+            val unsyncedHistory = createUnsyncedCloseHistory(position, closeCondition)
+            val historyInfo = exchangeImpl.getCloseHistoryInfo(position)
+            historyInfo?.let {
+                val transactionTime = it.first().get("time").asLong()
+                val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    realizedPnL = realizedPnl,
+                    commission = commission,
+                    afterBalance = afterBalance
+                )
+                saveCloseHistory(syncedHistory)
+            } ?: let {
+                unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ -> position }
+                saveCloseHistory(unsyncedHistory)
             }
+
             conditionUseCase.removeCloseCondition(position)
-            logger.debug(closeHistory.toString())
-            historyRepository.saveCloseHistory(closeHistory)
         }
     }
 
+
     @Scheduled(fixedDelay = 2000)
     fun syncHistory() {
-        val openToRemove = mutableListOf<Position>()
-        val closeToRemove = mutableListOf<Position>()
-
+        val openToRemove = mutableListOf<OpenHistory>()
+        val closeToRemove = mutableListOf<CloseHistory>()
         unsyncedOpenPositionHistoryMap.forEach { entry ->
-            val openHistory = exchangeImpl.getOpenHistory(entry.key, entry.value)
-            if (openHistory.transactionTime != 0L) {    // synced
-                historyRepository.updateOpenHistory(openHistory)
-                openToRemove.add(entry.key)
+            val unsyncedHistory = entry.key
+            val position = entry.value
+            val historyInfo = exchangeImpl.getOpenHistoryInfo(position)
+            historyInfo?.let {    // synced
+                val transactionTime = it.first().get("time").asLong()
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    commission = commission,
+                    afterBalance = afterBalance
+                )
+                historyRepository.updateOpenHistory(syncedHistory)
+                openToRemove.add(unsyncedHistory)
             }
         }
         unsyncedClosePositionHistoryMap.forEach { entry ->
-            val closeHistory = exchangeImpl.getCloseHistory(entry.key, entry.value)
-            if (closeHistory.transactionTime != 0L) {   // synced
-                historyRepository.updateCloseHistory(closeHistory)
-                closeToRemove.add(entry.key)
+            val unsyncedHistory = entry.key
+            val position = entry.value
+            val historyInfo = exchangeImpl.getCloseHistoryInfo(position)
+            historyInfo?.let {
+                val transactionTime = it.first().get("time").asLong()
+                val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    realizedPnL = realizedPnl,
+                    commission = commission,
+                    afterBalance = afterBalance
+                )
+                historyRepository.updateCloseHistory(syncedHistory)
+                closeToRemove.add(unsyncedHistory)
             }
         }
 
@@ -99,6 +147,32 @@ class HistoryUseCase(
         for (entry in strategyHistoryToggleMap) {
             entry.setValue(false)
         }
+    }
+
+    private fun createUnsyncedOpenHistory(position: Position, openCondition: OpenCondition) = OpenHistory(
+        historyKey = OpenHistory.generateHistoryKey(position),
+        position = position,
+        strategyKey = position.strategyKey,
+        openCondition = openCondition,
+        orderSide = position.orderSide,
+        orderType = position.orderType
+    )
+
+    private fun createUnsyncedCloseHistory(position: Position, closeCondition: CloseCondition) = CloseHistory(
+        historyKey = CloseHistory.generateHistoryKey(position),
+        position = position,
+        strategyKey = position.strategyKey,
+        closeCondition = closeCondition,
+        orderSide = position.orderSide,
+        orderType = position.orderType
+    )
+
+    private fun saveOpenHistory(history: OpenHistory) {
+        historyRepository.saveOpenHistory(history)
+    }
+
+    private fun saveCloseHistory(history: CloseHistory) {
+        historyRepository.saveCloseHistory(history)
     }
 
     private fun loadStrategySpecKey() {

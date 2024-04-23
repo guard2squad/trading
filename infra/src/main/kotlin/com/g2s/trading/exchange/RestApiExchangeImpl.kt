@@ -1,17 +1,16 @@
 package com.g2s.trading.exchange
 
-import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.exceptions.BinanceClientException
+import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.exceptions.OrderFailException
-import com.g2s.trading.history.*
+import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
@@ -269,98 +268,60 @@ class RestApiExchangeImpl(
         return changedLeverage
     }
 
-    override fun getOpenHistory(position: Position, condition: OpenCondition): OpenHistory {
-        val openHistoryInfo = getHistoryInfo(position, true)
-        if (openHistoryInfo != null) {
-            val transactionTime = openHistoryInfo.get(0).get("time").asLong()
-            var commission = 0.0
-            openHistoryInfo.forEach {
-                commission += it.get("commission").asDouble()
-            }
-            val openHistory = createOpenHistory(
-                position = position,
-                condition = condition,
-                transactionTime = transactionTime,
-                commission = commission,
-                afterBalance = getCurrentBalance(transactionTime)
-            )
-
-            return openHistory
-        }
-        return createOpenHistory(position, condition, 0, 0.0, 0.0)
-    }
-
-    fun createOpenHistory(
-        position: Position, condition: OpenCondition, transactionTime: Long,
-        commission: Double,
-        afterBalance: Double
-    ) = OpenHistory(
-        historyKey = OpenHistory.generateHistoryKey(position),
-        position = position,
-        strategyKey = position.strategyKey,
-        openCondition = condition,
-        orderSide = position.orderSide,
-        orderType = position.orderType,
-        transactionTime, commission, afterBalance
-    )
-
-    override fun getCloseHistory(position: Position, condition: CloseCondition): CloseHistory {
-        val closeHistoryInfo = getHistoryInfo(position, false)
-        if (closeHistoryInfo != null) {
-            val transactionTime = closeHistoryInfo.get(0).get("time").asLong()
-            var realizedPnL = 0.0
-            var commission = 0.0
-            closeHistoryInfo.forEach {
-                realizedPnL += it.get("realizedPnl").asDouble()
-                commission += it.get("commission").asDouble()
-            }
-            val closeHistory = createCloseHistory(
-                position = position,
-                condition = condition,
-                transactionTime = transactionTime,
-                realizedPnL = realizedPnL,
-                commission = commission,
-                afterBalance = getCurrentBalance(transactionTime)
-            )
-
-            return closeHistory
-        }
-
-        return createCloseHistory(position, condition, 0, 0.0, 0.0, 0.0)
-    }
-
-    private fun createCloseHistory(
-        position: Position,
-        condition: CloseCondition,
-        transactionTime: Long,
-        realizedPnL: Double,
-        commission: Double,
-        afterBalance: Double
-    ) = CloseHistory(
-        historyKey = CloseHistory.generateHistoryKey(position),
-        position = position,
-        strategyKey = position.strategyKey,
-        closeCondition = condition,
-        orderSide = position.orderSide,
-        orderType = position.orderType,
-        transactionTime, realizedPnL, commission, afterBalance
-    )
-
-    private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode? {
-        val orderId: Long? = if (isOpen) {
-            openPositionOrderIdMap[position]
-        } else {
-            closedPositionOrderIdMap[position]
-        }
-
+    override fun getOpenHistoryInfo(position: Position): JsonNode? {
+        val orderId = openPositionOrderIdMap[position]
         if (orderId == null) {
             logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
             return null
         }
 
-        logger.debug("getHistoryInfo-positionKey: {}", position.positionKey)
-        logger.debug("getHistoryInfo-orderId: $orderId")
+        val jsonResponse = getHistoryInfo(position, orderId)
+        if (jsonResponse != null) {
+            openPositionOrderIdMap.remove(position)
+        }
 
+        return jsonResponse
+    }
+
+    override fun getCloseHistoryInfo(position: Position): JsonNode? {
+        val orderId = closedPositionOrderIdMap[position]
+        if (orderId == null) {
+            logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
+            return null
+        }
+
+        val jsonResponse = getHistoryInfo(position, orderId)
+        if (jsonResponse != null) {
+            closedPositionOrderIdMap.remove(position)
+        }
+
+        return jsonResponse
+    }
+
+    /**
+     * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
+     *
+     * 이 함수는 Binance 클라이언트를 통해 계정 정보를 요청하고, 반환된 JSON 데이터에서 "assets" 배열을 분석하여
+     * "USDT" 자산의 "walletBalance" 값을 추출하여 반환합니다.
+     *
+     * @param timeStamp 조회할 시점의 타임스탬프입니다. 이 값은 요청 파라미터로 전달됩니다.
+     * @return 조회된 USDT 자산의 지갑 잔액을 `Double` 타입으로 반환합니다.
+     */
+    override fun getCurrentBalance(timeStamp: Long): Double {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to timeStamp.toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val balance = bodyJson.get("assets").filter { jsonNode ->
+            Asset.entries.map { it.name }.contains(jsonNode.get("asset").textValue())
+        }[0].get("walletBalance").asDouble()
+
+        return balance
+    }
+
+    private fun getHistoryInfo(position: Position, orderId: Long): JsonNode? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
             "orderId" to orderId
@@ -373,36 +334,7 @@ class RestApiExchangeImpl(
             logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
             return null
         }
-        if (isOpen) {
-            openPositionOrderIdMap.remove(position)
-        } else {
-            closedPositionOrderIdMap.remove(position)
-        }
 
         return jsonResponse
-    }
-
-
-    /**
-     * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
-     *
-     * 이 함수는 Binance 클라이언트를 통해 계정 정보를 요청하고, 반환된 JSON 데이터에서 "assets" 배열을 분석하여
-     * "USDT" 자산의 "walletBalance" 값을 추출하여 반환합니다.
-     *
-     * @param timeStamp 조회할 시점의 타임스탬프입니다. 이 값은 요청 파라미터로 전달됩니다.
-     * @return 조회된 USDT 자산의 지갑 잔액을 `Double` 타입으로 반환합니다.
-     */
-    private fun getCurrentBalance(timeStamp: Long): Double {
-        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "timestamp" to timeStamp.toString()
-        )
-        val bodyString = binanceClient.account().accountInformation(parameters)
-        val bodyJson = om.readTree(bodyString)
-
-        val balance = bodyJson.get("assets").filter { jsonNode ->
-            Asset.entries.map { it.name }.contains(jsonNode.get("asset").textValue())
-        }[0].get("walletBalance").asDouble()
-
-        return balance
     }
 }

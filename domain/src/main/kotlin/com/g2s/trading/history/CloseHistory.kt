@@ -11,10 +11,10 @@ data class CloseHistory(
     val closeCondition: CloseCondition,
     val orderSide: OrderSide,
     val orderType: OrderType,
-    val transactionTime: Long,
-    val realizedPnL: Double,
-    val commission: Double,
-    val afterBalance: Double,
+    val transactionTime: Long = 0,
+    val realizedPnL: Double = 0.0,
+    val commission: Double = 0.0,
+    val afterBalance: Double = 0.0,
 ) {
     companion object {
         fun generateHistoryKey(position: Position): String {
