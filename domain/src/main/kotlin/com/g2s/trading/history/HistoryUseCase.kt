@@ -36,7 +36,7 @@ class HistoryUseCase(
             }
             conditionUseCase.removeOpenCondition(position)
             logger.debug(openHistory.toString())
-            historyRepository.saveHistory(openHistory)
+            historyRepository.saveOpenHistory(openHistory)
         }
     }
 
@@ -49,32 +49,32 @@ class HistoryUseCase(
             }
             conditionUseCase.removeCloseCondition(position)
             logger.debug(closeHistory.toString())
-            historyRepository.saveHistory(closeHistory)
+            historyRepository.saveCloseHistory(closeHistory)
         }
     }
 
     @Scheduled(fixedDelay = 2000)
     fun syncHistory() {
-        val toRemoveOpen = mutableListOf<Position>()
-        val toRemoveClose = mutableListOf<Position>()
+        val openToRemove = mutableListOf<Position>()
+        val closeToRemove = mutableListOf<Position>()
 
         unsyncedOpenPositionHistoryMap.forEach { entry ->
             val openHistory = exchangeImpl.getOpenHistory(entry.key, entry.value)
-            if (openHistory.transactionTime != 0L) {
+            if (openHistory.transactionTime != 0L) {    // synced
                 historyRepository.updateOpenHistory(openHistory)
-                toRemoveOpen.add(entry.key)
+                openToRemove.add(entry.key)
             }
         }
         unsyncedClosePositionHistoryMap.forEach { entry ->
             val closeHistory = exchangeImpl.getCloseHistory(entry.key, entry.value)
-            if (closeHistory.transactionTime != 0L) {
+            if (closeHistory.transactionTime != 0L) {   // synced
                 historyRepository.updateCloseHistory(closeHistory)
-                toRemoveClose.add(entry.key)
+                closeToRemove.add(entry.key)
             }
         }
 
-        toRemoveOpen.forEach { unsyncedOpenPositionHistoryMap.remove(it) }
-        toRemoveClose.forEach { unsyncedClosePositionHistoryMap.remove(it) }
+        openToRemove.forEach { unsyncedOpenPositionHistoryMap.remove(it) }
+        closeToRemove.forEach { unsyncedClosePositionHistoryMap.remove(it) }
     }
 
     fun turnOnHistoryFeature(strategyKey: String) {

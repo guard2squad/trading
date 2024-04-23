@@ -28,7 +28,6 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.IllegalArgumentException
 import kotlin.math.max
@@ -248,7 +247,7 @@ class SimpleOpenMan(
 
             return AnalyzeReport.MatchingReport(
                 candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                    patten = SimplePattern.TOP_TAIL,
+                    pattern = SimplePattern.TOP_TAIL,
                     candleHammerRatio = "TEST",
                     operationalCandleHammerRatio = "TEST",
                     beforeBalance = availableBalance.toDouble(),
@@ -285,7 +284,7 @@ class SimpleOpenMan(
                 )
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
-                        patten = SimplePattern.TOP_TAIL,
+                        pattern = SimplePattern.TOP_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
                         beforeBalance = availableBalance.toDouble(),
@@ -315,7 +314,7 @@ class SimpleOpenMan(
                 )
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                        patten = SimplePattern.BOTTOM_TAIL,
+                        pattern = SimplePattern.BOTTOM_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
                         beforeBalance = availableBalance.toDouble(),
@@ -347,7 +346,7 @@ class SimpleOpenMan(
                     )
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.MIDDLE_HIGH_TAIL,
+                            pattern = SimplePattern.MIDDLE_HIGH_TAIL,
                             candleHammerRatio = calculatedHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),
                             beforeBalance = availableBalance.toDouble(),
@@ -375,7 +374,7 @@ class SimpleOpenMan(
                     )
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.MIDDLE_LOW_TAIL,
+                            pattern = SimplePattern.MIDDLE_LOW_TAIL,
                             candleHammerRatio = candleHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),
                             beforeBalance = availableBalance.toDouble(),
