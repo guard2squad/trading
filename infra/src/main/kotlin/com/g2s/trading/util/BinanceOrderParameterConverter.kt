@@ -17,7 +17,6 @@ object BinanceOrderParameterConverter {
         parameters["side"] = when (position.orderSide) {
             OrderSide.LONG -> "BUY"
             OrderSide.SHORT -> "SELL"
-            OrderSide.TEST -> "BUY"
         }
         parameters["type"] = position.orderType.toString()
         parameters["quantity"] = position.positionAmt.toString()
@@ -37,7 +36,6 @@ object BinanceOrderParameterConverter {
         parameters["side"] = when (position.orderSide) {
             OrderSide.LONG -> "SELL"
             OrderSide.SHORT -> "BUY"
-            OrderSide.TEST -> "SELL"
         }
         parameters["type"] = position.orderType.toString()
         parameters["quantity"] = position.positionAmt.absoluteValue.toString()
