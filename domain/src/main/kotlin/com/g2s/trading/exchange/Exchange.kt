@@ -1,10 +1,11 @@
 package com.g2s.trading.exchange
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.account.Account
 import com.g2s.trading.history.CloseCondition
-import com.g2s.trading.history.History.Close
-import com.g2s.trading.history.History.Open
+import com.g2s.trading.history.CloseHistory
 import com.g2s.trading.history.OpenCondition
+import com.g2s.trading.history.OpenHistory
 import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
@@ -22,6 +23,7 @@ interface Exchange {
     fun getMinNotionalValue(symbol: Symbol): Double
     fun getLeverage(symbol: Symbol): Int
     fun setLeverage(symbol: Symbol, leverage: Int): Int
-    fun getOpenHistory(position: Position, condition: OpenCondition): Open
-    fun getCloseHistory(position: Position, condition: CloseCondition): Close
+    fun getOpenHistoryInfo(position: Position): JsonNode?
+    fun getCloseHistoryInfo(position: Position): JsonNode?
+    fun getCurrentBalance(timeStamp: Long): Double
 }

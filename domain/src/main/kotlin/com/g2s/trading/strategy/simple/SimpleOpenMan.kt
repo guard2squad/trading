@@ -234,7 +234,6 @@ class SimpleOpenMan(
         val bodyLength = bodyTop - bodyBottom
         val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
         val operationalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
-
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             logger.debug("body length : 0")
             return AnalyzeReport.NonMatchingReport
@@ -264,7 +263,7 @@ class SimpleOpenMan(
                 )
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
-                        patten = SimplePattern.TOP_TAIL,
+                        pattern = SimplePattern.TOP_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
                         beforeBalance = availableBalance.toDouble(),
@@ -294,7 +293,7 @@ class SimpleOpenMan(
                 )
                 return AnalyzeReport.MatchingReport(
                     candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                        patten = SimplePattern.BOTTOM_TAIL,
+                        pattern = SimplePattern.BOTTOM_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
                         beforeBalance = availableBalance.toDouble(),
@@ -326,7 +325,7 @@ class SimpleOpenMan(
                     )
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.MIDDLE_HIGH_TAIL,
+                            pattern = SimplePattern.MIDDLE_HIGH_TAIL,
                             candleHammerRatio = calculatedHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),
                             beforeBalance = availableBalance.toDouble(),
@@ -354,7 +353,7 @@ class SimpleOpenMan(
                     )
                     return AnalyzeReport.MatchingReport(
                         candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                            patten = SimplePattern.MIDDLE_LOW_TAIL,
+                            pattern = SimplePattern.MIDDLE_LOW_TAIL,
                             candleHammerRatio = candleHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),
                             beforeBalance = availableBalance.toDouble(),

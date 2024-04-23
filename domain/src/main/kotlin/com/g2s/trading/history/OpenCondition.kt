@@ -15,13 +15,13 @@ sealed class OpenCondition {
     Exception in thread "taskExecutor-10" java.lang.reflect.InaccessibleObjectException: Unable to make field private final java.math.BigInteger java.math.BigDecimal.intVal accessible: module java.base does not "opens java.math" to unnamed module @644baf4a
      */
     data class SimpleCondition(
-        val patten: SimplePattern,
+        val pattern: SimplePattern,
         val candleHammerRatio: String,
         val operationalCandleHammerRatio: String,
         val beforeBalance: Double
     ) : OpenCondition() {
         override fun toString(): String {
-            return "SimpleCondition(patten=$patten, candleHammerRatio=$candleHammerRatio, operationalCandleHammerRatio=$operationalCandleHammerRatio, beforeBalance=$beforeBalance)"
+            return "SimpleCondition(patten=$pattern, candleHammerRatio=$candleHammerRatio, operationalCandleHammerRatio=$operationalCandleHammerRatio, beforeBalance=$beforeBalance)"
         }
     }
 
