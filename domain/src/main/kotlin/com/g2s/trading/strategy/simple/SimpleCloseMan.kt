@@ -230,7 +230,6 @@ class SimpleCloseMan(
                     )
                 }
             }
-
         }
         // close position
         if (shouldClose) {

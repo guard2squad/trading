@@ -1,19 +1,16 @@
 package com.g2s.trading.exchange
 
-import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.exceptions.BinanceClientException
+import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
 import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.exceptions.OrderFailException
-import com.g2s.trading.history.CloseCondition
-import com.g2s.trading.history.History
-import com.g2s.trading.history.OpenCondition
+import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
@@ -37,8 +34,8 @@ class RestApiExchangeImpl(
     // TODO(exchange Info 주기적으로 UPDATE)
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
-    private val openPositionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
-    private val closedPositionOrderIdMap = ConcurrentHashMap<Position.PositionKey, Long>()
+    private val openPositionOrderIdMap = ConcurrentHashMap<Position, Long>()
+    private val closedPositionOrderIdMap = ConcurrentHashMap<Position, Long>()
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -108,10 +105,10 @@ class RestApiExchangeImpl(
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            closedPositionOrderIdMap.compute(position.positionKey) { _, _ -> orderId }
+            closedPositionOrderIdMap.compute(position) { _, _ -> orderId }
             logger.debug(
                 "orderId updated: {}, positionKey: {}",
-                closedPositionOrderIdMap[position.positionKey],
+                closedPositionOrderIdMap[position],
                 position.positionKey
             )
         } catch (e: OrderFailException) {
@@ -126,10 +123,10 @@ class RestApiExchangeImpl(
             val orderId = om.readTree(orderResult).get("orderId").asLong()
             logger.debug("orderId: $orderId")
 
-            openPositionOrderIdMap.compute(position.positionKey) { _, _ -> orderId }
+            openPositionOrderIdMap.compute(position) { _, _ -> orderId }
             logger.debug(
                 "orderId updated: {}, positionKey: {}",
-                openPositionOrderIdMap[position.positionKey],
+                openPositionOrderIdMap[position],
                 position.positionKey
             )
         } catch (e: OrderFailException) {
@@ -271,104 +268,35 @@ class RestApiExchangeImpl(
         return changedLeverage
     }
 
-    override fun getOpenHistory(position: Position, condition: OpenCondition): History.Open {
-        val openHistoryInfo = getHistoryInfo(position, true)
-        if (openHistoryInfo != null) {
-            val openHistory = createOpenHistory(
-                position,
-                condition,
-                openHistoryInfo.get("time").asLong(),
-                openHistoryInfo.get("commission").asDouble(),
-                getCurrentBalance(openHistoryInfo.get("time").asLong())
-            )
-
-            return openHistory
-        }
-        return createOpenHistory(position, condition, 0, 0.0, 0.0)
-    }
-
-    fun createOpenHistory(
-        position: Position, condition: OpenCondition, transactionTime: Long,
-        commission: Double,
-        afterBalance: Double
-    ) = History.Open(
-        historyKey = History.generateHistoryKey(position),
-        position = position,
-        strategyKey = position.strategyKey,
-        openCondition = condition,
-        orderSide = position.orderSide,
-        orderType = position.orderType,
-        transactionTime, commission, afterBalance
-    )
-
-    override fun getCloseHistory(position: Position, condition: CloseCondition): History.Close {
-        val closeHistoryInfo = getHistoryInfo(position, false)
-        if (closeHistoryInfo != null) {
-
-            val closeHistory = createCloseHistory(
-                position,
-                condition,
-                closeHistoryInfo.get("time").asLong(),
-                closeHistoryInfo.get("realizedPnl").asDouble(),
-                closeHistoryInfo.get("commission").asDouble(),
-                getCurrentBalance(closeHistoryInfo.get("time").asLong())
-            )
-
-            return closeHistory
-        }
-
-        return createCloseHistory(position, condition, 0, 0.0, 0.0, 0.0)
-    }
-
-    private fun createCloseHistory(
-        position: Position,
-        condition: CloseCondition,
-        transactionTime: Long,
-        realizedPnL: Double,
-        commission: Double,
-        afterBalance: Double
-    ) = History.Close(
-        historyKey = History.generateHistoryKey(position),
-        position = position,
-        strategyKey = position.strategyKey,
-        closeCondition = condition,
-        orderSide = position.orderSide,
-        orderType = position.orderType,
-        transactionTime, realizedPnL, commission, afterBalance
-    )
-
-    private fun getHistoryInfo(position: Position, isOpen: Boolean): JsonNode? {
-        val orderId: Long? = if (isOpen) {
-            openPositionOrderIdMap.remove(position.positionKey)
-        } else {
-            closedPositionOrderIdMap.remove(position.positionKey)
-        }
-
+    override fun getOpenHistoryInfo(position: Position): JsonNode? {
+        val orderId = openPositionOrderIdMap[position]
         if (orderId == null) {
             logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
             return null
         }
 
-        logger.debug("getHistoryInfo-positionKey: {}", position.positionKey)
-        logger.debug("getHistoryInfo-orderId: $orderId")
+        val jsonResponse = getHistoryInfo(position, orderId)
+        if (jsonResponse != null) {
+            openPositionOrderIdMap.remove(position)
+        }
 
-        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to position.symbol.value,
-            "orderId" to orderId
-        )
+        return jsonResponse
+    }
 
-        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
-        logger.debug("API response: {}", jsonResponse.asText())
-
-        if (jsonResponse == null || jsonResponse.isEmpty || jsonResponse.size() != 1) {
-            logger.warn("Invalid or empty response for orderId: $orderId")
-            logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
+    override fun getCloseHistoryInfo(position: Position): JsonNode? {
+        val orderId = closedPositionOrderIdMap[position]
+        if (orderId == null) {
+            logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
             return null
         }
 
-        return jsonResponse.get(0)
-    }
+        val jsonResponse = getHistoryInfo(position, orderId)
+        if (jsonResponse != null) {
+            closedPositionOrderIdMap.remove(position)
+        }
 
+        return jsonResponse
+    }
 
     /**
      * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
@@ -379,7 +307,7 @@ class RestApiExchangeImpl(
      * @param timeStamp 조회할 시점의 타임스탬프입니다. 이 값은 요청 파라미터로 전달됩니다.
      * @return 조회된 USDT 자산의 지갑 잔액을 `Double` 타입으로 반환합니다.
      */
-    private fun getCurrentBalance(timeStamp: Long): Double {
+    override fun getCurrentBalance(timeStamp: Long): Double {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to timeStamp.toString()
         )
@@ -391,5 +319,22 @@ class RestApiExchangeImpl(
         }[0].get("walletBalance").asDouble()
 
         return balance
+    }
+
+    private fun getHistoryInfo(position: Position, orderId: Long): JsonNode? {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "symbol" to position.symbol.value,
+            "orderId" to orderId
+        )
+
+        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+
+        if (jsonResponse == null || jsonResponse.isEmpty) {
+            logger.warn("Invalid or empty response for orderId: $orderId")
+            logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
+            return null
+        }
+
+        return jsonResponse
     }
 }
