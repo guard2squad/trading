@@ -186,6 +186,7 @@ class SimpleOpenMan(
         val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
         val hammerRatio = spec.op["hammerRatio"].asDouble()
         val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
+        val stopLossFactor = spec.op["stopLossFactor"].asDouble()
         when (val analyzeReport = analyze(oldCandleStick, hammerRatio, takeProfitFactor, availableBalance)) {
             is AnalyzeReport.NonMatchingReport -> {
                 logger.debug("non matching report for symbol: {}", candleStick.symbol)
@@ -201,10 +202,14 @@ class SimpleOpenMan(
                     orderType = OrderType.MARKET,
                     entryPrice = markPrice.price,
                     positionAmt = quantity(
-                        allocatedBalance,
-                        BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
-                        BigDecimal(markPrice.price),
-                        symbolUseCase.getQuantityPrecision(analyzeReport.symbol)
+                        balance = allocatedBalance,
+                        minNotional = BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
+                        markPrice = BigDecimal(markPrice.price),
+                        takeProfitFactor = takeProfitFactor,
+                        stopLossFactor = stopLossFactor,
+                        tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
+                        quantityPrecision = symbolUseCase.getQuantityPrecision(analyzeReport.symbol),
+                        orderSide = analyzeReport.orderSide
                     ),
                     asset = spec.asset,
                     referenceData = analyzeReport.referenceData,
@@ -252,8 +257,8 @@ class SimpleOpenMan(
             )
             if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
                     bodyTop,
-                    bodyTop.minus(tailLength.multiply(operationalTakeProfitFactor))
-                )
+                    bodyTop.plus(tailLength.multiply(operationalTakeProfitFactor))
+                )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
             ) {
                 logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
@@ -262,7 +267,7 @@ class SimpleOpenMan(
                     DoubleNode(tailLength.toDouble())
                 )
                 return AnalyzeReport.MatchingReport(
-                    candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                         pattern = SimplePattern.TOP_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
@@ -314,8 +319,8 @@ class SimpleOpenMan(
                 val calculatedHammerRatio = highTailLength / bodyLength
                 if (calculatedHammerRatio > operationalHammerRatio && isPositivePnl(
                         bodyTop,
-                        bodyTop.minus(highTailLength.multiply(operationalTakeProfitFactor))
-                    )
+                        bodyTop.plus(highTailLength.multiply(operationalTakeProfitFactor))
+                    )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
                 ) {
                     logger.debug("계산된HammerRatio: ${calculatedHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
@@ -324,7 +329,7 @@ class SimpleOpenMan(
                         DoubleNode(highTailLength.toDouble())
                     )
                     return AnalyzeReport.MatchingReport(
-                        candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                             pattern = SimplePattern.MIDDLE_HIGH_TAIL,
                             candleHammerRatio = calculatedHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),
@@ -370,13 +375,49 @@ class SimpleOpenMan(
         balance: BigDecimal,
         minNotional: BigDecimal,
         markPrice: BigDecimal,
-        quantityPrecision: Int
+        takeProfitFactor: Double,
+        stopLossFactor: Double,
+        tailLength: Double,
+        quantityPrecision: Int,
+        orderSide: OrderSide
     ): Double {
         return when (orderMode) {
             OrderMode.MINIMUM_QUANTITY -> {
                 // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
                 // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
-                minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+                val quantity = minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+                var takeProfitQuantity: Double
+                var stopLossQuantity: Double
+                when (orderSide) {
+                    OrderSide.LONG -> {
+                        takeProfitQuantity = minNotional.divide(
+                            markPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                            quantityPrecision,
+                            RoundingMode.CEILING
+                        ).toDouble()
+
+                        stopLossQuantity = minNotional.divide(
+                            markPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
+                            quantityPrecision,
+                            RoundingMode.CEILING
+                        ).toDouble()
+                    }
+
+                    OrderSide.SHORT -> {
+                        takeProfitQuantity = minNotional.divide(
+                            markPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                            quantityPrecision,
+                            RoundingMode.CEILING
+                        ).toDouble()
+
+                        stopLossQuantity = minNotional.divide(
+                            markPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
+                            quantityPrecision,
+                            RoundingMode.CEILING
+                        ).toDouble()
+                    }
+                }
+                maxOf(takeProfitQuantity, stopLossQuantity, quantity)
             }
 
             OrderMode.NORMAL -> {
