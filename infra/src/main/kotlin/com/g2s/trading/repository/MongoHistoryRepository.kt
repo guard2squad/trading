@@ -44,6 +44,7 @@ class MongoHistoryRepository(
             set("transactionTime", history.transactionTime)
             set("commission", history.commission)
             set("afterBalance", history.afterBalance)
+            set("syncedQuoteQty", history.syncedQuoteQty)
         }
         mongoTemplate.updateFirst(query, update, OpenHistory::class.java, HISTORY_COLLECTION_NAME)
         logger.debug("update open history")
@@ -56,6 +57,7 @@ class MongoHistoryRepository(
             set("realizedPnL", history.realizedPnL)
             set("commission", history.commission)
             set("afterBalance", history.afterBalance)
+            set("syncedQuoteQty", history.syncedQuoteQty)
         }
         mongoTemplate.updateFirst(query, update, CloseHistory::class.java, HISTORY_COLLECTION_NAME)
         logger.debug("update close history")

@@ -257,8 +257,8 @@ class SimpleOpenMan(
             )
             if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
                     bodyTop,
-                    bodyTop.minus(tailLength.multiply(operationalTakeProfitFactor))
-                )
+                    bodyTop.plus(tailLength.multiply(operationalTakeProfitFactor))
+                )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
             ) {
                 logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
                 val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
@@ -267,7 +267,7 @@ class SimpleOpenMan(
                     DoubleNode(tailLength.toDouble())
                 )
                 return AnalyzeReport.MatchingReport(
-                    candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                         pattern = SimplePattern.TOP_TAIL,
                         candleHammerRatio = candleHammerRatio.toString(),
                         operationalCandleHammerRatio = operationalHammerRatio.toString(),
@@ -319,8 +319,8 @@ class SimpleOpenMan(
                 val calculatedHammerRatio = highTailLength / bodyLength
                 if (calculatedHammerRatio > operationalHammerRatio && isPositivePnl(
                         bodyTop,
-                        bodyTop.minus(highTailLength.multiply(operationalTakeProfitFactor))
-                    )
+                        bodyTop.plus(highTailLength.multiply(operationalTakeProfitFactor))
+                    )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
                 ) {
                     logger.debug("계산된HammerRatio: ${calculatedHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
                     val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
@@ -329,7 +329,7 @@ class SimpleOpenMan(
                         DoubleNode(highTailLength.toDouble())
                     )
                     return AnalyzeReport.MatchingReport(
-                        candleStick.symbol, OrderSide.SHORT, OpenCondition.SimpleCondition(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
                             pattern = SimplePattern.MIDDLE_HIGH_TAIL,
                             candleHammerRatio = calculatedHammerRatio.toString(),
                             operationalCandleHammerRatio = operationalHammerRatio.toString(),

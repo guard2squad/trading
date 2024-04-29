@@ -203,14 +203,32 @@ class ExchangeTest {
         testGetInitialLeverage()
     }
 
+    /**
+     * symbol과 orderId를 통해 단건 거래 기록 조회하는 API를 테스트
+     * orderId는 userStream 또는 최근 다건 기록을 조회하면 얻을 수 있음
+     */
+
     @Test
     fun testGetTradeHistory() {
         val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = symbol.value
-        parameters["orderId"] = 4008926203  // stream에서 얻을 수 있음
+        parameters["orderId"] = 4025653842
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         jsonResponse[0]
+        println(pretty.writeValueAsString(jsonResponse))
+    }
+
+    /**
+     * symbol을 통해 계정의 최근 다건 거래 기록 조회하는 API를 테스트
+     * 디폴트 배열 사이즈: 500
+     */
+    @Test
+    fun testGetTradeHistories() {
+        val parameters = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT",
+        )
+        val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         println(pretty.writeValueAsString(jsonResponse))
     }
 
@@ -343,5 +361,14 @@ class ExchangeTest {
         val nowSeoul = ZonedDateTime.now(ZoneId.of("Asia/Seoul"))
         val formatter = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss")
         println(nowSeoul.format(formatter))
+    }
+
+    @Test
+    fun getCommissionRate() {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT"
+        )
+        val res = om.readTree(binanceClient.account().getCommissionRate(params))
+        println(pretty.writeValueAsString(res))
     }
 }
