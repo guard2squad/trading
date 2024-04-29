@@ -92,10 +92,12 @@ class HistoryUseCase(
                 val transactionTime = it.first().get("time").asLong()
                 val commission = it.sumOf { node -> node.get("commission").asDouble() }
                 val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
                 val syncedHistory = unsyncedHistory.copy(
                     transactionTime = transactionTime,
                     commission = commission,
-                    afterBalance = afterBalance
+                    afterBalance = afterBalance,
+                    syncedQuoteQty = syncedQuoteQty
                 )
                 historyRepository.updateOpenHistory(syncedHistory)
                 openToRemove.add(unsyncedHistory)
@@ -110,11 +112,13 @@ class HistoryUseCase(
                 val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
                 val commission = it.sumOf { node -> node.get("commission").asDouble() }
                 val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
                 val syncedHistory = unsyncedHistory.copy(
                     transactionTime = transactionTime,
                     realizedPnL = realizedPnl,
                     commission = commission,
-                    afterBalance = afterBalance
+                    afterBalance = afterBalance,
+                    syncedQuoteQty = syncedQuoteQty
                 )
                 historyRepository.updateCloseHistory(syncedHistory)
                 closeToRemove.add(unsyncedHistory)

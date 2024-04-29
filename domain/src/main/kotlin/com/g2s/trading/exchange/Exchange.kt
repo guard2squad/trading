@@ -2,10 +2,6 @@ package com.g2s.trading.exchange
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.account.Account
-import com.g2s.trading.history.CloseCondition
-import com.g2s.trading.history.CloseHistory
-import com.g2s.trading.history.OpenCondition
-import com.g2s.trading.history.OpenHistory
 import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode

@@ -321,6 +321,58 @@ class RestApiExchangeImpl(
         return balance
     }
 
+    /**
+     * 해당 포지션과 주문 ID를 기반으로 거래 기록을 조회합니다.
+     * <p>
+     * 이 메서드는 지정된 포지션과 주문 ID에 대한 거래 기록을 Binance API(GET /fapi/v1/userTrades)를 통해 조회하고,
+     * 조회된 데이터는 JSON 배열 형태로 반환됩니다. 각 배열 요소는 거래에 대한 상세 정보를 포함하며,
+     * 예시 응답은 아래와 같습니다.
+     * </p>
+     *
+     * <b>응답값 예시:</b>
+     * <pre>
+     * [
+     *   {
+     *     "symbol": "BTCUSDT",
+     *     "id": 284885830,
+     *     "orderId": 4025653842,
+     *     "side": "BUY",
+     *     "price": "62799.70",
+     *     "qty": "0.020",
+     *     "realizedPnl": "0",
+     *     "marginAsset": "USDT",
+     *     "quoteQty": "1255.99400",
+     *     "commission": "0.50239760",
+     *     "commissionAsset": "USDT",
+     *     "time": 1714371606787,
+     *     "positionSide": "BOTH",
+     *     "buyer": true,
+     *     "maker": false
+     *   },
+     *   {
+     *     "symbol": "BTCUSDT",
+     *     "id": 284885831,
+     *     "orderId": 4025653842,
+     *     "side": "BUY",
+     *     "price": "62799.90",
+     *     "qty": "0.231",
+     *     "realizedPnl": "0",
+     *     "marginAsset": "USDT",
+     *     "quoteQty": "14506.77690",
+     *     "commission": "5.80271076",
+     *     "commissionAsset": "USDT",
+     *     "time": 1714371606787,
+     *     "positionSide": "BOTH",
+     *     "buyer": true,
+     *     "maker": false
+     *   }
+     * ]
+     * </pre>
+     *
+     * @param position  조회할 포지션 객체
+     * @param orderId   조회할 거래의 주문 ID
+     * @return JSON 배열 형태의 거래 기록 데이터 노드. 거래 기록이 없거나 오류가 발생한 경우 null 반환
+     */
     private fun getHistoryInfo(position: Position, orderId: Long): JsonNode? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to position.symbol.value,
