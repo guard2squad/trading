@@ -8,7 +8,8 @@ import java.util.concurrent.ConcurrentHashMap
 class ConditionUseCase {
 
     private val positionOpenConditionMap = ConcurrentHashMap<Position.PositionKey, OpenCondition>()
-    private val positionCloseConditionMap = ConcurrentHashMap<Position.PositionKey, CloseCondition>()
+    private val positionCloseConditionMap =
+        ConcurrentHashMap<Position.PositionKey, CloseConditionStruct>()
 
     fun setOpenCondition(position: Position, condition: OpenCondition) {
         positionOpenConditionMap.computeIfAbsent(position.positionKey) { _ ->
@@ -16,9 +17,34 @@ class ConditionUseCase {
         }
     }
 
-    fun setCloseCondition(position: Position, condition: CloseCondition) {
-        positionCloseConditionMap.computeIfAbsent(position.positionKey) { _ ->
-            condition
+    // Limit 주문의 경우 익절/손절 closeCondition 각각 저장
+    fun setCloseCondition(position: Position, condition: CloseCondition, tradingAction: TradingAction) {
+        positionCloseConditionMap.compute(position.positionKey) { _, conditions ->
+            when (tradingAction) {
+                TradingAction.STOP_LOSS -> {
+                    if (conditions == null) {
+                        CloseConditionStruct(
+                            takeProfit = null,
+                            stopLoss = condition
+                        )
+                    } else {
+                        conditions.stopLoss = condition
+                        conditions
+                    }
+                }
+
+                TradingAction.TAKE_PROFIT -> {
+                    if (conditions == null) {
+                        CloseConditionStruct(
+                            takeProfit = condition,
+                            stopLoss = null
+                        )
+                    } else {
+                        conditions.takeProfit = condition
+                        conditions
+                    }
+                }
+            }
         }
     }
 
@@ -26,7 +52,7 @@ class ConditionUseCase {
         return positionOpenConditionMap[position.positionKey]!!
     }
 
-    fun getCloseCondition(position: Position): CloseCondition {
+    fun getCloseCondition(position: Position): CloseConditionStruct {
         return positionCloseConditionMap[position.positionKey]!!
     }
 
@@ -37,4 +63,9 @@ class ConditionUseCase {
     fun removeCloseCondition(position: Position) {
         positionCloseConditionMap.remove(position.positionKey)
     }
+
+    data class CloseConditionStruct(
+        var takeProfit: CloseCondition?,
+        var stopLoss: CloseCondition?,
+    )
 }

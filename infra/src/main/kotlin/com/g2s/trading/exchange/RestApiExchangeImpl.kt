@@ -11,6 +11,7 @@ import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.indicator.MarkPrice
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
@@ -18,6 +19,7 @@ import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.util.BinanceOrderParameterConverter
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 
 
@@ -27,6 +29,7 @@ class RestApiExchangeImpl(
 ) : Exchange {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val om = ObjectMapperProvider.get()
+    private val pretty = om.writerWithDefaultPrettyPrinter()
 
     private var positionMode = PositionMode.ONE_WAY_MODE
     private var positionSide = PositionSide.BOTH
@@ -35,7 +38,6 @@ class RestApiExchangeImpl(
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
     private val openPositionOrderIdMap = ConcurrentHashMap<Position, Long>()
-    private val closedPositionOrderIdMap = ConcurrentHashMap<Position, Long>()
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -99,18 +101,14 @@ class RestApiExchangeImpl(
      *     }
      * ```
      */
-    override fun closePosition(position: Position) {
-        val params = BinanceOrderParameterConverter.toBinanceClosePositionParam(position, positionMode, positionSide)
+    override fun closePosition(position: Position, orderType: OrderType, price: BigDecimal): Long {
+        val params =
+            BinanceOrderParameterConverter.toBinanceClosePositionParam(position, price, positionMode, positionSide)
         try {
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
 
-            closedPositionOrderIdMap.compute(position) { _, _ -> orderId }
-            logger.debug(
-                "orderId updated: {}, positionKey: {}",
-                closedPositionOrderIdMap[position],
-                position.positionKey
-            )
+            return orderId
         } catch (e: OrderFailException) {
             throw e
         }
@@ -121,11 +119,10 @@ class RestApiExchangeImpl(
         try {
             val orderResult = sendOrder(params)
             val orderId = om.readTree(orderResult).get("orderId").asLong()
-            logger.debug("orderId: $orderId")
 
             openPositionOrderIdMap.compute(position) { _, _ -> orderId }
             logger.debug(
-                "orderId updated: {}, positionKey: {}",
+                "openPositionOrderIdMap updated: {}, positionKey: {}",
                 openPositionOrderIdMap[position],
                 position.positionKey
             )
@@ -208,11 +205,11 @@ class RestApiExchangeImpl(
     private fun sendOrder(params: LinkedHashMap<String, Any>): String {
         try {
             val response: String = binanceClient.account().newOrder(params)
-            logger.debug(response)
+            logger.info("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
             return response
         } catch (e: BinanceClientException) {
             logger.warn("$params\n" + e.errMsg)
-            throw OrderFailException("선물 주문 실패")
+            throw OrderFailException(params["type"].toString() + " 선물 주문 실패")
         }
     }
 
@@ -283,17 +280,8 @@ class RestApiExchangeImpl(
         return jsonResponse
     }
 
-    override fun getCloseHistoryInfo(position: Position): JsonNode? {
-        val orderId = closedPositionOrderIdMap[position]
-        if (orderId == null) {
-            logger.warn("No order ID found for positionKey: {},openTime: {}", position.positionKey, position.openTime)
-            return null
-        }
-
+    override fun getCloseHistoryInfo(position: Position, orderId: Long): JsonNode? {
         val jsonResponse = getHistoryInfo(position, orderId)
-        if (jsonResponse != null) {
-            closedPositionOrderIdMap.remove(position)
-        }
 
         return jsonResponse
     }
@@ -380,6 +368,7 @@ class RestApiExchangeImpl(
         )
 
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
+        logger.info(om.writerWithDefaultPrettyPrinter().writeValueAsString(jsonResponse))
 
         if (jsonResponse == null || jsonResponse.isEmpty) {
             logger.warn("Invalid or empty response for orderId: $orderId")
@@ -388,5 +377,32 @@ class RestApiExchangeImpl(
         }
 
         return jsonResponse
+    }
+
+    override fun getCommissionRate(symbol: Symbol): Double {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT"
+        )
+        val jsonResponse = om.readTree(binanceClient.account().getCommissionRate(params))
+        val takerCommissionRate = jsonResponse["takerCommissionRate"].asDouble()
+
+        return takerCommissionRate
+    }
+
+    override fun getPricePrecision(symbol: Symbol): Int {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("pricePrecision").asInt()
+    }
+
+    override fun getMinPrice(symbol: Symbol): Double {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
+            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("minPrice").asDouble()
+    }
+
+    override fun getTickSize(symbol: Symbol): Double {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
+            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("tickSize").asDouble()
     }
 }

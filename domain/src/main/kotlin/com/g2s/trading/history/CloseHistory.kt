@@ -8,7 +8,7 @@ data class CloseHistory(
     val historyKey: String,
     val position: Position,
     val strategyKey: String,
-    val closeCondition: CloseCondition,
+    val closeCondition: CloseCondition? = null,
     val orderSide: OrderSide,
     val orderType: OrderType,
     val transactionTime: Long = 0,

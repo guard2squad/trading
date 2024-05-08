@@ -1,6 +1,8 @@
 package com.g2s.trading.history
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.history.ConditionUseCase.*
 import com.g2s.trading.position.Position
 import com.g2s.trading.strategy.StrategySpecRepository
 import org.slf4j.LoggerFactory
@@ -17,7 +19,7 @@ class HistoryUseCase(
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
     private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<OpenHistory, Position>()
-    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<CloseHistory, Position>()
+    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<CloseHistory, Pair<Position, Long>>()
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     init {
@@ -52,30 +54,21 @@ class HistoryUseCase(
         }
     }
 
-    fun recordCloseHistory(position: Position) {
+    fun recordCloseHistory(position: Position, orderId: Long) {
         val toggle = strategyHistoryToggleMap[position.strategyKey]
         if (toggle == true) {
-            val closeCondition = conditionUseCase.getCloseCondition(position)
-            val unsyncedHistory = createUnsyncedCloseHistory(position, closeCondition)
-            val historyInfo = exchangeImpl.getCloseHistoryInfo(position)
+            // 익절/손절 조건이 모두 포함된 구조체
+            val closeConditionStruct = conditionUseCase.getCloseCondition(position)
+            val unsyncedHistory = createUnsyncedCloseHistory(position)
+            val historyInfo = exchangeImpl.getCloseHistoryInfo(position, orderId)
             historyInfo?.let {
-                val transactionTime = it.first().get("time").asLong()
-                val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
-                val commission = it.sumOf { node -> node.get("commission").asDouble() }
-                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
-                val syncedHistory = unsyncedHistory.copy(
-                    transactionTime = transactionTime,
-                    realizedPnL = realizedPnl,
-                    commission = commission,
-                    afterBalance = afterBalance
-                )
+                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeConditionStruct)
                 saveCloseHistory(syncedHistory)
+                conditionUseCase.removeCloseCondition(position)
             } ?: let {
-                unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ -> position }
+                unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ -> Pair(position, orderId) }
                 saveCloseHistory(unsyncedHistory)
             }
-
-            conditionUseCase.removeCloseCondition(position)
         }
     }
 
@@ -105,21 +98,13 @@ class HistoryUseCase(
         }
         unsyncedClosePositionHistoryMap.forEach { entry ->
             val unsyncedHistory = entry.key
-            val position = entry.value
-            val historyInfo = exchangeImpl.getCloseHistoryInfo(position)
+            val pair = entry.value
+            val position = pair.first
+            val orderId = pair.second
+            val closeConditionStruct = conditionUseCase.getCloseCondition(position)
+            val historyInfo = exchangeImpl.getCloseHistoryInfo(position, orderId)
             historyInfo?.let {
-                val transactionTime = it.first().get("time").asLong()
-                val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
-                val commission = it.sumOf { node -> node.get("commission").asDouble() }
-                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
-                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
-                val syncedHistory = unsyncedHistory.copy(
-                    transactionTime = transactionTime,
-                    realizedPnL = realizedPnl,
-                    commission = commission,
-                    afterBalance = afterBalance,
-                    syncedQuoteQty = syncedQuoteQty
-                )
+                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeConditionStruct)
                 historyRepository.updateCloseHistory(syncedHistory)
                 closeToRemove.add(unsyncedHistory)
             }
@@ -162,11 +147,10 @@ class HistoryUseCase(
         orderType = position.orderType
     )
 
-    private fun createUnsyncedCloseHistory(position: Position, closeCondition: CloseCondition) = CloseHistory(
+    private fun createUnsyncedCloseHistory(position: Position) = CloseHistory(
         historyKey = CloseHistory.generateHistoryKey(position),
         position = position,
         strategyKey = position.strategyKey,
-        closeCondition = closeCondition,
         orderSide = position.orderSide,
         orderType = position.orderType
     )
@@ -185,5 +169,29 @@ class HistoryUseCase(
                 true
             }
         }
+    }
+
+    private fun processCloseHistoryInfo(
+        historyInfo: JsonNode,
+        unsyncedHistory: CloseHistory,
+        closeConditionStruct: CloseConditionStruct
+    ): CloseHistory {
+        val transactionTime = historyInfo.first().get("time").asLong()
+        val realizedPnl = historyInfo.sumOf { node -> node.get("realizedPnl").asDouble() }
+        val commission = historyInfo.sumOf { node -> node.get("commission").asDouble() }
+        val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+        val syncedQuoteQty: Double = historyInfo.sumOf { node -> node.get("quoteQty").asDouble() }
+        val closeCondition =
+            if (realizedPnl > 0) closeConditionStruct.takeProfit else closeConditionStruct.stopLoss
+        val syncedHistory = unsyncedHistory.copy(
+            closeCondition = closeCondition,
+            transactionTime = transactionTime,
+            realizedPnL = realizedPnl,
+            commission = commission,
+            afterBalance = afterBalance,
+            syncedQuoteQty = syncedQuoteQty
+        )
+
+        return syncedHistory
     }
 }

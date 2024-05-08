@@ -45,6 +45,18 @@ class SymbolUseCase(
         return exchangeImpl.getMinNotionalValue(symbol)
     }
 
+    fun getPricePrecision(symbol: Symbol): Int {
+        return exchangeImpl.getPricePrecision(symbol)
+    }
+
+    fun getMinPrice(symbol: Symbol): Double {
+        return exchangeImpl.getMinPrice(symbol)
+    }
+
+    fun getTickSize(symbol: Symbol): Double {
+        return exchangeImpl.getTickSize(symbol)
+    }
+
     fun getLeverage(symbol: Symbol): Int {
         return symbolLeverageMap[symbol]!!
     }
@@ -54,5 +66,11 @@ class SymbolUseCase(
         symbolLeverageMap[symbol] = changedLeverage
 
         return changedLeverage
+    }
+
+    fun getCommissionRate(symbol: Symbol): Double {
+        val takerCommissionRate = exchangeImpl.getCommissionRate(symbol)
+
+        return takerCommissionRate
     }
 }

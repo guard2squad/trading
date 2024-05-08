@@ -126,6 +126,7 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.listenUserStream(listenKey) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val eventType = eventJson.get("e").textValue()
+            // DEBUG
             logger.debug(pretty.writeValueAsString(eventJson))
             when (eventType) {
                 BinanceUserStreamEventType.ACCOUNT_UPDATE.toString() -> {
@@ -173,9 +174,11 @@ class ExchangeStream(
                     // Order Status가 FILLED되면 refresh account and position | publish accumulatedCommision and accumulatedRP
                     if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
                         val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
-                        // sync position의 경우 열 때는 필요한데 닫을 때는 필요 없음
-                        val transactionTime = jsonOrder.get("T").asLong()
+                        // 포지션을 열 때만 필요한 작업: sync position
                         positionUseCase.syncPosition(symbol)
+                        // 포지션을 닫을 때만 필요한 작업:
+                        val orderId = jsonOrder.get("i").asLong()
+                        positionUseCase.processFilledClosedPosition(orderId)
                         accountUseCase.syncAccount()
                     }
                 }
