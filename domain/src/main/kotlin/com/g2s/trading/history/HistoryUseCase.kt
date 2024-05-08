@@ -114,6 +114,56 @@ class HistoryUseCase(
         closeToRemove.forEach { unsyncedClosePositionHistoryMap.remove(it) }
     }
 
+
+    @Scheduled(fixedDelay = 2000)
+    fun syncHistory() {
+        val openToRemove = mutableListOf<OpenHistory>()
+        val closeToRemove = mutableListOf<CloseHistory>()
+        unsyncedOpenPositionHistoryMap.forEach { entry ->
+            val unsyncedHistory = entry.key
+            val position = entry.value
+            val historyInfo = exchangeImpl.getOpenHistoryInfo(position)
+            historyInfo?.let {    // synced
+                val transactionTime = it.first().get("time").asLong()
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    commission = commission,
+                    afterBalance = afterBalance,
+                    syncedQuoteQty = syncedQuoteQty
+                )
+                historyRepository.updateOpenHistory(syncedHistory)
+                openToRemove.add(unsyncedHistory)
+            }
+        }
+        unsyncedClosePositionHistoryMap.forEach { entry ->
+            val unsyncedHistory = entry.key
+            val position = entry.value
+            val historyInfo = exchangeImpl.getCloseHistoryInfo(position)
+            historyInfo?.let {
+                val transactionTime = it.first().get("time").asLong()
+                val realizedPnl = it.sumOf { node -> node.get("realizedPnl").asDouble() }
+                val commission = it.sumOf { node -> node.get("commission").asDouble() }
+                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
+                val syncedHistory = unsyncedHistory.copy(
+                    transactionTime = transactionTime,
+                    realizedPnL = realizedPnl,
+                    commission = commission,
+                    afterBalance = afterBalance,
+                    syncedQuoteQty = syncedQuoteQty
+                )
+                historyRepository.updateCloseHistory(syncedHistory)
+                closeToRemove.add(unsyncedHistory)
+            }
+        }
+
+        openToRemove.forEach { unsyncedOpenPositionHistoryMap.remove(it) }
+        closeToRemove.forEach { unsyncedClosePositionHistoryMap.remove(it) }
+    }
+
     fun turnOnHistoryFeature(strategyKey: String) {
         strategyHistoryToggleMap.compute(strategyKey) { _, _ ->
             true
