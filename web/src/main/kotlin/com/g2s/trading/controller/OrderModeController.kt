@@ -25,7 +25,8 @@ class OrderModeController {
         if (!isReedy) {
             setUp()
         }
-        strategies?.first { it.getTypeOfStrategy() == strategyType }?.changeOrderMode(orderMode)
+        strategies?.first { it.getType().name == strategyType }
+        // TODO("CHANGE ORDER_MODE")
     }
 
     private fun setUp() {

@@ -1,59 +1,58 @@
 package com.g2s.trading.account
 
 import com.g2s.trading.exchange.Exchange
-import org.slf4j.LoggerFactory
+import com.g2s.trading.strategy.StrategySpec
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Service
 class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
-    private val logger = LoggerFactory.getLogger(this.javaClass)
-    lateinit var localAccount: Account
-    private var synced: Boolean = false
+    private lateinit var localAccount: Account
     private val lock = AtomicBoolean(false)
 
     init {
         localAccount = loadAccount()
-        synced = true
     }
 
-    fun refreshAccount(refreshedAccount: Account) {
-        this.localAccount = refreshedAccount
+    fun withdraw(spec: StrategySpec): Money {
+        if (!acquire()) return Money.NotAvailableMoney
+        localAccount.sync()
+
+        val withdrawAmount = (localAccount.totalBalance * spec.allocatedRatio) / spec.symbols.size
+        if (withdrawAmount <= localAccount.availableBalance) {
+            localAccount.withdraw(withdrawAmount)
+        }
+
+        release()
+        return Money.AvailableMoney(withdrawAmount)
     }
 
-    fun syncAccount() {
-        logger.debug("synced account \n- asset : ${localAccount.assetWallets[0].asset} \n- balance : ${localAccount.assetWallets[0].walletBalance}\n")
-        synced = true
+    fun withdraw(amount: Double): Money {
+        if (!acquire()) return Money.NotAvailableMoney
+        localAccount.sync()
+
+        if (amount <= localAccount.availableBalance) {
+            localAccount.withdraw(amount)
+        }
+
+        release()
+        return Money.AvailableMoney(amount)
     }
 
-    fun getAllocatedBalancePerStrategy(asset: Asset, availableRatio: Double): BigDecimal {
-        val assetWallet = this.localAccount.assetWallets.first { it.asset == asset }
-        return BigDecimal(assetWallet.walletBalance).multiply(BigDecimal(availableRatio))
+    fun deposit(amount: Double) {
+        localAccount.deposit(amount)
     }
 
-    fun getAvailableBalance(asset: Asset): BigDecimal {
-        val assetWallet = localAccount.assetWallets.first { it.asset == asset }
-        return BigDecimal(assetWallet.walletBalance)
-    }
-
-    fun setUnSynced() {
-        synced = false
-    }
-
-    fun isSynced(): Boolean {
-        return synced
-    }
-
-    fun acquire(): Boolean {
+    private fun acquire(): Boolean {
         return lock.compareAndSet(false, true)
     }
 
-    fun release(): Boolean {
+    private fun release(): Boolean {
         return lock.compareAndSet(true, false)
     }
+
 
     private fun loadAccount(): Account {
         return exchangeImpl.getAccount()

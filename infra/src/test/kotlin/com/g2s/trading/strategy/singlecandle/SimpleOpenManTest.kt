@@ -1,4 +1,4 @@
-package com.g2s.trading.strategy.simple
+package com.g2s.trading.strategy.singlecandle
 
 import com.g2s.trading.order.OrderSide
 import org.junit.jupiter.api.Test

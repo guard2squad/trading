@@ -2,17 +2,13 @@ package com.g2s.trading.repository
 
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionRepository
-import org.slf4j.LoggerFactory
-import org.springframework.data.mongodb.core.FindAndReplaceOptions
 import org.springframework.data.mongodb.core.MongoTemplate
-import org.springframework.data.mongodb.core.query.Criteria.where
+import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.stereotype.Component
 
 @Component
 class MongoPositionRepository(private val mongoTemplate: MongoTemplate) : PositionRepository {
-
-    private val logger = LoggerFactory.getLogger(MongoStrategySpecRepository::class.java)
 
     companion object {
         private const val POSITION_COLLECTION_NAME = "positions"
@@ -27,19 +23,13 @@ class MongoPositionRepository(private val mongoTemplate: MongoTemplate) : Positi
     }
 
     override fun updatePosition(position: Position) {
-        val query = Query.query(where("positionKey").`is`(position.positionKey))
+        val query = Query(Criteria.where("positionId").`is`(position.positionId))
 
-        val options = FindAndReplaceOptions.options().upsert().returnNew()
-        val result = mongoTemplate.findAndReplace(query, position, options, POSITION_COLLECTION_NAME)
-
-        if (result != null) {
-            logger.debug("Position : A document was upserted or replaced.")
-        } else {
-            logger.debug("Position : No operation was performed.")
-        }
+        mongoTemplate.findAndReplace(query, position, POSITION_COLLECTION_NAME)
     }
 
-    override fun deletePosition(position: Position) {
-        mongoTemplate.remove(Query.query(where("positionKey").`is`(position.positionKey)), POSITION_COLLECTION_NAME)
+    override fun deletePosition(id: String) {
+        val query = Query(Criteria.where("positionId").`is`(id))
+        mongoTemplate.remove(query, POSITION_COLLECTION_NAME)
     }
 }

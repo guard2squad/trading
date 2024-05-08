@@ -1,10 +1,11 @@
 package com.g2s.trading.symbol
 
-data class Symbol(val value: String) {
-    companion object {
-        fun valueOf(value : String) : Symbol {
-            return Symbol(value)
-        }
-    }
-
-}
+data class Symbol(
+    val value: String,
+    val quantityPrecision: Int,
+    val pricePrecision: Int,
+    val minimumNotionalValue: Double,
+    val minimumPrice: Double,
+    val tickSize: Double,
+    val commissionRate: Double,
+)

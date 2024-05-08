@@ -1,58 +1,58 @@
 package com.g2s.trading.symbol
 
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.strategy.StrategySpecRepository
-import com.g2s.trading.strategy.StrategySpecServiceStatus
-import com.g2s.trading.strategy.StrategyType
+import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.strategy.StrategySpecUseCase
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Service
 class SymbolUseCase(
-    val exchangeImpl: Exchange,
-    val mongoStrategySpecRepository: StrategySpecRepository
+    private val exchangeImpl: Exchange,
+    strategySpecUseCase: StrategySpecUseCase,
+    positionUseCase: PositionUseCase
 ) {
+    private val symbols: Map<Symbol, AtomicBoolean>
 
-    private val symbols: MutableSet<Symbol> = StrategyType.entries
-        .flatMap { strategyType ->
-            mongoStrategySpecRepository.findAllServiceStrategySpecByType(strategyType.value)
-                .filter { strategySpec -> strategySpec.status == StrategySpecServiceStatus.SERVICE }
-                .flatMap { strategySpec -> strategySpec.symbols }
-        }.toMutableSet()
+    init {
+        symbols = strategySpecUseCase.findAllServiceSpecs()
+            .flatMap { strategySpec -> strategySpec.symbols }.map { symbolValue -> generateSymbol(symbolValue) }
+            .toSet().associateWith { AtomicBoolean(false) }
 
-    private val symbolLeverageMap = ConcurrentHashMap<Symbol, Int>().apply {
-        symbols.forEach { symbol ->
-            put(symbol, exchangeImpl.getLeverage(symbol))
+        val positions = positionUseCase.getAllPositions()
+        positions.forEach { position ->
+            useSymbol(position.symbol)
         }
     }
 
 
-    fun getAllSymbols(): List<Symbol> {
-        return symbols.toList()
+    fun useSymbol(symbol: Symbol): Boolean {
+        return symbols[symbol]?.let {
+            it.compareAndSet(false, true)
+        } ?: false
     }
 
-    fun getQuantityPrecision(symbol: Symbol): Int {
-        return exchangeImpl.getQuantityPrecision(symbol)
+    fun unUseSymbol(symbol: Symbol) {
+        symbols[symbol]!!.set(false)
     }
 
-    // 시장가 주문일 때만 적용
-    // 시장가 주문이 아닐 때 filterType : LOT_SIZE
-    fun getMinQty(symbol: Symbol): Double {
-        return exchangeImpl.getMinQty(symbol)
+    fun getSymbol(value: String): Symbol? {
+        return symbols.keys.firstOrNull { symbol -> symbol.value == value }
     }
 
-    fun getMinNotionalValue(symbol: Symbol): Double {
-        return exchangeImpl.getMinNotionalValue(symbol)
+    fun getAllSymbols(): Set<Symbol> {
+        return symbols.keys
     }
 
-    fun getLeverage(symbol: Symbol): Int {
-        return symbolLeverageMap[symbol]!!
-    }
-
-    fun setLeverage(symbol: Symbol, leverage: Int): Int {
-        val changedLeverage = exchangeImpl.setLeverage(symbol, leverage)
-        symbolLeverageMap[symbol] = changedLeverage
-
-        return changedLeverage
+    private fun generateSymbol(symbolValue: String): Symbol {
+        return Symbol(
+            value = symbolValue,
+            quantityPrecision = exchangeImpl.getQuantityPrecision(symbolValue),
+            pricePrecision = exchangeImpl.getPricePrecision(symbolValue),
+            minimumNotionalValue = exchangeImpl.getMinNotionalValue(symbolValue),
+            minimumPrice = exchangeImpl.getMinPrice(symbolValue),
+            tickSize = exchangeImpl.getTickSize(symbolValue),
+            commissionRate = exchangeImpl.getCommissionRate(symbolValue),
+        )
     }
 }

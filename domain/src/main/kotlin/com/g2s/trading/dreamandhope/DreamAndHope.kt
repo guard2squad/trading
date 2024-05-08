@@ -2,15 +2,15 @@ package com.g2s.trading.dreamandhope
 
 import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.event.StrategyEvent
-import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
+import com.g2s.trading.strategy.StrategySpec
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
 class DreamAndHope(
-    private val mongoStrategySpecRepository: StrategySpecRepository,
+    private val strategySpecRepository: StrategySpecRepository,
     private val eventUseCase: EventUseCase
 ) {
 
@@ -20,10 +20,10 @@ class DreamAndHope(
         try {
             logger.debug("start: $strategyKey")
             // strategyKey로 DB에서 스펙조회
-            mongoStrategySpecRepository.findStrategySpecByKey(strategyKey)
+            strategySpecRepository.findStrategySpecByKey(strategyKey)
                 ?.let { spec ->
                     if (spec.status == StrategySpecServiceStatus.SERVICE) {
-                        eventUseCase.publishEvent(StrategyEvent.StartStrategyEvent(spec))
+                        eventUseCase.publishAsyncEvent(StrategyEvent.StartStrategyEvent(spec))
                     }
                 }
         } catch (e: Exception) {
@@ -34,10 +34,10 @@ class DreamAndHope(
     fun stop(strategyKey: String) {
         try {
             logger.debug("stop: $strategyKey")
-            mongoStrategySpecRepository.findStrategySpecByKey(strategyKey)
+            strategySpecRepository.findStrategySpecByKey(strategyKey)
                 ?.let { spec ->
                     if (spec.status == StrategySpecServiceStatus.STOP) {
-                        eventUseCase.publishEvent(StrategyEvent.StartStrategyEvent(spec))
+                        eventUseCase.publishAsyncEvent(StrategyEvent.StopStrategyEvent(spec))
                     }
                 }
         } catch (e: Exception) {
@@ -48,8 +48,8 @@ class DreamAndHope(
     fun update(strategySpec: StrategySpec) {
         try {
             logger.debug("update: ${strategySpec.strategyKey}")
-            mongoStrategySpecRepository.updateSpec(strategySpec)
-                .let { spec -> eventUseCase.publishEvent(StrategyEvent.UpdateStrategyEvent(spec)) }
+            strategySpecRepository.updateSpec(strategySpec)
+                .let { spec -> eventUseCase.publishAsyncEvent(StrategyEvent.UpdateStrategyEvent(spec)) }
         } catch (e: Exception) {
             throw DreamAndHopeErrors.UPDATE_STRATEGY_ERROR.error(
                 "Failed to update Strategy: ${strategySpec.strategyKey}",

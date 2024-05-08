@@ -1,9 +1,11 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.Interval
+import com.g2s.trading.position.PositionMode
 import com.g2s.trading.symbol.Symbol
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
@@ -19,7 +21,6 @@ import java.util.*
 
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
-@Disabled
 class ExchangeTest {
 
     @Autowired
@@ -33,6 +34,21 @@ class ExchangeTest {
     fun testExchangeInfo() {
         val jsonExchangeInfo = om.readTree(binanceClient.market().exchangeInfo())
         println(pretty.writeValueAsString(jsonExchangeInfo))
+    }
+
+    @Disabled
+    @Test
+    fun test() {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val balance = (bodyJson["assets"] as ArrayNode)
+            .first { it["asset"].textValue() == "USDT" }
+            .map { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }[0]
+
     }
 
     /**
@@ -80,11 +96,11 @@ class ExchangeTest {
      *     ]
      * }
      */
+    @Disabled
     @Test
     fun testGetInitialLeverageBracket() {
-        val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol.value
+        parameters["symbol"] = "BTCUSDT"
         val jsonResponse = om.readTree(binanceClient.account().getLeverageBracket(parameters))
         println(pretty.writeValueAsString(jsonResponse))
     }
@@ -167,11 +183,11 @@ class ExchangeTest {
      * } ]
      *
      */
+    @Disabled
     @Test
     fun testGetInitialLeverage() {
-        val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol.value
+        parameters["symbol"] = "BTCUSDT"
         val jsonResponse = om.readTree(binanceClient.account().positionInformation(parameters))
         val leverage = jsonResponse.get(0).get("leverage").asInt()
         println("Leverage: $leverage")
@@ -190,11 +206,11 @@ class ExchangeTest {
      * binanceJavaConnector에서 account 클래스의 메서드는 signed한 요청임.
      * @param timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
      */
+    @Disabled
     @Test
     fun testSetLeverage() {
-        val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol.value
+        parameters["symbol"] = "BTCUSDT"
         parameters["leverage"] = 3
         val jsonResponse = om.readTree(binanceClient.account().changeInitialLeverage(parameters))
         println(pretty.writeValueAsString(jsonResponse))
@@ -208,12 +224,12 @@ class ExchangeTest {
      * orderId는 userStream 또는 최근 다건 기록을 조회하면 얻을 수 있음
      */
 
+    @Disabled
     @Test
     fun testGetTradeHistory() {
-        val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = symbol.value
-        parameters["orderId"] = 4025653842
+        parameters["symbol"] = "BTCUSDT"
+        parameters["orderId"] = 4033865847
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         jsonResponse[0]
         println(pretty.writeValueAsString(jsonResponse))
@@ -223,6 +239,7 @@ class ExchangeTest {
      * symbol을 통해 계정의 최근 다건 거래 기록 조회하는 API를 테스트
      * 디폴트 배열 사이즈: 500
      */
+    @Disabled
     @Test
     fun testGetTradeHistories() {
         val parameters = linkedMapOf<String, Any>(
@@ -231,7 +248,7 @@ class ExchangeTest {
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         println(pretty.writeValueAsString(jsonResponse))
     }
-
+    @Disabled
     @Test
     fun getAccountTest() {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
@@ -242,6 +259,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 LastPrice
+    @Disabled
     @Test
     fun testGetContinuousContractCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -255,6 +273,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 IndexPrice
+    @Disabled
     @Test
     fun testGetIndexPriceCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -267,6 +286,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 MarkPrice
+    @Disabled
     @Test
     fun testGetMarkPriceCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -279,6 +299,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 LastPrice
+    @Disabled
     @Test
     fun testGetCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -290,25 +311,25 @@ class ExchangeTest {
         println(pretty.writeValueAsString(jsonCandleStick))
     }
 
+    @Disabled
     @Test
     fun testGetMinQtyByMarketOrder() {
-        val symbol = Symbol.valueOf("BTCUSDT")
-        getMinQtyByMarketOrder(symbol)
+        getMinQtyByMarketOrder("BTCUSDT")
     }
 
 
-    private fun getMinQtyByMarketOrder(symbol: Symbol) {
+    private fun getMinQtyByMarketOrder(symbolValue: String) {
         val jsonSymbols = om.readTree(binanceClient.market().exchangeInfo()).get("symbols")
         if (jsonSymbols.isArray) {
             jsonSymbols.forEach { symbolNode ->
-                if (symbolNode.get("symbol").asText() == symbol.value) {
+                if (symbolNode.get("symbol").asText() == symbolValue) {
                     val filterNode = symbolNode.get(
                         "filters"
                     )
                     filterNode.forEach { node ->
                         if (node.get("filterType").asText() == "MARKET_LOT_SIZE") {
                             val minQty = node.get("minQty").asText()
-                            print("${symbol.value} : ")
+                            print("${symbolValue} : ")
                             println(minQty)
                         }
                     }
@@ -345,7 +366,7 @@ class ExchangeTest {
             CandleStick(
                 symbol = symbol,
                 interval = interval,
-                key = jsonCandleStick.get(0).asLong(),
+                openTime = jsonCandleStick.get(0).asLong(),
                 open = jsonCandleStick.get(1).asDouble(),
                 high = jsonCandleStick.get(2).asDouble(),
                 low = jsonCandleStick.get(3).asDouble(),
@@ -356,6 +377,7 @@ class ExchangeTest {
         return candleStick
     }
 
+    @Disabled
     @Test
     fun getCurrentUtcDateTimeString() {
         val nowSeoul = ZonedDateTime.now(ZoneId.of("Asia/Seoul"))
@@ -363,6 +385,18 @@ class ExchangeTest {
         println(nowSeoul.format(formatter))
     }
 
+    /**
+     *  Symbol의 수수료를 응답
+     *  GET /fapi/v1/commissionRate
+     *
+     * Response:
+     *  {
+     *     "symbol": "BTCUSDT",
+     *     "makerCommissionRate": "0.0002",  // 0.02%
+     *     "takerCommissionRate": "0.0004"   // 0.04%
+     *  }
+     */
+    @Disabled
     @Test
     fun getCommissionRate() {
         val params = linkedMapOf<String, Any>(
@@ -371,4 +405,91 @@ class ExchangeTest {
         val res = om.readTree(binanceClient.account().getCommissionRate(params))
         println(pretty.writeValueAsString(res))
     }
+
+    @Disabled
+    @Test
+    fun testBuyMarketOrder() {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
+            "side" to "BUY",
+            "type" to "MARKET",
+            "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
+            "timeStamp" to System.currentTimeMillis(),
+            "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
+            "positionSide" to "BOTH",
+        )
+
+        val response = om.readTree(binanceClient.account().newOrder(params))
+        println(pretty.writeValueAsString(response))
+    }
+
+    @Disabled
+    @Test
+    fun testSellMarketOrder() {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
+            "side" to "SELL",
+            "type" to "MARKET",
+            "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
+            "timeStamp" to System.currentTimeMillis(),
+            "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
+            "positionSide" to "BOTH",
+        )
+
+        val response = om.readTree(binanceClient.account().newOrder(params))
+        println(pretty.writeValueAsString(response))
+    }
+
+    /**
+     * param에 사용되는 ENUM
+     *
+     * Order Type
+     * - MARKET
+     * - LIMIT
+     * - STOP
+     * - TAKE_PROFIT
+     * - LIQUIDATION
+     *
+     * Side
+     * - BUY
+     * - SELL
+     *
+     * Time in force (timeInForce):
+     *
+     * - GTC: Good Till Cancel(GTC order valitidy is 1 year from placement)
+     * - IOC: Immediate or Cancel
+     * - FOK: Fill or Kill
+     * - GTX: Good Till Crossing (Post Only)
+     * - GTD: Good Till Date
+     */
+    @Disabled
+    @Test
+    fun testLimitOrder() {
+        val orderType = "LIMIT"
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
+            "side" to "BUY",
+            "type" to orderType.toString(),
+            "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
+            "timeStamp" to System.currentTimeMillis(),
+            "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
+            "positionSide" to "BOTH",
+            "timeInForce" to "GTX",
+            "price" to 63600
+        )
+
+        val response = binanceClient.account().newOrder(params)
+        println(pretty.writeValueAsString(response))
+    }
+    @Disabled
+    @Test
+    fun testCancelOrder() {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to "BTCUSDT",
+            "orderId" to 4033977289
+        )
+        val response = binanceClient.account().cancelOrder(params)
+        val jsonResponse = om.readTree(response)
+    }
+
 }

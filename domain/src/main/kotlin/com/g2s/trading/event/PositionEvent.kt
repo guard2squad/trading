@@ -1,12 +1,16 @@
 package com.g2s.trading.event
 
 import com.g2s.trading.position.Position
-import org.springframework.context.ApplicationEvent
 
 sealed class PositionEvent(
     source: Any
-) : ApplicationEvent(source) {
-    data class PositionSyncedEvent(
+) : Event(source) {
+
+    data class PositionOpenedEvent(
         val source: Position
+    ) : PositionEvent(source)
+
+    data class PositionClosedEvent(
+        val source: Pair<Position, String>
     ) : PositionEvent(source)
 }
