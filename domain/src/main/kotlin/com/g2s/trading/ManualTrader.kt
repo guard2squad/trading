@@ -4,8 +4,10 @@ import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.history.CloseCondition
 import com.g2s.trading.history.ConditionUseCase
 import com.g2s.trading.history.OpenCondition
+import com.g2s.trading.history.TradingAction
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpec
@@ -78,8 +80,8 @@ class ManualTrader(
             lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
             return
         }
-        conditionUseCase.setCloseCondition(position, CloseCondition.ManualCondition)
-        positionUseCase.closePosition(position)
+        conditionUseCase.setCloseCondition(position, CloseCondition.ManualCondition, TradingAction.STOP_LOSS)
+        positionUseCase.closePosition(position, OrderType.MARKET)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 

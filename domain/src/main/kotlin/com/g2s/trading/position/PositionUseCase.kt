@@ -6,9 +6,11 @@ import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.history.HistoryUseCase
+import com.g2s.trading.order.OrderType
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
@@ -21,6 +23,7 @@ class PositionUseCase(
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val positionMap = ConcurrentHashMap<Position.PositionKey, Position>()
+    private val pendingPositions = ConcurrentHashMap<Long, Position>()
 
     init {
         loadPositions()
@@ -87,24 +90,79 @@ class PositionUseCase(
      *  포지션을 닫고, 주문이 실패할 경우 롤백합니다. 주문 성공 여부를 반환힙니다.
      *
      * @param position The trading position to close.
+     * @param orderType Order Type
+     * @param takeProfitPrice Order Type이 Limit일 때 익절 가격
+     * @param stopLossPrice Order Type이 Limit일 때 손절 가격
      * @return [Boolean] indicating success (`true`) or failure (`false`) of the operation.
      */
-    fun closePosition(position: Position): Boolean {
-        val originalPosition = position.copy()
+    fun closePosition(
+        position: Position,
+        orderType: OrderType,
+        takeProfitPrice: BigDecimal? = null,
+        stopLossPrice: BigDecimal? = null
+    ): Boolean {
+        when (orderType) {
+            OrderType.MARKET -> {
+                val originalPosition = position.copy()
 
-        try {
-            accountUseCase.setUnSynced()
+                try {
+                    accountUseCase.setUnSynced()
+                    positionRepository.deletePosition(position)
+                    positionMap.remove(position.positionKey)
+                    val orderId = exchangeImpl.closePosition(position, OrderType.MARKET)
+                    historyUseCase.recordCloseHistory(position, orderId)
+                    return true
+                } catch (e: OrderFailException) {
+                    logger.warn(e.message)
+                    positionMap[originalPosition.positionKey] = originalPosition
+                    positionRepository.savePosition(originalPosition)
+                    accountUseCase.syncAccount()
+                    return false
+                }
+            }
+
+            OrderType.LIMIT -> {
+                assert(stopLossPrice != null)
+                assert(takeProfitPrice != null)
+                // 주문이 채결되면 계좌 synced
+                accountUseCase.setUnSynced()
+                // 익절 주문
+                try {
+                    val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.LIMIT, stopLossPrice!!)
+                    pendingPositions.compute(stopLossOrderId) { _, _ -> position }
+                } catch (e: OrderFailException) {
+                    accountUseCase.syncAccount()
+                    logger.warn(e.message)
+                }
+                // 손절 주문
+                try {
+                    val takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.LIMIT, takeProfitPrice!!)
+                    pendingPositions.compute(takeProfitOrderId) { _, _ -> position }
+                } catch (e: OrderFailException) {
+                    accountUseCase.syncAccount()
+                    logger.warn(e.message)
+                }
+                return true
+            }
+        }
+    }
+
+    /**
+     * 주문이 체결되면 주문에 해당하는 포지션을 처리합니다.
+     * - DB에서 포지션 삭제
+     * - 도메인의 포지션 맵에서 포지션 삭제
+     * - close history 기록
+     *
+     * @param orderId 체결된 주문의 ID
+     */
+    fun processFilledClosedPosition(orderId: Long) {
+        pendingPositions.remove(orderId)?.also { position ->
             positionRepository.deletePosition(position)
             positionMap.remove(position.positionKey)
-            exchangeImpl.closePosition(position)
-            historyUseCase.recordCloseHistory(position)
-            return true
-        } catch (e: OrderFailException) {
-            logger.warn(e.message)
-            positionMap[originalPosition.positionKey] = originalPosition
-            positionRepository.savePosition(originalPosition)
-            accountUseCase.syncAccount()
-            return false
+            historyUseCase.recordCloseHistory(position, orderId)
+            pendingPositions.entries.find { it.value == position }?.let {
+                pendingPositions.remove(it.key)
+            }
         }
     }
 

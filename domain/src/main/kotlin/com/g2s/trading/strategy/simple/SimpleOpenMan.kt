@@ -49,7 +49,6 @@ class SimpleOpenMan(
 
     companion object {
         private const val TYPE = "simple"
-        private const val TAKER_FEE_RATE = 0.00045  // taker fee : 0.045%
     }
 
     private val specs: ConcurrentHashMap<String, StrategySpec> = ConcurrentHashMap<String, StrategySpec>().also { map ->
@@ -199,8 +198,8 @@ class SimpleOpenMan(
                     strategyKey = spec.strategyKey,
                     symbol = analyzeReport.symbol,
                     orderSide = analyzeReport.orderSide,
-                    orderType = OrderType.MARKET,
-                    entryPrice = markPrice.price,
+                    orderType = OrderType.MARKET,   // TODO: LIMIT 주문 할 수 있도록, 로직 추가
+                    entryPrice = markPrice.price,   // TODO: LIMIT 주문시 계산
                     positionAmt = quantity(
                         balance = allocatedBalance,
                         minNotional = BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
@@ -256,6 +255,7 @@ class SimpleOpenMan(
                 bodyLength
             )
             if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
+                    candleStick.symbol,
                     bodyTop,
                     bodyTop.plus(tailLength.multiply(operationalTakeProfitFactor))
                 )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
@@ -286,6 +286,7 @@ class SimpleOpenMan(
                 bodyLength
             )
             if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
+                    candleStick.symbol,
                     bodyBottom,
                     bodyBottom.plus(tailLength.multiply(operationalTakeProfitFactor))
                 )
@@ -318,6 +319,7 @@ class SimpleOpenMan(
                 )
                 val calculatedHammerRatio = highTailLength / bodyLength
                 if (calculatedHammerRatio > operationalHammerRatio && isPositivePnl(
+                        candleStick.symbol,
                         bodyTop,
                         bodyTop.plus(highTailLength.multiply(operationalTakeProfitFactor))
                     )   // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
@@ -346,6 +348,7 @@ class SimpleOpenMan(
                 )
                 val candleHammerRatio = lowTailLength / bodyLength
                 if (candleHammerRatio > operationalHammerRatio && isPositivePnl(
+                        candleStick.symbol,
                         bodyBottom,
                         bodyBottom.plus(lowTailLength.multiply(operationalTakeProfitFactor))
                     )
@@ -426,14 +429,12 @@ class SimpleOpenMan(
         }
     }
 
-    /*
-        MARKET ORDER => taker
-        taker fee : 0.045%
-     */
-    private fun isPositivePnl(open: BigDecimal, close: BigDecimal): Boolean {
+    private fun isPositivePnl(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
+        val commissionRate = symbolUseCase.getCommissionRate(symbol)
         val pnl = (open - close).abs()
-        val fee = (open + close).multiply(BigDecimal(TAKER_FEE_RATE))
+        val fee = (open + close).multiply(BigDecimal(commissionRate))
         logger.debug("fee :{}, pnl :{}", fee, pnl)
+
         return pnl > fee
     }
 
