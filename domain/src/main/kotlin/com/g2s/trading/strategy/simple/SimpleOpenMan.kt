@@ -158,6 +158,7 @@ class SimpleOpenMan(
                     logger.debug("same candlestick {}", candleStick.symbol)
                     false
                 }
+                oldCandleStick = old
                 true
             }
         }
