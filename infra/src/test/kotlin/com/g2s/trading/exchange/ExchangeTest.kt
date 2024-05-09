@@ -216,7 +216,7 @@ class ExchangeTest {
         val symbol = Symbol.valueOf("BTCUSDT")
         val parameters = LinkedHashMap<String, Any>()
         parameters["symbol"] = symbol.value
-        parameters["orderId"] = 4031966377
+        parameters["orderId"] = 4033638246
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         jsonResponse[0]
         println(pretty.writeValueAsString(jsonResponse))
@@ -425,61 +425,5 @@ class ExchangeTest {
 
         val response = binanceClient.account().newOrder(params)
         println(pretty.writeValueAsString(response))
-    }
-
-    @Test
-    fun testClosePositionByLimitOrder() {
-        // 시장가 주문으로 position open하고
-        val params = linkedMapOf<String, Any>(
-            "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
-            "side" to "BUY",
-            "type" to OrderType.MARKET.toString(),
-            "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
-            "timeStamp" to System.currentTimeMillis(),
-            "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
-            "positionSide" to PositionSide.BOTH.toString(),
-        )
-
-        val response = om.readTree(binanceClient.account().newOrder(params))
-        println(pretty.writeValueAsString(response))
-        if (response["status"].asText() == "NEW") {
-            // 익절 limit 주문 테스트
-            run {
-                val orderType = OrderType.LIMIT
-                val params = linkedMapOf<String, Any>(
-                    "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
-                    "side" to "SELL",
-                    "type" to orderType.toString(),
-                    "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
-                    "timeStamp" to System.currentTimeMillis(),
-                    "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
-                    "positionSide" to PositionSide.BOTH.toString(),
-                    "timeInForce" to "GTX",
-                    "price" to 63600
-                )
-
-                val response = om.readTree(binanceClient.account().newOrder(params))
-                println(pretty.writeValueAsString(response))
-            }
-
-            // 손절 limit 주문 테스트
-            run {
-                val orderType = OrderType.LIMIT
-                val params = linkedMapOf<String, Any>(
-                    "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
-                    "side" to "SELL",
-                    "type" to orderType.toString(),
-                    "quantity" to 0.002, // 함수로 symbol에 따라 양 결정해서 테스트
-                    "timeStamp" to System.currentTimeMillis(),
-                    "positionMode" to PositionMode.ONE_WAY_MODE.toString(),
-                    "positionSide" to PositionSide.BOTH.toString(),
-                    "timeInForce" to "GTX",
-                    "price" to 64000
-                )
-
-                val response = om.readTree(binanceClient.account().newOrder(params))
-                println(pretty.writeValueAsString(response))
-            }
-        }
     }
 }
