@@ -3,14 +3,16 @@ package com.g2s.trading.history
 import com.g2s.trading.order.OrderSide
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
+import java.security.MessageDigest
 
 data class OpenHistory(
     val historyKey: String,
     val position: Position,
     val strategyKey: String,
-    val openCondition: OpenCondition,
+    val openCondition: OpenCondition? = null,
     val orderSide: OrderSide,
     val orderType: OrderType,
+    val orderId: Long,
     val transactionTime: Long = 0,
     val commission: Double = 0.0,
     val afterBalance: Double = 0.0,
@@ -18,7 +20,14 @@ data class OpenHistory(
 ) {
     companion object {
         fun generateHistoryKey(position: Position): String {
-            return "${position.positionKey}-${position.strategyKey}-${position.openTime}"
+            val input = "${position.positionKey}/${position.strategyKey}/${position.openTime}"
+
+            return hashString(input)
+        }
+
+        private fun hashString(input: String): String {
+            val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
+            return bytes.joinToString(separator = "") { "%02x".format(it) }
         }
     }
 }

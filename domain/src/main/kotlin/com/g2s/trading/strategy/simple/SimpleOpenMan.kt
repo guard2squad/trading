@@ -3,14 +3,13 @@ package com.g2s.trading.strategy.simple
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.DoubleNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.g2s.trading.indicator.MarkPriceUseCase
-import com.g2s.trading.event.StrategyEvent
-import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.history.ConditionUseCase
+import com.g2s.trading.event.StrategyEvent
+import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.history.OpenCondition
 import com.g2s.trading.indicator.CandleStick
+import com.g2s.trading.indicator.MarkPriceUseCase
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.matchingReport.AnalyzeReport
@@ -28,9 +27,7 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.IllegalArgumentException
 import kotlin.math.max
 import kotlin.math.min
 
@@ -42,7 +39,6 @@ class SimpleOpenMan(
     private val accountUseCase: AccountUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
     private val symbolUseCase: SymbolUseCase,
-    private val conditionUseCase: ConditionUseCase,
 ) : Strategy {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private var orderMode = OrderMode.MINIMUM_QUANTITY
@@ -174,7 +170,7 @@ class SimpleOpenMan(
         val hammerRatio = spec.op["hammerRatio"].asDouble()
         val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
-        when (val analyzeReport = analyze(oldCandleStick, hammerRatio, takeProfitFactor, availableBalance)) {
+        when (val analyzeReport = analyze(oldCandleStick, hammerRatio, availableBalance)) {
             is AnalyzeReport.NonMatchingReport -> {
                 logger.debug("non matching report for symbol: {}", candleStick.symbol)
             }
@@ -202,8 +198,7 @@ class SimpleOpenMan(
                     referenceData = analyzeReport.referenceData,
                 )
                 logger.debug("openPosition strategyKey: {}, symbol: {}", position.strategyKey, position.symbol)
-                conditionUseCase.setOpenCondition(position, analyzeReport.openCondition)
-                positionUseCase.openPosition(position)
+                positionUseCase.openPosition(position, analyzeReport.openCondition)
             }
         }
 
@@ -214,7 +209,6 @@ class SimpleOpenMan(
     private fun analyze(
         candleStick: CandleStick,
         hammerRatio: Double,
-        takeProfitFactor: Double,
         availableBalance: BigDecimal
     ): AnalyzeReport {
         logger.debug("analyze... candleStick: {}", candleStick)
@@ -241,21 +235,23 @@ class SimpleOpenMan(
                 tailLength,
                 bodyLength
             )
-            logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
-            val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-            (referenceData as ObjectNode).set<DoubleNode>(
-                "tailLength",
-                DoubleNode(tailLength.toDouble())
-            )
-            // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
-            return AnalyzeReport.MatchingReport(
-                candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                    pattern = SimplePattern.TOP_TAIL,
-                    candleHammerRatio = candleHammerRatio.toString(),
-                    operationalCandleHammerRatio = operationalHammerRatio.toString(),
-                    beforeBalance = availableBalance.toDouble(),
-                ), referenceData
-            )
+            if (candleHammerRatio > operationalHammerRatio) {
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
+                val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
+                (referenceData as ObjectNode).set<DoubleNode>(
+                    "tailLength",
+                    DoubleNode(tailLength.toDouble())
+                )
+                // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
+                return AnalyzeReport.MatchingReport(
+                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                        pattern = SimplePattern.TOP_TAIL,
+                        candleHammerRatio = candleHammerRatio.toString(),
+                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                        beforeBalance = availableBalance.toDouble(),
+                    ), referenceData
+                )
+            }
         } else if (tailBottom < bodyBottom && tailTop == bodyTop) {
             logger.debug("bottom tail")
             val tailLength = bodyBottom - tailBottom
@@ -266,20 +262,22 @@ class SimpleOpenMan(
                 tailLength,
                 bodyLength
             )
-            logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
-            val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-            (referenceData as ObjectNode).set<DoubleNode>(
-                "tailLength",
-                DoubleNode(tailLength.toDouble())
-            )
-            return AnalyzeReport.MatchingReport(
-                candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                    pattern = SimplePattern.BOTTOM_TAIL,
-                    candleHammerRatio = candleHammerRatio.toString(),
-                    operationalCandleHammerRatio = operationalHammerRatio.toString(),
-                    beforeBalance = availableBalance.toDouble(),
-                ), referenceData
-            )
+            if (candleHammerRatio > operationalHammerRatio) {
+                logger.debug("candleHammer: ${candleHammerRatio.toDouble()}, decimalHammer: ${operationalHammerRatio.toDouble()}")
+                val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
+                (referenceData as ObjectNode).set<DoubleNode>(
+                    "tailLength",
+                    DoubleNode(tailLength.toDouble())
+                )
+                return AnalyzeReport.MatchingReport(
+                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                        pattern = SimplePattern.BOTTOM_TAIL,
+                        candleHammerRatio = candleHammerRatio.toString(),
+                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                        beforeBalance = availableBalance.toDouble(),
+                    ), referenceData
+                )
+            }
         } else {
             val highTailLength = tailTop - bodyTop
             val lowTailLength = bodyBottom - tailBottom
@@ -292,21 +290,23 @@ class SimpleOpenMan(
                     bodyLength
                 )
                 // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
-                val calculatedHammerRatio = highTailLength / bodyLength
-                logger.debug("계산된HammerRatio: ${calculatedHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
-                val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                (referenceData as ObjectNode).set<DoubleNode>(
-                    "tailLength",
-                    DoubleNode(highTailLength.toDouble())
-                )
-                return AnalyzeReport.MatchingReport(
-                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                        pattern = SimplePattern.MIDDLE_HIGH_TAIL,
-                        candleHammerRatio = calculatedHammerRatio.toString(),
-                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
-                        beforeBalance = availableBalance.toDouble(),
-                    ), referenceData
-                )
+                val candleHammerRatio = highTailLength / bodyLength
+                if (candleHammerRatio > operationalHammerRatio) {
+                    logger.debug("계산된HammerRatio: ${candleHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
+                    val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
+                    (referenceData as ObjectNode).set<DoubleNode>(
+                        "tailLength",
+                        DoubleNode(highTailLength.toDouble())
+                    )
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                            pattern = SimplePattern.MIDDLE_HIGH_TAIL,
+                            candleHammerRatio = candleHammerRatio.toString(),
+                            operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                            beforeBalance = availableBalance.toDouble(),
+                        ), referenceData
+                    )
+                }
             } else {
                 logger.debug(
                     "middle low tail\nhighTail: {}, lowTail: {}, bodyTail: {}",
@@ -315,20 +315,22 @@ class SimpleOpenMan(
                     bodyLength
                 )
                 val candleHammerRatio = lowTailLength / bodyLength
-                logger.debug("계산된HammerRatio: ${candleHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
-                val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
-                (referenceData as ObjectNode).set<DoubleNode>(
-                    "tailLength",
-                    DoubleNode(lowTailLength.toDouble())
-                )
-                return AnalyzeReport.MatchingReport(
-                    candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
-                        pattern = SimplePattern.MIDDLE_LOW_TAIL,
-                        candleHammerRatio = candleHammerRatio.toString(),
-                        operationalCandleHammerRatio = operationalHammerRatio.toString(),
-                        beforeBalance = availableBalance.toDouble(),
-                    ), referenceData
-                )
+                if (candleHammerRatio > operationalHammerRatio) {
+                    logger.debug("계산된HammerRatio: ${candleHammerRatio.toDouble()}, 운영HammerRatio: ${operationalHammerRatio.toDouble()}")
+                    val referenceData = ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java)
+                    (referenceData as ObjectNode).set<DoubleNode>(
+                        "tailLength",
+                        DoubleNode(lowTailLength.toDouble())
+                    )
+                    return AnalyzeReport.MatchingReport(
+                        candleStick.symbol, OrderSide.LONG, OpenCondition.SimpleCondition(
+                            pattern = SimplePattern.MIDDLE_LOW_TAIL,
+                            candleHammerRatio = candleHammerRatio.toString(),
+                            operationalCandleHammerRatio = operationalHammerRatio.toString(),
+                            beforeBalance = availableBalance.toDouble(),
+                        ), referenceData
+                    )
+                }
             }
         }
 

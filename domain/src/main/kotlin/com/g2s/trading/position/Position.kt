@@ -26,7 +26,7 @@ data class Position(
     // ONE_WAY_MODE의 경우 Symbol로 만 식별 가능하지만 HEDGE_MODE인 경우 OrderSide도 포함해야함
     data class PositionKey(val symbol: Symbol, val orderSide: OrderSide) {
         override fun toString(): String {
-            return "symbol=${symbol.value}, orderSide=$orderSide"
+            return "symbol=${symbol.value}/orderSide=$orderSide"
         }
     }
 

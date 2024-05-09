@@ -9,4 +9,8 @@ sealed class PositionEvent(
     data class PositionSyncedEvent(
         val source: Position
     ) : PositionEvent(source)
+
+    data class PositionFilledEvent(
+        val source: Position
+    ) : PositionEvent(source)
 }

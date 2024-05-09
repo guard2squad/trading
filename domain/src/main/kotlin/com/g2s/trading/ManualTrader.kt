@@ -1,10 +1,7 @@
 package com.g2s.trading
 
 import com.g2s.trading.account.AccountUseCase
-import com.g2s.trading.history.CloseCondition
-import com.g2s.trading.history.ConditionUseCase
 import com.g2s.trading.history.OpenCondition
-import com.g2s.trading.history.TradingAction
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderType
@@ -19,7 +16,6 @@ class ManualTrader(
     val lockUseCase: LockUseCase,
     val accountUseCase: AccountUseCase,
     val positionUseCase: PositionUseCase,
-    val conditionUseCase: ConditionUseCase,
 ) {
 
     fun manuallyOpenPosition(position: Position, spec: StrategySpec) {
@@ -62,8 +58,7 @@ class ManualTrader(
         } catch (e: RuntimeException) {
             println(e.message)
         }
-        conditionUseCase.setOpenCondition(position, OpenCondition.ManualCondition)
-        positionUseCase.openPosition(position)
+        positionUseCase.openPosition(position, OpenCondition.ManualCondition)
         accountUseCase.release()
         lockUseCase.release(position.strategyKey, LockUsage.OPEN)
     }
@@ -80,7 +75,6 @@ class ManualTrader(
             lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
             return
         }
-        conditionUseCase.setCloseCondition(position, CloseCondition.ManualCondition, TradingAction.STOP_LOSS)
         positionUseCase.closePosition(position, OrderType.MARKET)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }

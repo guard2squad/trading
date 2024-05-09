@@ -17,8 +17,8 @@ sealed class CloseCondition {
         val tailLength: String,
         val tailLengthWithFactor: String,   // Factor: 손절 할 때 StopLossFactor, 익절할 때 takeProfitFactor
         val factor: Double,
-        val entryPrice: String,
-        val closePrice: String,
+        val entryPrice: Double,
+        val closePrice: Double,
         val beforeBalance: Double
     ) : CloseCondition() {
         override fun toString(): String {

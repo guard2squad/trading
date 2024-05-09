@@ -11,8 +11,8 @@ import java.math.BigDecimal
 
 interface Exchange {
     fun getAccount(): Account
-    fun closePosition(position: Position, orderType: OrderType, price: BigDecimal = BigDecimal.ZERO) : Long
-    fun openPosition(position: Position)
+    fun closePosition(position: Position, orderType: OrderType, price: Double = 0.0): Long
+    fun openPosition(position: Position): Long
     fun setPositionMode(positionMode: PositionMode)
     fun getMarkPrice(symbol: Symbol): MarkPrice
     fun getPosition(symbol: Symbol): Position
@@ -21,11 +21,11 @@ interface Exchange {
     fun getMinNotionalValue(symbol: Symbol): Double
     fun getLeverage(symbol: Symbol): Int
     fun setLeverage(symbol: Symbol, leverage: Int): Int
-    fun getOpenHistoryInfo(position: Position): JsonNode?
-    fun getCloseHistoryInfo(position: Position, orderId: Long): JsonNode?
+    fun getHistoryInfo(position: Position, orderId: Long): JsonNode?
     fun getCurrentBalance(timeStamp: Long): Double
     fun getCommissionRate(symbol: Symbol): Double
     fun getPricePrecision(symbol: Symbol): Int
     fun getMinPrice(symbol: Symbol): Double
     fun getTickSize(symbol: Symbol): Double
+    fun cancelOrder(symbol: Symbol, orderId: Long)
 }

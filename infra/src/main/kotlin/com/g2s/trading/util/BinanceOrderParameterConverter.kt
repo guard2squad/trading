@@ -5,7 +5,6 @@ import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.position.PositionSide
-import java.math.BigDecimal
 import kotlin.math.absoluteValue
 
 object BinanceOrderParameterConverter {
@@ -35,7 +34,8 @@ object BinanceOrderParameterConverter {
 
     fun toBinanceClosePositionParam(
         position: Position,
-        price: BigDecimal = BigDecimal.ZERO,
+        orderType: OrderType,
+        price: Double = 0.0,
         positionMode: PositionMode,
         positionSide: PositionSide
     ): LinkedHashMap<String, Any> {
@@ -45,15 +45,15 @@ object BinanceOrderParameterConverter {
             OrderSide.LONG -> "SELL"
             OrderSide.SHORT -> "BUY"
         }
-        parameters["type"] = position.orderType.toString()
+        parameters["type"] = orderType.toString()
         parameters["quantity"] = position.positionAmt.absoluteValue.toString()
         parameters["timeStamp"] = System.currentTimeMillis()
         parameters["positionMode"] = positionMode.toString()
         parameters["positionSide"] = positionSide.toString()
         // Limit order에서 추가적으로 필요한 Parameter
-        if (position.orderType == OrderType.LIMIT) {
-            parameters["timeInForce"] = "GTX"
-            parameters["price"] = price.toDouble()
+        if (orderType == OrderType.LIMIT) {
+            parameters["timeInForce"] = "GTC"
+            parameters["price"] = price
         }
         return parameters
     }

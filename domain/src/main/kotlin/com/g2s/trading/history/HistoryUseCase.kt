@@ -2,25 +2,22 @@ package com.g2s.trading.history
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.history.ConditionUseCase.*
 import com.g2s.trading.position.Position
 import com.g2s.trading.strategy.StrategySpecRepository
-import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class HistoryUseCase(
-    private val conditionUseCase: ConditionUseCase,
     private val strategySpecRepository: StrategySpecRepository,
     private val historyRepository: HistoryRepository,
     private val exchangeImpl: Exchange
 ) {
     private val strategyHistoryToggleMap = ConcurrentHashMap<String, Boolean>()
-    private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<OpenHistory, Position>()
-    private val unsyncedClosePositionHistoryMap = ConcurrentHashMap<CloseHistory, Pair<Position, Long>>()
-    private val logger = LoggerFactory.getLogger(this.javaClass)
+    private val unsyncedOpenPositionHistoryMap = ConcurrentHashMap<OpenHistory, Triple<Position, Long, OpenCondition>>()
+    private val unsyncedClosePositionHistoryMap =
+        ConcurrentHashMap<CloseHistory, Triple<Position, Long, CloseCondition>>()
 
     init {
         loadStrategySpecKey()
@@ -29,44 +26,44 @@ class HistoryUseCase(
         }
     }
 
-    fun recordOpenHistory(position: Position) {
+    fun recordOpenHistory(position: Position, orderId: Long, openCondition: OpenCondition) {
         val toggle = strategyHistoryToggleMap[position.strategyKey]
         if (toggle == true) {
-            val openCondition = conditionUseCase.getOpenCondition(position)
-            val unsyncedHistory = createUnsyncedOpenHistory(position, openCondition)
-            val historyInfo = exchangeImpl.getOpenHistoryInfo(position)
+            val unsyncedHistory = createUnsyncedOpenHistory(position, orderId)
+            val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {
-                val transactionTime = it.first().get("time").asLong()
-                val commission = it.sumOf { node -> node.get("commission").asDouble() }
-                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
-                val syncedHistory = unsyncedHistory.copy(
-                    transactionTime = transactionTime,
-                    commission = commission,
-                    afterBalance = afterBalance
-                )
+                val syncedHistory = processOpenHistoryInfo(it, unsyncedHistory, openCondition)
                 saveOpenHistory(syncedHistory)
             } ?: run {
-                unsyncedOpenPositionHistoryMap.compute(unsyncedHistory) { _, _ -> position }
+                unsyncedOpenPositionHistoryMap.compute(unsyncedHistory) { _, _ ->
+                    Triple(
+                        position,
+                        orderId,
+                        openCondition
+                    )
+                }
                 saveOpenHistory(unsyncedHistory)
             }
-
-            conditionUseCase.removeOpenCondition(position)
         }
     }
 
-    fun recordCloseHistory(position: Position, orderId: Long) {
+    fun recordCloseHistory(position: Position, orderId: Long, closeCondition: CloseCondition) {
         val toggle = strategyHistoryToggleMap[position.strategyKey]
         if (toggle == true) {
             // 익절/손절 조건이 모두 포함된 구조체
-            val closeConditionStruct = conditionUseCase.getCloseCondition(position)
-            val unsyncedHistory = createUnsyncedCloseHistory(position)
-            val historyInfo = exchangeImpl.getCloseHistoryInfo(position, orderId)
+            val unsyncedHistory = createUnsyncedCloseHistory(position, orderId)
+            val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {
-                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeConditionStruct)
+                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeCondition)
                 saveCloseHistory(syncedHistory)
-                conditionUseCase.removeCloseCondition(position)
             } ?: let {
-                unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ -> Pair(position, orderId) }
+                unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ ->
+                    Triple(
+                        position,
+                        orderId,
+                        closeCondition
+                    )
+                }
                 saveCloseHistory(unsyncedHistory)
             }
         }
@@ -79,32 +76,26 @@ class HistoryUseCase(
         val closeToRemove = mutableListOf<CloseHistory>()
         unsyncedOpenPositionHistoryMap.forEach { entry ->
             val unsyncedHistory = entry.key
-            val position = entry.value
-            val historyInfo = exchangeImpl.getOpenHistoryInfo(position)
+            val triple = entry.value
+            val position = triple.first
+            val orderId = triple.second
+            val openCondition = triple.third
+            val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {    // synced
-                val transactionTime = it.first().get("time").asLong()
-                val commission = it.sumOf { node -> node.get("commission").asDouble() }
-                val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
-                val syncedQuoteQty: Double = it.sumOf { node -> node.get("quoteQty").asDouble() }
-                val syncedHistory = unsyncedHistory.copy(
-                    transactionTime = transactionTime,
-                    commission = commission,
-                    afterBalance = afterBalance,
-                    syncedQuoteQty = syncedQuoteQty
-                )
+                val syncedHistory = processOpenHistoryInfo(it, unsyncedHistory, openCondition)
                 historyRepository.updateOpenHistory(syncedHistory)
                 openToRemove.add(unsyncedHistory)
             }
         }
         unsyncedClosePositionHistoryMap.forEach { entry ->
             val unsyncedHistory = entry.key
-            val pair = entry.value
-            val position = pair.first
-            val orderId = pair.second
-            val closeConditionStruct = conditionUseCase.getCloseCondition(position)
-            val historyInfo = exchangeImpl.getCloseHistoryInfo(position, orderId)
+            val triple = entry.value
+            val position = triple.first
+            val orderId = triple.second
+            val closeCondition = triple.third
+            val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {
-                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeConditionStruct)
+                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeCondition)
                 historyRepository.updateCloseHistory(syncedHistory)
                 closeToRemove.add(unsyncedHistory)
             }
@@ -138,19 +129,20 @@ class HistoryUseCase(
         }
     }
 
-    private fun createUnsyncedOpenHistory(position: Position, openCondition: OpenCondition) = OpenHistory(
+    private fun createUnsyncedOpenHistory(position: Position, orderId: Long) = OpenHistory(
         historyKey = OpenHistory.generateHistoryKey(position),
         position = position,
         strategyKey = position.strategyKey,
-        openCondition = openCondition,
+        orderId = orderId,
         orderSide = position.orderSide,
         orderType = position.orderType
     )
 
-    private fun createUnsyncedCloseHistory(position: Position) = CloseHistory(
+    private fun createUnsyncedCloseHistory(position: Position, orderId: Long) = CloseHistory(
         historyKey = CloseHistory.generateHistoryKey(position),
         position = position,
         strategyKey = position.strategyKey,
+        orderId = orderId,
         orderSide = position.orderSide,
         orderType = position.orderType
     )
@@ -171,18 +163,36 @@ class HistoryUseCase(
         }
     }
 
+    private fun processOpenHistoryInfo(
+        historyInfo: JsonNode,
+        unsyncedHistory: OpenHistory,
+        openCondition: OpenCondition
+    ): OpenHistory {
+        val transactionTime = historyInfo.first().get("time").asLong()
+        val commission = historyInfo.sumOf { node -> node.get("commission").asDouble() }
+        val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
+        val syncedQuoteQty: Double = historyInfo.sumOf { node -> node.get("quoteQty").asDouble() }
+        val syncedHistory = unsyncedHistory.copy(
+            openCondition = openCondition,
+            transactionTime = transactionTime,
+            commission = commission,
+            afterBalance = afterBalance,
+            syncedQuoteQty = syncedQuoteQty
+        )
+
+        return syncedHistory
+    }
+
     private fun processCloseHistoryInfo(
         historyInfo: JsonNode,
         unsyncedHistory: CloseHistory,
-        closeConditionStruct: CloseConditionStruct
+        closeCondition: CloseCondition
     ): CloseHistory {
         val transactionTime = historyInfo.first().get("time").asLong()
         val realizedPnl = historyInfo.sumOf { node -> node.get("realizedPnl").asDouble() }
         val commission = historyInfo.sumOf { node -> node.get("commission").asDouble() }
         val afterBalance = exchangeImpl.getCurrentBalance(transactionTime)
         val syncedQuoteQty: Double = historyInfo.sumOf { node -> node.get("quoteQty").asDouble() }
-        val closeCondition =
-            if (realizedPnl > 0) closeConditionStruct.takeProfit else closeConditionStruct.stopLoss
         val syncedHistory = unsyncedHistory.copy(
             closeCondition = closeCondition,
             transactionTime = transactionTime,
