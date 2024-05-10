@@ -183,7 +183,7 @@ class PositionUseCase(
         } catch (e: OrderFailException) {
             logger.warn("주문 취소 실패: " + e.message)
         } finally {
-            pendingPositions.remove(orderIdToCancel)
+            pendingPositions.remove(otherOrderId)
         }
 
         pendingPositions.remove(orderId)?.also { p ->
