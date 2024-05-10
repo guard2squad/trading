@@ -107,29 +107,28 @@ class PositionUseCase(
         orderStrategy: OrderStrategy,
         takeProfitPrice: Double = 0.0,
         stopLossPrice: Double = 0.0,
-        takeProfitCondition: CloseCondition,
-        stopLossCondition: CloseCondition,
+        takeProfitCondition: CloseCondition? = null,
+        stopLossCondition: CloseCondition? = null,
+        marketCloseCondition: CloseCondition? = null
     ): Boolean {
         when (orderStrategy) {
             OrderStrategy.MARKET -> {
-                // 사용 안 하는 기능
-//                val originalPosition = position.copy()
-//
-//                try {
-//                    accountUseCase.setUnSynced()
-//                    positionRepository.deletePosition(position)
-//                    openedPositions.remove(position.positionKey)
-//                    val orderId = exchangeImpl.closePosition(position, OrderType.MARKET)
-//                    historyUseCase.recordCloseHistory(position, orderId, marketCloseCondition!!)
-//                    return true
-//                } catch (e: OrderFailException) {
-//                    logger.warn(e.message)
-//                    openedPositions[originalPosition.positionKey] = originalPosition
-//                    positionRepository.savePosition(originalPosition)
-//                    accountUseCase.syncAccount()
-//                    return false
-//                }
-                return false    // TODO: delete
+                val originalPosition = position.copy()
+
+                try {
+                    accountUseCase.setUnSynced()
+                    positionRepository.deletePosition(position)
+                    openedPositions.remove(position.positionKey)
+                    val orderId = exchangeImpl.closePosition(position, OrderType.MARKET)
+                    pendingPositions.compute(orderId) { _, _ -> Pair(position, marketCloseCondition!!) }
+                    return true
+                } catch (e: OrderFailException) {
+                    logger.warn(e.message)
+                    openedPositions[originalPosition.positionKey] = originalPosition
+                    positionRepository.savePosition(originalPosition)
+                    accountUseCase.syncAccount()
+                    return false
+                }
             }
 
             OrderStrategy.DUAL_LIMIT -> {
@@ -142,9 +141,10 @@ class PositionUseCase(
                     logger.debug("TAKE_PROFIT_LIMIT 익절주문: ${position.positionKey}")
                     logger.debug("익절가: $takeProfitPrice")
                     takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.TAKE_PROFIT, takeProfitPrice)
-                    pendingPositions.compute(takeProfitOrderId) { _, _ -> Pair(position, takeProfitCondition) }
+                    pendingPositions.compute(takeProfitOrderId) { _, _ -> Pair(position, takeProfitCondition!!) }
                 } catch (e: OrderFailException) {
                     logger.warn(e.message)
+                    logger.warn("익절 주문 실패로 시장가로 다시 주문")
                     return false
                 }
                 // 손절 주문
@@ -152,16 +152,10 @@ class PositionUseCase(
                     logger.debug("STOP_LIMIT 손절주문: ${position.positionKey}")
                     logger.debug("손절가: $stopLossPrice")
                     val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.STOP, stopLossPrice)
-                    pendingPositions.compute(stopLossOrderId) { _, _ -> Pair(position, stopLossCondition) }
+                    pendingPositions.compute(stopLossOrderId) { _, _ -> Pair(position, stopLossCondition!!) }
                 } catch (e: OrderFailException) {
                     logger.warn(e.message)
                     logger.warn("손절 주문 실패로 시장가로 다시 주문")
-                    // pendingPositions에서 익절 주문 삭제
-                    pendingPositions.remove(takeProfitOrderId)
-                    // 시장가로 손절 주문
-                    val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.MARKET)
-                    // processFilledClosedPosition에서 사용할 수 있도록 손절 주문을 pendingPositions에 저장.
-                    pendingPositions.compute(stopLossOrderId) { _, _ -> Pair(position, stopLossCondition) }
                     return false
                 }
                 return true
@@ -192,9 +186,9 @@ class PositionUseCase(
             pendingPositions.remove(orderIdToCancel)
         }
 
-        pendingPositions.remove(orderId)?.also { pair ->
-            val position = pair.first
-            val closeCondition = pair.second
+        pendingPositions.remove(orderId)?.also { p ->
+            val position = p.first
+            val closeCondition = p.second
             positionRepository.deletePosition(position)
             openedPositions.remove(position.positionKey)
             historyUseCase.recordCloseHistory(position, orderId, closeCondition)

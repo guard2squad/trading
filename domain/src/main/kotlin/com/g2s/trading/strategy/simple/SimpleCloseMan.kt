@@ -149,10 +149,15 @@ class SimpleCloseMan(
         if (hasClosed) {
             // 정상적으로 주문 넣은 경우
             pendingPositions.compute(position) { _, _ -> }
-            opendPositions.remove(position.positionKey)
-            // 릴리즈
-            lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
+        } else {
+            // 시장가 주문
+            positionUseCase.closePosition(position, OrderStrategy.MARKET, marketCloseCondition = stopLossCondition)
+            // 시장가로 손절 주문
         }
+        // 열린 포지션에서 제거
+        opendPositions.remove(position.positionKey)
+        // 릴리즈
+        lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 
     @EventListener
