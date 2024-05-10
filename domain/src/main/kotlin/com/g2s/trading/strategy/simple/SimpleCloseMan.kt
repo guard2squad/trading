@@ -153,11 +153,6 @@ class SimpleCloseMan(
             // 릴리즈
             lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
         }
-        else {
-            // 주문 실패 했으면 릴리즈하고 재시도
-            lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
-            scheduler.schedule({ handlePositionSyncedEvent(event) }, 1, TimeUnit.SECONDS)
-        }
     }
 
     @EventListener

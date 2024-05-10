@@ -76,7 +76,7 @@ class ManualTrader(
             lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
             return
         }
-        positionUseCase.closePosition(position, OrderStrategy.MARKET)
+//        positionUseCase.closePosition(position, OrderStrategy.MARKET)
         lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
     }
 
