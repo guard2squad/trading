@@ -136,13 +136,15 @@ class PositionUseCase(
                 assert(takeProfitPrice != 0.0)
                 logger.debug("진입가: ${position.entryPrice}")
                 // 익절 주문
+                val takeProfitOrderId: Long
                 try {
                     logger.debug("LIMIT 익절주문: ${position.positionKey}")
                     logger.debug("익절가: $takeProfitPrice")
-                    val takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.TAKE_PROFIT, takeProfitPrice)
+                    takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.TAKE_PROFIT, takeProfitPrice)
                     pendingPositions.compute(takeProfitOrderId) { _, _ -> Pair(position, takeProfitCondition!!) }
                 } catch (e: OrderFailException) {
                     logger.warn(e.message)
+                    return false
                 }
                 // 손절 주문
                 try {
@@ -151,7 +153,14 @@ class PositionUseCase(
                     val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.STOP, stopLossPrice)
                     pendingPositions.compute(stopLossOrderId) { _, _ -> Pair(position, stopLossCondition!!) }
                 } catch (e: OrderFailException) {
+                    // 익절 주문 취소
                     logger.warn(e.message)
+                    logger.warn("손절 주문 실패로 익절 주문 취소")
+                    // pendingPositions에서 삭제
+                    pendingPositions.remove(takeProfitOrderId)
+                    // 주문 취소
+                    exchangeImpl.cancelOrder(position.symbol, takeProfitOrderId)
+                    return false
                 }
                 return true
             }
@@ -174,7 +183,7 @@ class PositionUseCase(
             pendingPositions.entries.find { it.key != orderId && it.value.first == positionToRemove }!!.key
         try {
             // 채결된 포지션이 익절이라면 손절 주문 취소, 손절이라면 익절 주문 취소
-            exchangeImpl.cancelOrder(positionToRemove!!.symbol, orderIdToCancel)
+            exchangeImpl.cancelOrder(positionToRemove.symbol, orderIdToCancel)
         } catch (e: OrderFailException) {
             logger.warn("주문 취소 실패: " + e.message)
         } finally {

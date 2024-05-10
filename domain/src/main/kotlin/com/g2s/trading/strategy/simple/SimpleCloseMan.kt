@@ -98,10 +98,6 @@ class SimpleCloseMan(
             logger.debug("position not synced : ${position.symbol.value}")
             return
         }
-        // 이미 CLOSE 주문 넣었다면 종료
-        if (pendingPositions.containsKey(position)) {
-            return
-        }
         // strategy 락을 획득할 때까지 재시도
         val acquired = lockUseCase.acquire(position.strategyKey, LockUsage.CLOSE)
         if (!acquired) {
@@ -136,7 +132,7 @@ class SimpleCloseMan(
             availableBalance
         )
         // 포지션 닫는 주문 넣음
-        positionUseCase.closePosition(
+        val hasClosed = positionUseCase.closePosition(
             position,
             OrderStrategy.DUAL_LIMIT,
             takeProfitPrice = caculateLimitPrice(
@@ -150,10 +146,18 @@ class SimpleCloseMan(
             takeProfitCondition = takeProfitCondition,
             stopLossCondition = stopLossCondition
         )
-        pendingPositions.compute(position) { _, _ -> }
-        opendPositions.remove(position.positionKey)
-        // 릴리즈
-        lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
+        if (hasClosed) {
+            // 정상적으로 주문 넣은 경우
+            pendingPositions.compute(position) { _, _ -> }
+            opendPositions.remove(position.positionKey)
+            // 릴리즈
+            lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
+        }
+        else {
+            // 주문 실패 했으면 릴리즈하고 재시도
+            lockUseCase.release(position.strategyKey, LockUsage.CLOSE)
+            scheduler.schedule({ handlePositionSyncedEvent(event) }, 1, TimeUnit.SECONDS)
+        }
     }
 
     @EventListener
