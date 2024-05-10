@@ -8,6 +8,7 @@ import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.history.CloseCondition
 import com.g2s.trading.history.HistoryUseCase
 import com.g2s.trading.history.OpenCondition
+import com.g2s.trading.order.OrderStrategy
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
@@ -47,6 +48,7 @@ class PositionUseCase(
         try {
             val currentValue = openedPositions.computeIfAbsent(position.positionKey) { _ ->
                 logger.debug("openPostion 실행 전 map size = ${openedPositions.size}\n")
+                // MARKET으로 주문하고 FILLED되면 계좌 sync
                 accountUseCase.setUnSynced()
                 positionRepository.savePosition(position)
                 position
@@ -92,22 +94,25 @@ class PositionUseCase(
      *  포지션을 닫고, 주문이 실패할 경우 롤백합니다. 주문 성공 여부를 반환힙니다.
      *
      * @param position The trading position to close.
-     * @param orderType Order Type
+     * @param orderStrategy 주문 전략
      * @param takeProfitPrice Order Type이 Limit일 때 익절 가격
      * @param stopLossPrice Order Type이 Limit일 때 손절 가격
+     * @param takeProfitCondition 익절 조건
+     * @param stopLossCondition 손절 조건
+     * @param marketCloseCondition 시장가 판매 조건
      * @return [Boolean] indicating success (`true`) or failure (`false`) of the operation.
      */
     fun closePosition(
         position: Position,
-        orderType: OrderType,
+        orderStrategy: OrderStrategy,
         takeProfitPrice: Double = 0.0,
         stopLossPrice: Double = 0.0,
         takeProfitCondition: CloseCondition? = null,
         stopLossCondition: CloseCondition? = null,
         marketCloseCondition: CloseCondition? = null
     ): Boolean {
-        when (orderType) {
-            OrderType.MARKET -> {
+        when (orderStrategy) {
+            OrderStrategy.MARKET -> {
                 val originalPosition = position.copy()
 
                 try {
@@ -126,30 +131,26 @@ class PositionUseCase(
                 }
             }
 
-            OrderType.LIMIT -> {
+            OrderStrategy.DUAL_LIMIT -> {
                 assert(stopLossPrice != 0.0)
                 assert(takeProfitPrice != 0.0)
-                // 주문이 채결되면 processFilledClosedPosition 메서드에서 계좌 synced
-                accountUseCase.setUnSynced()
                 logger.debug("진입가: ${position.entryPrice}")
                 // 익절 주문
                 try {
                     logger.debug("LIMIT 익절주문: ${position.positionKey}")
                     logger.debug("익절가: $takeProfitPrice")
-                    val takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.LIMIT, takeProfitPrice)
+                    val takeProfitOrderId = exchangeImpl.closePosition(position, OrderType.TAKE_PROFIT, takeProfitPrice)
                     pendingPositions.compute(takeProfitOrderId) { _, _ -> Pair(position, takeProfitCondition!!) }
                 } catch (e: OrderFailException) {
-                    accountUseCase.syncAccount()
                     logger.warn(e.message)
                 }
                 // 손절 주문
                 try {
                     logger.debug("LIMIT 손절주문: ${position.positionKey}")
                     logger.debug("손절가: $stopLossPrice")
-                    val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.LIMIT, stopLossPrice)
+                    val stopLossOrderId = exchangeImpl.closePosition(position, OrderType.STOP, stopLossPrice)
                     pendingPositions.compute(stopLossOrderId) { _, _ -> Pair(position, stopLossCondition!!) }
                 } catch (e: OrderFailException) {
-                    accountUseCase.syncAccount()
                     logger.warn(e.message)
                 }
                 return true
@@ -166,24 +167,30 @@ class PositionUseCase(
      * @param orderId 체결된 주문의 ID
      */
     fun processFilledClosedPosition(orderId: Long) {
-        val removedEntry = pendingPositions.remove(orderId)?.also { pair ->
+        // open 주문이 filled된 경우 return
+        val pair = pendingPositions[orderId] ?: return
+        val positionToRemove = pair.first
+        val orderIdToCancel =
+            pendingPositions.entries.find { it.key != orderId && it.value.first == positionToRemove }!!.key
+        try {
+            // 채결된 포지션이 익절이라면 손절 주문 취소, 손절이라면 익절 주문 취소
+            exchangeImpl.cancelOrder(positionToRemove!!.symbol, orderIdToCancel)
+        } catch (e: OrderFailException) {
+            logger.warn("주문 취소 실패: " + e.message)
+        } finally {
+            pendingPositions.remove(orderIdToCancel)
+        }
+
+        pendingPositions.remove(orderId)?.also { pair ->
             val position = pair.first
             val closeCondition = pair.second
             positionRepository.deletePosition(position)
             openedPositions.remove(position.positionKey)
             historyUseCase.recordCloseHistory(position, orderId, closeCondition)
-            accountUseCase.syncAccount()
             // 각 CLOSE 전략에 FILLED 포지션 발행
             eventUseCase.publishEvent(PositionEvent.PositionFilledEvent(position))
             logger.debug("CLOSE 포지션 체결: ${position.positionKey}")
         }
-
-        // 채결된 포지션이 익절이라면 손절 주문 취소, 손절이라면 익절 주문 취소
-        removedEntry?.let { (position, _) ->
-            val matchingOrderId = pendingPositions.entries.find { it.value.first == position }?.key!!
-            exchangeImpl.cancelOrder(position.symbol, matchingOrderId)
-        }
-
     }
 
     fun processCancelledPosition(orderId: Long) {

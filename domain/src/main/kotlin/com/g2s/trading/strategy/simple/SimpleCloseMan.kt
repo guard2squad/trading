@@ -10,6 +10,7 @@ import com.g2s.trading.history.TradingAction.TAKE_PROFIT
 import com.g2s.trading.lock.LockUsage
 import com.g2s.trading.lock.LockUseCase
 import com.g2s.trading.order.OrderSide
+import com.g2s.trading.order.OrderStrategy
 import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
@@ -34,13 +35,12 @@ class SimpleCloseMan(
     private val symbolUseCase: SymbolUseCase,
     private val strategySpecRepository: StrategySpecRepository
 ) {
+    private val scheduler = Executors.newScheduledThreadPool(1)
     private val logger = LoggerFactory.getLogger(this.javaClass)
 
     companion object {
         private const val TYPE = "simple"
     }
-
-    val scheduler = Executors.newScheduledThreadPool(1)
 
     // simple TYPE의 strategySpec들을 관리
     private val specs: ConcurrentHashMap<String, StrategySpec> =
@@ -138,7 +138,7 @@ class SimpleCloseMan(
         // 포지션 닫는 주문 넣음
         positionUseCase.closePosition(
             position,
-            OrderType.LIMIT,
+            OrderStrategy.DUAL_LIMIT,
             takeProfitPrice = caculateLimitPrice(
                 entryPrice.plus(tailLength.multiply(takeProfitFactor)),
                 symbol = position.symbol

@@ -185,6 +185,8 @@ class ExchangeStream(
                             positionUseCase.syncPosition(symbol)
                             // 포지션을 닫을 때만 필요한 작업:
                             positionUseCase.processFilledClosedPosition(orderId)
+                            // 공통으로 필요한 작업
+                            accountUseCase.syncAccount()
                         }
 
                         BinanceUserStreamOrderStatus.CANCELED -> {

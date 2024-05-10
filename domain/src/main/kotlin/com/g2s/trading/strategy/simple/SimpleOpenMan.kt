@@ -222,10 +222,12 @@ class SimpleOpenMan(
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             logger.debug("body length : 0")
             return AnalyzeReport.NonMatchingReport
-        } else if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
-            logger.debug("body length / total length <= 15%")
-            return AnalyzeReport.NonMatchingReport
-        } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
+        }
+//        else if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
+//            logger.debug("body length / total length <= 15%")
+//            return AnalyzeReport.NonMatchingReport
+//        }
+        else if (tailTop > bodyTop && tailBottom == bodyBottom) {
             logger.debug("top tail")
             val tailLength = tailTop - bodyTop  // tailLength = topTailLength
             val candleHammerRatio = tailLength / bodyLength

@@ -35,6 +35,7 @@ class HistoryUseCase(
                 val syncedHistory = processOpenHistoryInfo(it, unsyncedHistory, openCondition)
                 saveOpenHistory(syncedHistory)
             } ?: run {
+                saveOpenHistory(unsyncedHistory)
                 unsyncedOpenPositionHistoryMap.compute(unsyncedHistory) { _, _ ->
                     Triple(
                         position,
@@ -42,7 +43,6 @@ class HistoryUseCase(
                         openCondition
                     )
                 }
-                saveOpenHistory(unsyncedHistory)
             }
         }
     }
@@ -57,6 +57,7 @@ class HistoryUseCase(
                 val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeCondition)
                 saveCloseHistory(syncedHistory)
             } ?: let {
+                saveCloseHistory(unsyncedHistory)
                 unsyncedClosePositionHistoryMap.compute(unsyncedHistory) { _, _ ->
                     Triple(
                         position,
@@ -64,7 +65,6 @@ class HistoryUseCase(
                         closeCondition
                     )
                 }
-                saveCloseHistory(unsyncedHistory)
             }
         }
     }
@@ -75,29 +75,29 @@ class HistoryUseCase(
         val openToRemove = mutableListOf<OpenHistory>()
         val closeToRemove = mutableListOf<CloseHistory>()
         unsyncedOpenPositionHistoryMap.forEach { entry ->
-            val unsyncedHistory = entry.key
+            val openHistory = entry.key
             val triple = entry.value
             val position = triple.first
             val orderId = triple.second
             val openCondition = triple.third
             val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {    // synced
-                val syncedHistory = processOpenHistoryInfo(it, unsyncedHistory, openCondition)
+                val syncedHistory = processOpenHistoryInfo(it, openHistory, openCondition)
                 historyRepository.updateOpenHistory(syncedHistory)
-                openToRemove.add(unsyncedHistory)
+                openToRemove.add(openHistory)
             }
         }
         unsyncedClosePositionHistoryMap.forEach { entry ->
-            val unsyncedHistory = entry.key
+            val closeHistory = entry.key
             val triple = entry.value
             val position = triple.first
             val orderId = triple.second
             val closeCondition = triple.third
             val historyInfo = exchangeImpl.getHistoryInfo(position, orderId)
             historyInfo?.let {
-                val syncedHistory = processCloseHistoryInfo(it, unsyncedHistory, closeCondition)
+                val syncedHistory = processCloseHistoryInfo(it, closeHistory, closeCondition)
                 historyRepository.updateCloseHistory(syncedHistory)
-                closeToRemove.add(unsyncedHistory)
+                closeToRemove.add(closeHistory)
             }
         }
 
@@ -133,7 +133,7 @@ class HistoryUseCase(
         historyKey = OpenHistory.generateHistoryKey(position),
         position = position,
         strategyKey = position.strategyKey,
-        orderId = orderId,
+        binanceOrderId = orderId,
         orderSide = position.orderSide,
         orderType = position.orderType
     )
@@ -142,7 +142,7 @@ class HistoryUseCase(
         historyKey = CloseHistory.generateHistoryKey(position),
         position = position,
         strategyKey = position.strategyKey,
-        orderId = orderId,
+        binanceOrderId = orderId,
         orderSide = position.orderSide,
         orderType = position.orderType
     )

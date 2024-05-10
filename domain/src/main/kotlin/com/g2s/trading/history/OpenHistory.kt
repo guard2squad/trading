@@ -12,7 +12,7 @@ data class OpenHistory(
     val openCondition: OpenCondition? = null,
     val orderSide: OrderSide,
     val orderType: OrderType,
-    val orderId: Long,
+    val binanceOrderId: Long,
     val transactionTime: Long = 0,
     val commission: Double = 0.0,
     val afterBalance: Double = 0.0,

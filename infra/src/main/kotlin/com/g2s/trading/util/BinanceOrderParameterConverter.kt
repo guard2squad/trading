@@ -50,9 +50,13 @@ object BinanceOrderParameterConverter {
         parameters["timeStamp"] = System.currentTimeMillis()
         parameters["positionMode"] = positionMode.toString()
         parameters["positionSide"] = positionSide.toString()
-        // Limit order에서 추가적으로 필요한 Parameter
-        if (orderType == OrderType.LIMIT) {
-            parameters["timeInForce"] = "GTC"
+        // 추가적으로 필요한 Parameter
+        if (orderType == OrderType.TAKE_PROFIT) {
+            parameters["stopPrice"] = price
+            parameters["price"] = price
+        }
+        else if (orderType == OrderType.STOP) {
+            parameters["stopPrice"] = price
             parameters["price"] = price
         }
         return parameters
