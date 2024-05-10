@@ -148,11 +148,12 @@ class SimpleCloseMan(
         )
         if (hasClosed) {
             // 정상적으로 주문 넣은 경우
+            // pendingPositions에 임시 저장했다가, FILLED되면 제거
             pendingPositions.compute(position) { _, _ -> }
         } else {
-            // 시장가 주문
+            // 주문 실패 한 경우 시장가 주문
             positionUseCase.closePosition(position, OrderStrategy.MARKET, marketCloseCondition = stopLossCondition)
-            // 시장가로 손절 주문
+            pendingPositions.compute(position) { _, _ -> }
         }
         // 열린 포지션에서 제거
         opendPositions.remove(position.positionKey)

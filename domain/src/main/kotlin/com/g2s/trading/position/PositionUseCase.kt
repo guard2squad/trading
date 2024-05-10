@@ -112,25 +112,6 @@ class PositionUseCase(
         marketCloseCondition: CloseCondition? = null
     ): Boolean {
         when (orderStrategy) {
-            OrderStrategy.MARKET -> {
-                val originalPosition = position.copy()
-
-                try {
-                    accountUseCase.setUnSynced()
-                    positionRepository.deletePosition(position)
-                    openedPositions.remove(position.positionKey)
-                    val orderId = exchangeImpl.closePosition(position, OrderType.MARKET)
-                    pendingPositions.compute(orderId) { _, _ -> Pair(position, marketCloseCondition!!) }
-                    return true
-                } catch (e: OrderFailException) {
-                    logger.warn(e.message)
-                    openedPositions[originalPosition.positionKey] = originalPosition
-                    positionRepository.savePosition(originalPosition)
-                    accountUseCase.syncAccount()
-                    return false
-                }
-            }
-
             OrderStrategy.DUAL_LIMIT -> {
                 assert(stopLossPrice != 0.0)
                 assert(takeProfitPrice != 0.0)
@@ -160,6 +141,25 @@ class PositionUseCase(
                 }
                 return true
             }
+
+            OrderStrategy.MARKET -> {
+                val originalPosition = position.copy()
+
+                try {
+                    accountUseCase.setUnSynced()
+                    positionRepository.deletePosition(position)
+                    openedPositions.remove(position.positionKey)
+                    val orderId = exchangeImpl.closePosition(position, OrderType.MARKET)
+                    pendingPositions.compute(orderId) { _, _ -> Pair(position, marketCloseCondition!!) }
+                    return true
+                } catch (e: OrderFailException) {
+                    logger.warn(e.message)
+                    openedPositions[originalPosition.positionKey] = originalPosition
+                    positionRepository.savePosition(originalPosition)
+                    accountUseCase.syncAccount()
+                    return false
+                }
+            }
         }
     }
 
@@ -175,11 +175,11 @@ class PositionUseCase(
         // open 주문이 filled된 경우 return
         val pair = pendingPositions[orderId] ?: return
         val positionToRemove = pair.first
-        val orderIdToCancel =
+        val otherOrderId =
             pendingPositions.entries.find { it.key != orderId && it.value.first == positionToRemove }!!.key
         try {
             // 채결된 포지션이 익절이라면 손절 주문 취소, 손절이라면 익절 주문 취소
-            exchangeImpl.cancelOrder(positionToRemove.symbol, orderIdToCancel)
+            exchangeImpl.cancelOrder(positionToRemove.symbol, otherOrderId)
         } catch (e: OrderFailException) {
             logger.warn("주문 취소 실패: " + e.message)
         } finally {
