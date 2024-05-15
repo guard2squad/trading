@@ -1,6 +1,5 @@
 package com.g2s.trading.controller
 
-import com.g2s.trading.strategy.Strategy
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.web.bind.annotation.PostMapping

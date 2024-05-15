@@ -1,9 +1,9 @@
 package com.g2s.trading.repository
 
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
+import com.g2s.trading.strategy.NewStrategySpec
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.FindOneAndReplaceOptions
 import com.mongodb.client.model.ReturnDocument
@@ -29,12 +29,12 @@ class MongoStrategySpecRepository(
         return result
     }
 
-    override fun findAllServiceStrategySpec(): List<StrategySpec> {
+    override fun findAllServiceStrategySpec(): List<NewStrategySpec> {
         val query = Query.query(
-            Criteria.where(StrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
+            Criteria.where(NewStrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
         )
         return mongoTemplate.find(
-            query, StrategySpec::class.java, SPEC_COLLECTION_NAME
+            query, NewStrategySpec::class.java, SPEC_COLLECTION_NAME
         )
     }
 

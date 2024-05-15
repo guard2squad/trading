@@ -1,16 +1,22 @@
 package com.g2s.trading.exchange
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.g2s.trading.account.Account
 import com.g2s.trading.indicator.MarkPrice
-import com.g2s.trading.order.OrderType
-import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.symbol.Symbol
-import java.math.BigDecimal
+import com.g2s.trading.order.NewOrder
+import com.g2s.trading.account.NewAccount
 
 interface Exchange {
-    fun getAccount(): Account
+    fun sendOrder(order: NewOrder)
+    fun cancelOrder(symbol: Symbol, orderId: String)
+    fun getAccount(): NewAccount
+
+    /***
+     *
+     * 절 취 선
+     *
+     */
     fun closePosition(position: Position, orderType: OrderType, price: Double = 0.0): Long
     fun openPosition(position: Position): Long
     fun setPositionMode(positionMode: PositionMode)
@@ -28,4 +34,6 @@ interface Exchange {
     fun getMinPrice(symbol: Symbol): Double
     fun getTickSize(symbol: Symbol): Double
     fun cancelOrder(symbol: Symbol, orderId: Long)
+
+
 }

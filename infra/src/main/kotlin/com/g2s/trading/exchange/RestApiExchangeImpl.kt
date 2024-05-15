@@ -5,18 +5,15 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.g2s.trading.account.Account
 import com.g2s.trading.account.Asset
-import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.exceptions.OrderFailException
 import com.g2s.trading.indicator.MarkPrice
-import com.g2s.trading.order.OrderType
-import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
-import com.g2s.trading.position.PositionSide
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.util.BinanceOrderParameterConverter
+import com.g2s.trading.order.NewOrder
+import com.g2s.trading.account.NewAccount
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
@@ -30,11 +27,23 @@ class RestApiExchangeImpl(
     private val pretty = om.writerWithDefaultPrettyPrinter()
 
     private var positionMode = PositionMode.ONE_WAY_MODE
-    private var positionSide = PositionSide.BOTH
+    private var positionSide = "BOTH"
 
     // TODO(exchange Info 주기적으로 UPDATE)
     // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
+
+    override fun sendOrder(order: NewOrder) {
+        TODO("Not yet implemented")
+    }
+
+
+    /***
+     *
+     *
+     * 절취선
+     *
+     */
 
     override fun setPositionMode(positionMode: PositionMode) {
         this.positionMode = positionMode
@@ -43,21 +52,18 @@ class RestApiExchangeImpl(
         }
     }
 
-    override fun getAccount(): Account {
+    override fun getAccount(): NewAccount {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to System.currentTimeMillis().toString()
         )
         val bodyString = binanceClient.account().accountInformation(parameters)
         val bodyJson = om.readTree(bodyString)
 
-        val assetWallets = (bodyJson.get("assets") as ArrayNode)
-            .filter { jsonNode ->
-                Asset.entries.map { it.name }.contains(jsonNode.get("asset").textValue())
-            }.map {
-                om.convertValue(it, AssetWallet::class.java)
-            }
+        val balance = (bodyJson["assets"] as ArrayNode)
+            .first { it["asset"].textValue() == "USDT" }
+            .map { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }[0]
 
-        return Account(assetWallets)
+        return NewAccount(balance.first, balance.second)
     }
 
     /**

@@ -2,7 +2,6 @@ package com.g2s.trading.repository
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.history.CloseHistory
 import com.g2s.trading.history.HistoryRepository
 import com.g2s.trading.history.OpenHistory
 import org.slf4j.LoggerFactory

@@ -1,6 +1,5 @@
 package com.g2s.trading.repository
 
-import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.mongodb.core.FindAndReplaceOptions

@@ -1,14 +1,12 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.Interval
-import com.g2s.trading.order.OrderType
 import com.g2s.trading.position.PositionMode
-import com.g2s.trading.position.PositionSide
 import com.g2s.trading.symbol.Symbol
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
@@ -22,7 +20,6 @@ import java.util.*
 
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
-@Disabled
 class ExchangeTest {
 
     @Autowired
@@ -36,6 +33,20 @@ class ExchangeTest {
     fun testExchangeInfo() {
         val jsonExchangeInfo = om.readTree(binanceClient.market().exchangeInfo())
         println(pretty.writeValueAsString(jsonExchangeInfo))
+    }
+
+    @Test
+    fun test(){
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val balance = (bodyJson["assets"] as ArrayNode)
+            .first { it["asset"].textValue() == "USDT" }
+            .map { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }[0]
+
     }
 
     /**
@@ -466,7 +477,7 @@ class ExchangeTest {
 
             // 손절 limit 주문 테스트
             run {
-                val orderType = OrderType.STOP
+                val orderType = OrderType.STOP_LOSS
                 val params = linkedMapOf<String, Any>(
                     "symbol" to "BTCUSDT",  // symbol 순회하면서 테스트
                     "side" to "SELL",

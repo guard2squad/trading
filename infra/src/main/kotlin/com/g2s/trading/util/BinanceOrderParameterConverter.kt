@@ -1,10 +1,7 @@
 package com.g2s.trading.util
 
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.order.OrderType
-import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionMode
-import com.g2s.trading.position.PositionSide
 import kotlin.math.absoluteValue
 
 object BinanceOrderParameterConverter {
@@ -55,7 +52,7 @@ object BinanceOrderParameterConverter {
             parameters["stopPrice"] = price
             parameters["price"] = price
         }
-        else if (orderType == OrderType.STOP) {
+        else if (orderType == OrderType.STOP_LOSS) {
             parameters["stopPrice"] = price
             parameters["price"] = price
         }

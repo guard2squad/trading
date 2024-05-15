@@ -5,22 +5,17 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl
 import com.binance.connector.futures.client.utils.JSONParser
 import com.binance.connector.futures.client.utils.RequestHandler
-
-import com.g2s.trading.indicator.MarkPrice
-import com.g2s.trading.event.TradingEvent
-import com.g2s.trading.account.Account
-import com.g2s.trading.account.AccountUseCase
 import com.g2s.trading.account.Asset
-import com.g2s.trading.account.AssetWallet
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.Interval
-import com.g2s.trading.position.PositionRefreshData
-import com.g2s.trading.position.PositionSide
-import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.symbol.Symbol
-import com.g2s.trading.symbol.SymbolUseCase
+import com.g2s.trading.position.NewPositionUseCase
+import com.g2s.trading.symbol.NewSymbolUseCase
+import com.g2s.trading.event.NewTradingEvent
+import com.g2s.trading.account.NewAccountUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -31,9 +26,9 @@ class ExchangeStream(
     private val binanceClient: UMFuturesClientImpl,
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
     private val eventUseCase: EventUseCase,
-    private val positionUseCase: PositionUseCase,
-    private val accountUseCase: AccountUseCase,
-    private val symbolUseCase: SymbolUseCase
+    private val positionUseCase: NewPositionUseCase,
+    private val accountUseCase: NewAccountUseCase,
+    private val symbolUseCase: NewSymbolUseCase
 ) {
     private val om = ObjectMapperProvider.get()
     private val pretty = om.writerWithDefaultPrettyPrinter()
@@ -100,7 +95,7 @@ class ExchangeStream(
             )
 
             eventUseCase.publishEvent(
-                TradingEvent.CandleStickEvent(candleStick)
+                NewTradingEvent.CandleStickEvent(candleStick)
             )
         }
 
@@ -115,7 +110,7 @@ class ExchangeStream(
 
             val markPrice = MarkPrice(receivedSymbol, lastMarkPrice)
             eventUseCase.publishEvent(
-                TradingEvent.MarkPriceRefreshEvent(markPrice)
+                NewTradingEvent.MarkPriceRefreshEvent(markPrice)
             )
         }
 

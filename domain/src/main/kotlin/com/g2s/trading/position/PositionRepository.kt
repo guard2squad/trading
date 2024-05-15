@@ -4,8 +4,8 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface PositionRepository {
-    fun findAllPositions(): List<Position>
-    fun savePosition(position: Position)
-    fun updatePosition(position: Position)
-    fun deletePosition(position: Position)
+    fun findAllPositions(): List<NewPosition>
+    fun savePosition(position: NewPosition)
+    fun updatePosition(position: NewPosition)
+    fun deletePosition(position: NewPosition)
 }
