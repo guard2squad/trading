@@ -38,6 +38,15 @@ class NewPositionUseCase(
     fun addCloseOrder(order: NewCloseOrder) {
         val position = openedPositions[order.positionId]
         position!!.closeOrders.add(order)
+        // TODO("UPDATE POSITION")
+        positionRepository.updateCloseOrders(position.id, position.closeOrders)
+    }
+
+    fun removeCloseOrder(order: NewCloseOrder) {
+        val position = openedPositions[order.positionId]
+        position!!.closeOrders.remove(order)
+        // TODO("UPDATE POSITION")
+        positionRepository.updateCloseOrders(position.id, position.closeOrders)
     }
 
     fun openPosition(pendingOrder: NewOpenOrder.MarketOrder, completeOrder: OrderResult) {
@@ -49,6 +58,8 @@ class NewPositionUseCase(
         )
 
         openedPositions[position.id] = position
+        // TODO("SAVE POSITION")
+        positionRepository.savePosition(position)
         eventUseCase.publishEvent(NewPositionEvent.PositionOpenedEvent(position))
         TODO("history")
     }
@@ -56,6 +67,8 @@ class NewPositionUseCase(
     fun closePosition(positionId: String): NewPosition? {
         val position = openedPositions.remove(positionId)
         position?.let {
+            // TODO("DELETE POSITION")
+            positionRepository.deletePosition(position.id)
             eventUseCase.publishEvent(NewPositionEvent.PositionClosedEvent(position))
         }
         TODO("history")

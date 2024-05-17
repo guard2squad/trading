@@ -11,29 +11,17 @@ interface Exchange {
     fun sendOrder(order: NewOrder)
     fun cancelOrder(symbol: Symbol, orderId: String)
     fun getAccount(): NewAccount
-
-    /***
-     *
-     * 절 취 선
-     *
-     */
-    fun closePosition(position: Position, orderType: OrderType, price: Double = 0.0): Long
-    fun openPosition(position: Position): Long
-    fun setPositionMode(positionMode: PositionMode)
     fun getMarkPrice(symbol: Symbol): MarkPrice
-    fun getPosition(symbol: Symbol): Position
-    fun getQuantityPrecision(symbol: Symbol): Int
-    fun getMinQty(symbol: Symbol): Double
-    fun getMinNotionalValue(symbol: Symbol): Double
-    fun getLeverage(symbol: Symbol): Int
-    fun setLeverage(symbol: Symbol, leverage: Int): Int
-    fun getHistoryInfo(position: Position, orderId: Long): JsonNode?
+    fun setPositionMode(positionMode: PositionMode)
+    fun getQuantityPrecision(symbolValue: String): Int
+    fun getPricePrecision(symbolValue: String): Int
+    fun getMinQty(symbolValue: String): Double
+    fun getMinPrice(symbolValue: String): Double
+    fun getMinNotionalValue(symbolValue: String): Double
+    fun getTickSize(symbolValue: String): Double
+    fun getCommissionRate(symbolValue: String): Double
+    fun getLeverage(symbolValue: String): Int
+    fun setLeverage(symbolValue: String, leverage: Int): Int
+    fun getHistoryInfo(order: NewOrder): JsonNode?
     fun getCurrentBalance(timeStamp: Long): Double
-    fun getCommissionRate(symbol: Symbol): Double
-    fun getPricePrecision(symbol: Symbol): Int
-    fun getMinPrice(symbol: Symbol): Double
-    fun getTickSize(symbol: Symbol): Double
-    fun cancelOrder(symbol: Symbol, orderId: Long)
-
-
 }

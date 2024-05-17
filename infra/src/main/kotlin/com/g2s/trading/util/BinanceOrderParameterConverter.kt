@@ -1,61 +1,43 @@
 package com.g2s.trading.util
 
+import com.g2s.trading.order.NewCloseOrder
+import com.g2s.trading.order.NewOpenOrder
+import com.g2s.trading.order.NewOrder
 import com.g2s.trading.order.OrderSide
-import com.g2s.trading.position.PositionMode
-import kotlin.math.absoluteValue
 
 object BinanceOrderParameterConverter {
-    fun toBinanceOpenPositionParam(
-        position: Position,
-        positionMode: PositionMode,
-        positionSide: PositionSide
-    ): LinkedHashMap<String, Any> {
-        val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = position.symbol.value
-        parameters["side"] = when (position.orderSide) {
+
+    fun toNewOrderParam(order: NewOrder): LinkedHashMap<String, Any> {
+        val parameters = linkedMapOf<String, Any>(
+            "symbol" to order.symbol.value,
+            "quantity" to order.amount,
+            "timeStamp" to System.currentTimeMillis(),
+            "positionMode" to "ONE_WAY_MODE"
+        )
+
+        when (order) {
+            is NewOpenOrder.MarketOrder -> {
+                parameters["type"] = "MARKET"
+            }
+
+            is NewCloseOrder.NewTakeProfitOrder -> {
+                parameters["type"] = "TAKE_PROFIT"
+                parameters["stopPrice"] = order.price
+                parameters["price"] = order.price
+            }
+
+            is NewCloseOrder.NewStopLossOrder -> {
+                parameters["type"] = "STOP_LOSS"
+                parameters["stopPrice"] = order.price
+                parameters["price"] = order.price
+            }
+        }
+
+        parameters["side"] = when (order.side) {
             OrderSide.LONG -> "BUY"
             OrderSide.SHORT -> "SELL"
         }
-        parameters["type"] = position.orderType.toString()
-        parameters["quantity"] = position.positionAmt.toString()
-        parameters["timeStamp"] = System.currentTimeMillis()
-        parameters["positionMode"] = positionMode.toString()
-        parameters["positionSide"] = positionSide.toString()
-        // Limit order에서 추가적으로 필요한 Parameter
-        if (position.orderType == OrderType.LIMIT) {
-            parameters["timeInForce"] = "GTX"
-            parameters["price"] = position.entryPrice
-        }
-        return parameters
-    }
 
-    fun toBinanceClosePositionParam(
-        position: Position,
-        orderType: OrderType,
-        price: Double = 0.0,
-        positionMode: PositionMode,
-        positionSide: PositionSide
-    ): LinkedHashMap<String, Any> {
-        val parameters = LinkedHashMap<String, Any>()
-        parameters["symbol"] = position.symbol.value
-        parameters["side"] = when (position.orderSide) {
-            OrderSide.LONG -> "SELL"
-            OrderSide.SHORT -> "BUY"
-        }
-        parameters["type"] = orderType.toString()
-        parameters["quantity"] = position.positionAmt.absoluteValue.toString()
-        parameters["timeStamp"] = System.currentTimeMillis()
-        parameters["positionMode"] = positionMode.toString()
-        parameters["positionSide"] = positionSide.toString()
-        // 추가적으로 필요한 Parameter
-        if (orderType == OrderType.TAKE_PROFIT) {
-            parameters["stopPrice"] = price
-            parameters["price"] = price
-        }
-        else if (orderType == OrderType.STOP_LOSS) {
-            parameters["stopPrice"] = price
-            parameters["price"] = price
-        }
         return parameters
     }
 }

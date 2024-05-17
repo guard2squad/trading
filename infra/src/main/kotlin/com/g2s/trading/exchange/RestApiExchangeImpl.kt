@@ -4,17 +4,17 @@ import com.binance.connector.futures.client.exceptions.BinanceClientException
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.g2s.trading.account.Asset
+import com.g2s.trading.account.NewAccount
 import com.g2s.trading.common.ObjectMapperProvider
-import com.g2s.trading.exceptions.OrderFailException
+import com.g2s.trading.order.OrderFailErrors
 import com.g2s.trading.indicator.MarkPrice
+import com.g2s.trading.order.NewOrder
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.util.BinanceOrderParameterConverter
-import com.g2s.trading.order.NewOrder
-import com.g2s.trading.account.NewAccount
 import org.slf4j.LoggerFactory
+import org.slf4j.event.Level
 import org.springframework.stereotype.Component
 
 
@@ -28,151 +28,15 @@ class RestApiExchangeImpl(
 
     private var positionMode = PositionMode.ONE_WAY_MODE
     private var positionSide = "BOTH"
-
-    // TODO(exchange Info 주기적으로 UPDATE)
-    // Exchange MetaData
     private var exchangeInfo: JsonNode = om.readTree(binanceClient.market().exchangeInfo())
-
-    override fun sendOrder(order: NewOrder) {
-        TODO("Not yet implemented")
-    }
-
-
-    /***
-     *
-     *
-     * 절취선
-     *
-     */
-
-    override fun setPositionMode(positionMode: PositionMode) {
-        this.positionMode = positionMode
-        if (positionMode == PositionMode.ONE_WAY_MODE) {
-            this.positionSide = PositionSide.BOTH
-        }
-    }
-
-    override fun getAccount(): NewAccount {
-        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "timestamp" to System.currentTimeMillis().toString()
-        )
-        val bodyString = binanceClient.account().accountInformation(parameters)
-        val bodyJson = om.readTree(bodyString)
-
-        val balance = (bodyJson["assets"] as ArrayNode)
-            .first { it["asset"].textValue() == "USDT" }
-            .map { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }[0]
-
-        return NewAccount(balance.first, balance.second)
-    }
-
-    /**
-     * 포지션을 close하고, 생성된 주문의 ID를 positionOrderIdMap에 저장합니다.
-     *
-     * @param position 종료할 포지션 정보를 담은 객체입니다.
-     * @throws OrderFailException 주문 실패 시 예외를 발생시킵니다.
-     *
-     * 주문 결과(`orderResult`) 예시:
-     * ```json
-     * {
-     *     "clientOrderId": "testOrder",
-     *     "cumQty": "0",
-     *     "cumQuote": "0",
-     *     "executedQty": "0",
-     *     "orderId": 22542179,
-     *     "avgPrice": "0.00000",
-     *     "origQty": "10",
-     *     "price": "0",
-     *     "reduceOnly": false,
-     *     "side": "BUY",
-     *     "positionSide": "SHORT",
-     *     "status": "NEW",
-     *     "stopPrice": "9300",        // please ignore when order type is TRAILING_STOP_MARKET
-     *     "closePosition": false,   // if Close-All
-     *     "symbol": "BTCUSDT",
-     *     "timeInForce": "GTD",
-     *     "type": "TRAILING_STOP_MARKET",
-     *     "origType": "TRAILING_STOP_MARKET",
-     *     "activatePrice": "9020",    // activation price, only return with TRAILING_STOP_MARKET order
-     *     "priceRate": "0.3",         // callback rate, only return with TRAILING_STOP_MARKET order
-     *     "updateTime": 1566818724722,
-     *     "workingType": "CONTRACT_PRICE",
-     *     "priceProtect": false,      // if conditional order trigger is protected
-     *     "priceMatch": "NONE",              //price match mode
-     *     "selfTradePreventionMode": "NONE", //self trading preventation mode
-     *     "goodTillDate": 1693207680000      //order pre-set auot cancel time for TIF GTD order
-     *     }
-     * ```
-     */
-    override fun closePosition(position: Position, orderType: OrderType, price: Double): Long {
-        val params =
-            BinanceOrderParameterConverter.toBinanceClosePositionParam(
-                position,
-                orderType,
-                price,
-                positionMode,
-                positionSide
-            )
-        try {
-            val orderResult = sendOrder(params)
-            val orderId = om.readTree(orderResult).get("orderId").asLong()
-
-            return orderId
-        } catch (e: OrderFailException) {
-            throw e
-        }
-    }
-
-    override fun openPosition(position: Position): Long {
-        val params = BinanceOrderParameterConverter.toBinanceOpenPositionParam(position, positionMode, positionSide)
-        try {
-            val orderResult = sendOrder(params)
-            val orderId = om.readTree(orderResult).get("orderId").asLong()
-
-            return orderId
-        } catch (e: OrderFailException) {
-            throw e
-        }
-    }
-
-    override fun getPosition(symbol: Symbol): Position {
-        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol.value,
-            "timestamp" to System.currentTimeMillis().toString()
-        )
-        val jsonString = binanceClient.account().positionInformation(parameters)
-
-        val position = om.readValue<List<Position>>(jsonString).first()
-
-        return position
-    }
 
     /**
      * POST /fapi/v1/order
      *
-     * Request 예시:
-     * ```json
-     * {
-     *     "id": "3f7df6e3-2df4-44b9-9919-d2f38f90a99a",
-     *     "method": "order.place",
-     *     "params": {
-     *         "apiKey": "HMOchcfii9ZRZnhjp2XjGXhsOBd6msAhKz9joQaWwZ7arcJTlD2hGPHQj1lGdTjR",
-     *         "positionSide": "BOTH",
-     *         "price": "43187.00",
-     *         "quantity": 0.1,
-     *         "side": "BUY",
-     *         "symbol": "BTCUSDT",
-     *         "timeInForce": "GTC",
-     *         "timestamp": 1702555533821,
-     *         "type": "LIMIT",
-     *         "signature": "0f04368b2d22aafd0ggc8809ea34297eff602272917b5f01267db4efbc1c9422"
-     *     }
-     * }
-     * ```
+     * newClientOrderId: A unique id among open orders.
      *
-     * @queryParameter newClientOrderId: A unique id among open orders.
      * Automatically generated if not sent. Can only be string following the rule: ^[\.A-Z\:/a-z0-9_-]{1,36}$
-     * 요청할 때 newClientOrderId에 값 넣으면 response의 clientOrderId에 동일한 값으로 설정됨
+     * 요청할 때 newClientOrderId에 값을 넣으면 응답의 clientOrderId이 동일한 값으로 설정됨
      *
      * response 예시:
      * ```json
@@ -206,15 +70,84 @@ class RestApiExchangeImpl(
      * }
      * ```
      */
-    private fun sendOrder(params: LinkedHashMap<String, Any>): String {
+    override fun sendOrder(order: NewOrder) {
+        val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
+
         try {
-            val response: String = binanceClient.account().newOrder(params)
-            logger.info("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
-            return response
+            val response: String = binanceClient.account().newOrder(parameters)
+            logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            logger.warn("$params\n" + e.errMsg)
-            throw OrderFailException(params["type"].toString() + " 선물 주문 실패")
+            logger.warn("$parameters\n" + e.errMsg)
+            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.WARN, e.errMsg)
         }
+    }
+
+    /**
+     * DELETE /fapi/v1/order
+     *
+     * Parameters:
+     * Name	                Type	Mandatory(필수 여부)
+     * symbol	            STRING	YES
+     * orderId	            LONG	NO
+     * origClientOrderId	STRING	NO
+     * recvWindow	        LONG	NO
+     * timestamp	        LONG	YES
+     *
+     * Either orderId or origClientOrderId must be sent.
+     *
+     * Response 예시:
+     *
+     * {
+     *     "clientOrderId": "myOrder1",
+     *     "cumQty": "0",
+     *     "cumQuote": "0",
+     *     "executedQty": "0",
+     *     "orderId": 283194212,
+     *     "origQty": "11",
+     *     "origType": "TRAILING_STOP_MARKET",
+     *     "price": "0",
+     *     "reduceOnly": false,
+     *     "side": "BUY",
+     *     "positionSide": "SHORT",
+     *     "status": "CANCELED",
+     *     "stopPrice": "9300",                // please ignore when order type is TRAILING_STOP_MARKET
+     *     "closePosition": false,   // if Close-All
+     *     "symbol": "BTCUSDT",
+     *     "timeInForce": "GTC",
+     *     "type": "TRAILING_STOP_MARKET",
+     *     "activatePrice": "9020",            // activation price, only return with TRAILING_STOP_MARKET order
+     *     "priceRate": "0.3",                 // callback rate, only return with TRAILING_STOP_MARKET order
+     *     "updateTime": 1571110484038,
+     *     "workingType": "CONTRACT_PRICE",
+     *     "priceProtect": false,            // if conditional order trigger is protected
+     *     "priceMatch": "NONE",              //price match mode
+     *     "selfTradePreventionMode": "NONE", //self trading preventation mode
+     *     "goodTillDate": 0                  //order pre-set auot cancel time for TIF GTD order
+     * }
+     *
+     */
+    override fun cancelOrder(symbol: Symbol, orderId: String) {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to symbol.value,
+            "orderId" to orderId
+        )
+        val response = binanceClient.account().cancelOrder(params)
+        // debug
+        val jsonResponse = om.readTree(response)
+        logger.debug(pretty.writeValueAsString(jsonResponse))
+    }
+
+    override fun getAccount(): NewAccount {
+        val parameters: LinkedHashMap<String, Any> = linkedMapOf(
+            "timestamp" to System.currentTimeMillis().toString()
+        )
+        val bodyString = binanceClient.account().accountInformation(parameters)
+        val bodyJson = om.readTree(bodyString)
+
+        val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
+            .let { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }
+
+        return NewAccount(balance.first, balance.second)
     }
 
     override fun getMarkPrice(symbol: Symbol): MarkPrice {
@@ -229,28 +162,63 @@ class RestApiExchangeImpl(
         )
     }
 
-    override fun getQuantityPrecision(symbol: Symbol): Int {
+    override fun setPositionMode(positionMode: PositionMode) {
+        this.positionMode = positionMode
+        if (positionMode == PositionMode.ONE_WAY_MODE) {
+            this.positionSide = "BOTH"
+        }
+    }
+
+
+    override fun getQuantityPrecision(symbolValue: String): Int {
         return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("quantityPrecision").asInt()
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("quantityPrecision").asInt()
+    }
+
+    override fun getPricePrecision(symbolValue: String): Int {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("pricePrecision").asInt()
     }
 
     // 시장가 주문일 때만 적용
     // 시장가 주문이 아닐 때 filterType : LOT_SIZE
-    override fun getMinQty(symbol: Symbol): Double {
+    override fun getMinQty(symbolValue: String): Double {
         return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("filters")
             .find { node -> node.get("filterType").asText() == "MARKET_LOT_SIZE" }!!.get("minQty").asDouble()
     }
 
-    override fun getMinNotionalValue(symbol: Symbol): Double {
+    override fun getMinPrice(symbolValue: String): Double {
         return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("filters")
+            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("minPrice").asDouble()
+    }
+
+    override fun getMinNotionalValue(symbolValue: String): Double {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("filters")
             .find { node -> node.get("filterType").asText() == "MIN_NOTIONAL" }!!.get("notional").asDouble()
     }
 
-    override fun getLeverage(symbol: Symbol): Int {
+    override fun getTickSize(symbolValue: String): Double {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("filters")
+            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("tickSize").asDouble()
+    }
+
+    override fun getCommissionRate(symbolValue: String): Double {
+        val params = linkedMapOf<String, Any>(
+            "symbol" to symbolValue
+        )
+        val jsonResponse = om.readTree(binanceClient.account().getCommissionRate(params))
+        val takerCommissionRate = jsonResponse["takerCommissionRate"].asDouble()
+
+        return takerCommissionRate
+    }
+
+    override fun getLeverage(symbolValue: String): Int {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol.value
+            "symbol" to symbolValue
         )
         val jsonResponse = om.readTree(binanceClient.account().positionInformation(parameters))
         val leverage = jsonResponse.get(0).get("leverage").asInt()
@@ -258,9 +226,9 @@ class RestApiExchangeImpl(
         return leverage
     }
 
-    override fun setLeverage(symbol: Symbol, leverage: Int): Int {
+    override fun setLeverage(symbolValue: String, leverage: Int): Int {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to symbol.value,
+            "symbol" to symbolValue,
             "leverage" to leverage
         )
         val jsonResponse = om.readTree(binanceClient.account().changeInitialLeverage(parameters))
@@ -271,9 +239,6 @@ class RestApiExchangeImpl(
 
     /**
      * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
-     *
-     * 이 함수는 Binance 클라이언트를 통해 계정 정보를 요청하고, 반환된 JSON 데이터에서 "assets" 배열을 분석하여
-     * "USDT" 자산의 "walletBalance" 값을 추출하여 반환합니다.
      *
      * @param timeStamp 조회할 시점의 타임스탬프입니다. 이 값은 요청 파라미터로 전달됩니다.
      * @return 조회된 USDT 자산의 지갑 잔액을 `Double` 타입으로 반환합니다.
@@ -293,7 +258,7 @@ class RestApiExchangeImpl(
     }
 
     /**
-     * 해당 포지션과 주문 ID를 기반으로 거래 기록을 조회합니다.
+     * 주문 ID를 기반으로 거래 기록을 조회합니다.
      * <p>
      * 이 메서드는 지정된 포지션과 주문 ID에 대한 거래 기록을 Binance API(GET /fapi/v1/userTrades)를 통해 조회하고,
      * 조회된 데이터는 JSON 배열 형태로 반환됩니다. 각 배열 요소는 거래에 대한 상세 정보를 포함하며,
@@ -340,62 +305,24 @@ class RestApiExchangeImpl(
      * ]
      * </pre>
      *
-     * @param position  조회할 포지션 객체
-     * @param orderId   조회할 거래의 주문 ID
+     * @param order 조회할 주문
      * @return JSON 배열 형태의 거래 기록 데이터 노드. 거래 기록이 없거나 오류가 발생한 경우 null 반환
      */
-    override fun getHistoryInfo(position: Position, orderId: Long): JsonNode? {
+    override fun getHistoryInfo(order: NewOrder): JsonNode? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
-            "symbol" to position.symbol.value,
-            "orderId" to orderId
+            "symbol" to order.symbol.value,
+            "orderId" to order.id
         )
 
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         logger.info("HISTORY INFO: " + om.writerWithDefaultPrettyPrinter().writeValueAsString(jsonResponse))
 
         if (jsonResponse == null || jsonResponse.isEmpty) {
-            logger.warn("Invalid or empty response for orderId: $orderId")
-            logger.warn("positionKey: {},openTime: {},", position.positionKey, position.openTime)
+            logger.warn("Invalid or empty response for orderId: $order.id")
             return null
         }
 
         return jsonResponse
     }
 
-    override fun getCommissionRate(symbol: Symbol): Double {
-        val params = linkedMapOf<String, Any>(
-            "symbol" to symbol.value
-        )
-        val jsonResponse = om.readTree(binanceClient.account().getCommissionRate(params))
-        val takerCommissionRate = jsonResponse["takerCommissionRate"].asDouble()
-
-        return takerCommissionRate
-    }
-
-    override fun getPricePrecision(symbol: Symbol): Int {
-        return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("pricePrecision").asInt()
-    }
-
-    override fun getMinPrice(symbol: Symbol): Double {
-        return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
-            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("minPrice").asDouble()
-    }
-
-    override fun getTickSize(symbol: Symbol): Double {
-        return exchangeInfo.get("symbols")
-            .find { node -> node.get("symbol").asText() == symbol.value }!!.get("filters")
-            .find { node -> node.get("filterType").asText() == "PRICE_FILTER" }!!.get("tickSize").asDouble()
-    }
-
-    override fun cancelOrder(symbol: Symbol, orderId: Long) {
-        val params = linkedMapOf<String, Any>(
-            "symbol" to symbol.value,
-            "orderId" to orderId
-        )
-        val response = binanceClient.account().cancelOrder(params)
-        val jsonResponse = om.readTree(response)
-        logger.debug("주문 취소: " + pretty.writeValueAsString(jsonResponse))
-    }
 }

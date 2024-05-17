@@ -24,7 +24,6 @@ import com.g2s.trading.strategy.NewStrategy
 import com.g2s.trading.strategy.NewStrategySpec
 import com.g2s.trading.strategy.NewStrategyType
 import com.g2s.trading.symbol.NewSymbolUseCase
-import com.g2s.trading.position.NewPositionUseCase
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -34,7 +33,6 @@ import kotlin.reflect.KClass
 
 @Component
 class SingleCandleStrategy(
-    private val positionUseCase: NewPositionUseCase,
     private val accountUseCase: NewAccountUseCase,
     private val symbolUseCase: NewSymbolUseCase,
     private val markPriceUseCase: MarkPriceUseCase,
@@ -66,7 +64,7 @@ class SingleCandleStrategy(
         val candleStick = event.source
 
         // check symbol
-        if (!spec.symbols.contains(candleStick.symbol)) {
+        if (!spec.symbols.contains(candleStick.symbol.value)) {
             return
         }
 
@@ -90,6 +88,7 @@ class SingleCandleStrategy(
 
                 // TODO(테스트후 캔들스틱 유효성 검사 추가)
 
+
                 // 오픈 가능한 symbol 확인
                 val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
                 val hammerRatio = spec.op["hammerRatio"].asDouble()
@@ -106,12 +105,12 @@ class SingleCandleStrategy(
                             price = markPrice.price,
                             amount = quantity(
                                 balance = money.amount,
-                                minNotional = BigDecimal(symbolUseCase.getMinNotionalValue(analyzeReport.symbol)),
+                                minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
                                 markPrice = BigDecimal(markPrice.price),
                                 takeProfitFactor = takeProfitFactor,
                                 stopLossFactor = stopLossFactor,
                                 tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
-                                quantityPrecision = symbolUseCase.getQuantityPrecision(analyzeReport.symbol),
+                                quantityPrecision = analyzeReport.symbol.quantityPrecision,
                                 orderSide = analyzeReport.orderSide
                             ),
                             side = analyzeReport.orderSide,
@@ -338,7 +337,7 @@ class SingleCandleStrategy(
     }
 
     private fun isPositivePnl(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
-        val commissionRate = symbolUseCase.getCommissionRate(symbol)
+        val commissionRate = symbol.commissionRate
         val pnl = (open - close).abs()
         val fee = (open + close).multiply(BigDecimal(commissionRate))
 

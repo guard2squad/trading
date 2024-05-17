@@ -5,17 +5,18 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl
 import com.binance.connector.futures.client.utils.JSONParser
 import com.binance.connector.futures.client.utils.RequestHandler
-import com.g2s.trading.account.Asset
+import com.g2s.trading.account.NewAccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.event.EventUseCase
+import com.g2s.trading.event.NewTradingEvent
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.Interval
 import com.g2s.trading.indicator.MarkPrice
-import com.g2s.trading.symbol.Symbol
+import com.g2s.trading.order.NewOrderUseCase
+import com.g2s.trading.order.OrderResult
 import com.g2s.trading.position.NewPositionUseCase
 import com.g2s.trading.symbol.NewSymbolUseCase
-import com.g2s.trading.event.NewTradingEvent
-import com.g2s.trading.account.NewAccountUseCase
+import com.g2s.trading.symbol.Symbol
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -26,6 +27,7 @@ class ExchangeStream(
     private val binanceClient: UMFuturesClientImpl,
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
     private val eventUseCase: EventUseCase,
+    private val orderUseCase: NewOrderUseCase,
     private val positionUseCase: NewPositionUseCase,
     private val accountUseCase: NewAccountUseCase,
     private val symbolUseCase: NewSymbolUseCase
@@ -80,10 +82,9 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.klineStream(symbol.value, interval.value) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val jsonKlineData = eventJson.get("k")
-            val symbolValue = Symbol.valueOf(jsonKlineData.get("s").asText())
             val intervalValue = Interval.from(jsonKlineData.get("i").asText())
             val candleStick = CandleStick(
-                symbol = symbolValue,
+                symbol = symbol,
                 interval = intervalValue,
                 key = jsonKlineData.get("t").asLong(),
                 open = jsonKlineData.get("o").asDouble(),
@@ -106,9 +107,7 @@ class ExchangeStream(
         val connectionId = binanceWebsocketClientImpl.markPriceStream(symbol.value, speed.value) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val lastMarkPrice = eventJson.get("p").asDouble()
-            val receivedSymbol = Symbol.valueOf(eventJson.get("s").asText())
-
-            val markPrice = MarkPrice(receivedSymbol, lastMarkPrice)
+            val markPrice = MarkPrice(symbol, lastMarkPrice)
             eventUseCase.publishEvent(
                 NewTradingEvent.MarkPriceRefreshEvent(markPrice)
             )
@@ -117,76 +116,111 @@ class ExchangeStream(
         return connectionId
     }
 
+    /**
+     * {
+     *   "e": "ACCOUNT_UPDATE",                // Event Type
+     *   "E": 1564745798939,                   // Event Time
+     *   "T": 1564745798938 ,                  // Transaction
+     *   "a":                                  // Update Data
+     *     {
+     *       "m":"ORDER",                      // Event reason type
+     *       "B":[                             // Balances
+     *         {
+     *           "a":"USDT",                   // Asset
+     *           "wb":"122624.12345678",       // Wallet Balance
+     *           "cw":"100.12345678",          // Cross Wallet Balance
+     *           "bc":"50.12345678"            // Balance Change except PnL and Commission
+     *         },
+     *         {
+     *           "a":"BUSD",
+     *           "wb":"1.00000000",
+     *           "cw":"0.00000000",
+     *           "bc":"-49.12345678"
+     *         }
+     *       ],
+     *       "P":[
+     *         {
+     *           "s":"BTCUSDT",            // Symbol
+     *           "pa":"0",                 // Position Amount
+     *           "ep":"0.00000",           // Entry Price
+     *           "bep":"0",                // breakeven price
+     *           "cr":"200",               // (Pre-fee) Accumulated Realized
+     *           "up":"0",                 // Unrealized PnL
+     *           "mt":"isolated",          // Margin Type
+     *           "iw":"0.00000000",        // Isolated Wallet (if isolated position)
+     *           "ps":"BOTH"               // Position Side
+     *         }，
+     *         {
+     *           "s":"BTCUSDT",
+     *           "pa":"20",
+     *           "ep":"6563.66500",
+     *           "bep":"6563.6",
+     *           "cr":"0",
+     *           "up":"2850.21200",
+     *           "mt":"isolated",
+     *           "iw":"13200.70726908",
+     *           "ps":"LONG"
+     *         },
+     *         {
+     *           "s":"BTCUSDT",
+     *           "pa":"-10",
+     *           "ep":"6563.86000",
+     *           "bep":"6563.6",
+     *           "cr":"-45.04000000",
+     *           "up":"-1423.15600",
+     *           "mt":"isolated",
+     *           "iw":"6570.42511771",
+     *           "ps":"SHORT"
+     *         }
+     *       ]
+     *     }
+     * }
+     */
     private fun openUserStream(listenKey: String): Int {
         val connectionId = binanceWebsocketClientImpl.listenUserStream(listenKey) { event ->
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val eventType = eventJson.get("e").textValue()
-            // DEBUG
-            logger.debug(pretty.writeValueAsString(eventJson))
             when (eventType) {
                 BinanceUserStreamEventType.ACCOUNT_UPDATE.toString() -> {
                     val jsonBalanceAndPosition = eventJson.get("a")
                     val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
-                    // Account Update
+                    // TODO: Account Update 할 지 미정
                     val jsonBalances = jsonBalanceAndPosition.get("B")
-                    val assetWallets = jsonBalances.filter { jsonBalance ->
-                        Asset.entries.map { it.name }.contains(jsonBalance.get("a").asText())
-                    }.map { node ->
-                        AssetWallet(
-                            asset = Asset.valueOf(node.get("a").asText()),
-                            walletBalance = node.get("wb").asDouble()
-                        )
-                    }
-                    val account = Account(assetWallets)
-                    accountUseCase.refreshAccount(account)
                     // Position Update
                     val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
-                        PositionRefreshData(
-                            symbol = Symbol.valueOf(node.get("s").asText()),
-                            entryPrice = node.get("ep").asDouble(),
-                            positionAmt = node.get("pa").asDouble(),
-                            positionSide = PositionSide.valueOf(node.get("ps").asText()),
-                        )
+                        val symbolValue = node["s"].asText()
+                        val entryPrice = node["ep"].asDouble()
+                        val amount = node["pa"].asDouble()
+                        val side = node["ps"].asText()
+                    // TODO: Position Update 할 지 미정
                     }
                     // Event reason type == ORDER 일 때 포지션 데이터 변동
                     if (accountUpdateEventReasonType == BinanceAccountUpdateEventReasonType.ORDER.name) {
                         // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개임
                         assert(positionRefreshDataList.size == 1)
                         val positionRefreshData = positionRefreshDataList[0]
-                        if (positionRefreshData.positionAmt != 0.0 && positionRefreshData.entryPrice != 0.0) {
-                            positionUseCase.refreshPosition(positionRefreshData)
-                            logger.debug(
-                                "POSITION_UPDATE_EVENT" +
-                                        "\n - refreshedPositionAmt: ${positionRefreshData.positionAmt}" +
-                                        "\n - entryPrice: ${positionRefreshData.entryPrice}" +
-                                        "\n - symbol: ${positionRefreshData.symbol.value}"
-                            )
-                        }
                     }
                 }
 
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString() -> {
                     val jsonOrder = eventJson.get("o")
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
-                    val orderId = jsonOrder.get("i").asLong()
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
                             // DO NOTHING
                         }
-                        // Order Status가 FILLED되면 refresh account and position | publish accumulatedCommision and accumulatedRP
                         BinanceUserStreamOrderStatus.FILLED -> {
-                            val symbol = Symbol.valueOf(jsonOrder.get("s").asText())
-                            // 포지션을 열 때만 필요한 작업: sync position
-                            positionUseCase.syncPosition(symbol)
-                            // 포지션을 닫을 때만 필요한 작업:
-                            positionUseCase.processFilledClosedPosition(orderId)
-                            // 공통으로 필요한 작업
-                            accountUseCase.syncAccount()
+                            val orderResult = OrderResult(
+                                orderId = jsonOrder["c"].asText(),
+                                symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
+                                price = jsonOrder["ap"].asDouble(),
+                                amount = jsonOrder["z"].asDouble(),
+                            )
+                            orderUseCase.handleResult(orderResult)
                         }
 
                         BinanceUserStreamOrderStatus.CANCELED -> {
-                            // OCO에 따라서 CLOSE 주문(익절/손절)중 하나의 주문이 체결되면, 다른 주문은 취소됨
-                            positionUseCase.processCancelledPosition(orderId)
+                            // DO NOTHING
                         }
 
                         BinanceUserStreamOrderStatus.PARTIALLY_FILLED -> {

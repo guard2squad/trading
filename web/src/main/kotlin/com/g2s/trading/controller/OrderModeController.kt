@@ -1,5 +1,6 @@
 package com.g2s.trading.controller
 
+import com.g2s.trading.strategy.NewStrategy
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.web.bind.annotation.PostMapping
@@ -13,7 +14,7 @@ class OrderModeController {
 
     @Autowired
     private lateinit var applicationContext: ApplicationContext
-    private var strategies: List<Strategy>? = null
+    private var strategies: List<NewStrategy>? = null
     private var isReedy = false
 
     @PostMapping
@@ -24,11 +25,12 @@ class OrderModeController {
         if (!isReedy) {
             setUp()
         }
-        strategies?.first { it.getTypeOfStrategy() == strategyType }?.changeOrderMode(orderMode)
+        strategies?.first { it.getType().name == strategyType }
+        // TODO("CHANGE ORDER_MODE")
     }
 
     private fun setUp() {
-        strategies = applicationContext.getBeansOfType(Strategy::class.java).values.toList()
+        strategies = applicationContext.getBeansOfType(NewStrategy::class.java).values.toList()
         isReedy = true
     }
 }

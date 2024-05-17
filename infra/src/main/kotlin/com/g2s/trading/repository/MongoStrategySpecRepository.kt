@@ -22,9 +22,9 @@ class MongoStrategySpecRepository(
         private const val SPEC_COLLECTION_NAME = "strategy_spec"
     }
 
-    override fun findStrategySpecByKey(strategyKey: String): StrategySpec? {
+    override fun findStrategySpecByKey(strategyKey: String): NewStrategySpec? {
         val query = Query.query(Criteria.where("strategyKey").`is`(strategyKey))
-        val result = mongoTemplate.findOne(query, StrategySpec::class.java, SPEC_COLLECTION_NAME)
+        val result = mongoTemplate.findOne(query, NewStrategySpec::class.java, SPEC_COLLECTION_NAME)
 
         return result
     }
@@ -38,19 +38,19 @@ class MongoStrategySpecRepository(
         )
     }
 
-    override fun findAllServiceStrategySpecByType(type: String): List<StrategySpec> {
-        val query = Query.query(
-            Criteria.where(StrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
-                .andOperator(
-                    Criteria.where(StrategySpec::strategyType.name).`is`(type)
-                )
-        )
-        return mongoTemplate.find(
-            query, StrategySpec::class.java, SPEC_COLLECTION_NAME
-        )
-    }
+//    override fun findAllServiceStrategySpecByType(type: String): List<NewStrategySpec> {
+//        val query = Query.query(
+//            Criteria.where(NewStrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
+//                .andOperator(
+//                    Criteria.where(NewStrategySpec::strategyType.name).`is`(type)
+//                )
+//        )
+//        return mongoTemplate.find(
+//            query, NewStrategySpec::class.java, SPEC_COLLECTION_NAME
+//        )
+//    }
 
-    override fun updateSpec(strategySpec: StrategySpec): StrategySpec {
+    override fun updateSpec(strategySpec: NewStrategySpec): NewStrategySpec {
         val om = ObjectMapperProvider.get()
         val resultDocument = mongoTemplate.db.getCollection(SPEC_COLLECTION_NAME).findOneAndReplace(
             Filters.eq(strategySpec::strategyKey.name, strategySpec.strategyKey),
@@ -58,6 +58,6 @@ class MongoStrategySpecRepository(
             FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER).upsert(true)
         )
 
-        return om.readValue(resultDocument!!.toJson(), StrategySpec::class.java)
+        return om.readValue(resultDocument!!.toJson(), NewStrategySpec::class.java)
     }
 }
