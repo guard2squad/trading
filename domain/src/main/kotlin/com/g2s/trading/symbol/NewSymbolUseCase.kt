@@ -18,7 +18,7 @@ class NewSymbolUseCase(
 
     init {
         symbols = strategySpecUseCase.findAllServiceSpecs()
-            .flatMap { strategySpec -> strategySpec.symbols }
+            .flatMap { strategySpec -> strategySpec.symbols }.map { symbolValue -> generateSymbol(symbolValue) }
             .toSet().associateWith { AtomicBoolean(false) }
 
         val positions = positionUseCase.getAllPositions()
@@ -43,31 +43,23 @@ class NewSymbolUseCase(
         unUseSymbol(event.source.openOrder.symbol)
     }
 
+    fun getSymbol(value: String): Symbol? {
+        return symbols.keys.firstOrNull { symbol -> symbol.value == value }
+    }
+
     fun getAllSymbols(): Set<Symbol> {
         return symbols.keys
     }
 
-    fun getQuantityPrecision(symbol: Symbol): Int {
-        return exchangeImpl.getQuantityPrecision(symbol)
-    }
-
-    fun getMinNotionalValue(symbol: Symbol): Double {
-        return exchangeImpl.getMinNotionalValue(symbol)
-    }
-
-    fun getPricePrecision(symbol: Symbol): Int {
-        return exchangeImpl.getPricePrecision(symbol)
-    }
-
-    fun getMinPrice(symbol: Symbol): Double {
-        return exchangeImpl.getMinPrice(symbol)
-    }
-
-    fun getTickSize(symbol: Symbol): Double {
-        return exchangeImpl.getTickSize(symbol)
-    }
-
-    fun getCommissionRate(symbol: Symbol): Double {
-        return exchangeImpl.getCommissionRate(symbol)
+    private fun generateSymbol(symbolValue: String): Symbol {
+        return Symbol(
+            value = symbolValue,
+            quantityPrecision = exchangeImpl.getQuantityPrecision(symbolValue),
+            pricePrecision = exchangeImpl.getPricePrecision(symbolValue),
+            minimumNotionalValue = exchangeImpl.getMinNotionalValue(symbolValue),
+            minimumPrice = exchangeImpl.getMinPrice(symbolValue),
+            tickSize = exchangeImpl.getTickSize(symbolValue),
+            commissionRate = exchangeImpl.getCommissionRate(symbolValue),
+        )
     }
 }

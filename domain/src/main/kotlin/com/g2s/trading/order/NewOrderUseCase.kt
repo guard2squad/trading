@@ -9,13 +9,17 @@ import org.springframework.stereotype.Service
 class NewOrderUseCase(
     private val exchangeImpl: Exchange,
     private val positionUseCase: NewPositionUseCase,
-    private val accountUseCase: NewAccountUseCase
+    private val accountUseCase: NewAccountUseCase,
+    private val orderRepository: OrderRepository
     // order repository
 ) {
     private val pendingOrders: MutableMap<String, NewOrder> = mutableMapOf()
 
     init {
-        TODO("load pending orders")
+        // TODO("load pending orders")
+        orderRepository.findAllPendingOrders().forEach { order ->
+            pendingOrders[order.id] = order
+        }
     }
 
     fun sendOrder(vararg order: NewOrder) {
@@ -49,13 +53,15 @@ class NewOrderUseCase(
     private fun cancelOrder(orderId: String) {
         pendingOrders.remove(orderId)?.let { order ->
             exchangeImpl.cancelOrder(order.symbol, order.id)
-            TODO("order repository remove pending order")
+            // TODO("order repository remove pending order")
+            orderRepository.deletePendingOrder(orderId)
         }
     }
 
     private fun removePendingOrder(orderId: String): NewOrder {
         return pendingOrders.remove(orderId)?.let { order ->
             // TODO("order repository remove pending order")
+            orderRepository.deletePendingOrder(orderId)
             order
         } ?: throw RuntimeException("pending order not exist: $orderId")
     }
@@ -71,12 +77,14 @@ class NewOrderUseCase(
             exchangeImpl.sendOrder(order)
             SendOrderResult.Success
         } catch (e: Exception) {
+            if (order is NewCloseOrder) positionUseCase.removeCloseOrder(order) // undo
             pendingOrders.remove(order.id)
             SendOrderResult.Failure(e)
         }
 
         if (result is SendOrderResult.Success) {
-            TODO("order repository write pending order")
+            // TODO("order repository write pending order")
+            orderRepository.savePendingOrder(order)
         }
     }
 
