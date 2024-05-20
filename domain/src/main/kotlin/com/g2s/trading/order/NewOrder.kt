@@ -14,6 +14,8 @@ sealed class NewOrder {
 
 sealed class NewOpenOrder : NewOrder() {
     abstract val referenceData: JsonNode
+    lateinit var positionId: String
+
     data class MarketOrder(
         override val id: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,

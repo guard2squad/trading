@@ -71,13 +71,12 @@ class RestApiExchangeImpl(
      * ```
      */
     override fun sendOrder(order: NewOrder) {
-        val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
-
         try {
+            val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
+
             val response: String = binanceClient.account().newOrder(parameters)
             logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            logger.warn("$parameters\n" + e.errMsg)
             throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.WARN, e.errMsg)
         }
     }

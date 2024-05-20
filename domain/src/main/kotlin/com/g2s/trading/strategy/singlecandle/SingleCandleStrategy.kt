@@ -27,6 +27,7 @@ import com.g2s.trading.symbol.NewSymbolUseCase
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.reflect.KClass
@@ -76,48 +77,54 @@ class SingleCandleStrategy(
         when (money) {
             is Money.NotAvailableMoney -> {
                 symbolUseCase.unUseSymbol(candleStick.symbol)
+                return
             }
 
             is Money.AvailableMoney -> {
                 val updateResult = LastCandles.update(candleStick)
-                if (updateResult == CandleStickUpdateResult.Failed) {
-                    symbolUseCase.unUseSymbol(candleStick.symbol)
-                    return
-                }
-                val oldCandleStick = (updateResult as CandleStickUpdateResult.Success).old
-
-                // TODO(테스트후 캔들스틱 유효성 검사 추가)
-
-
-                // 오픈 가능한 symbol 확인
-                val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
-                val hammerRatio = spec.op["hammerRatio"].asDouble()
-                val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
-                val stopLossFactor = spec.op["stopLossFactor"].asDouble()
-                when (val analyzeReport = analyze(oldCandleStick, hammerRatio)) {
-                    is AnalyzeReport.NonMatchingReport -> {
-                        symbolUseCase.unUseSymbol(event.source.symbol)
+                when (updateResult) {
+                    is CandleStickUpdateResult.Failed -> {
+                        symbolUseCase.unUseSymbol(candleStick.symbol)
+                        return
                     }
 
-                    is AnalyzeReport.MatchingReport -> {
-                        val order = NewOpenOrder.MarketOrder(
-                            symbol = analyzeReport.symbol,
-                            price = markPrice.price,
-                            amount = quantity(
-                                balance = money.amount,
-                                minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
-                                markPrice = BigDecimal(markPrice.price),
-                                takeProfitFactor = takeProfitFactor,
-                                stopLossFactor = stopLossFactor,
-                                tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
-                                quantityPrecision = analyzeReport.symbol.quantityPrecision,
-                                orderSide = analyzeReport.orderSide
-                            ),
-                            side = analyzeReport.orderSide,
-                            referenceData = analyzeReport.referenceData,
-                        )
+                    is CandleStickUpdateResult.Success -> {
+                        // 캔들스틱 유효성 검증
+                        if (!isValidCandleStick(updateResult.old, updateResult.new)) {
+                            symbolUseCase.unUseSymbol(candleStick.symbol)
+                            return
+                        }
 
-                        orderUseCase.sendOrder(order)
+                        // 전략으로 오픈여부 판단
+                        val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
+                        val hammerRatio = spec.op["hammerRatio"].asDouble()
+                        val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
+                        val stopLossFactor = spec.op["stopLossFactor"].asDouble()
+                        when (val analyzeReport = analyze(updateResult.old, hammerRatio)) {
+                            is AnalyzeReport.NonMatchingReport -> {
+                                symbolUseCase.unUseSymbol(event.source.symbol)
+                            }
+
+                            is AnalyzeReport.MatchingReport -> {
+                                val order = NewOpenOrder.MarketOrder(
+                                    symbol = analyzeReport.symbol,
+                                    price = markPrice.price,
+                                    amount = quantity(
+                                        balance = money.amount,
+                                        minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
+                                        markPrice = BigDecimal(markPrice.price),
+                                        takeProfitFactor = takeProfitFactor,
+                                        stopLossFactor = stopLossFactor,
+                                        tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
+                                        quantityPrecision = analyzeReport.symbol.quantityPrecision,
+                                        orderSide = analyzeReport.orderSide
+                                    ),
+                                    side = analyzeReport.orderSide,
+                                    referenceData = analyzeReport.referenceData,
+                                )
+                                orderUseCase.sendOrder(order)
+                            }
+                        }
                     }
                 }
             }
@@ -158,6 +165,19 @@ class SingleCandleStrategy(
         )
 
         orderUseCase.sendOrder(takeProfitOrder, stopLossOrder)
+    }
+
+    private fun isValidCandleStick(old: CandleStick, new: CandleStick): Boolean {
+        val now = Instant.now().toEpochMilli()
+        val oneSecond = 1000L
+        val oneMinute = 60 * oneSecond
+        // 이전 꺼랑 1분 차이 (TODO: key랑 open timestamp 분리)
+        if (new.key - old.key != oneMinute) return false
+
+        // 새로 열린지 1초 이하
+        if (now - new.key > oneSecond) return false
+
+        return true
     }
 
     private fun closePrice(

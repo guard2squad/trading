@@ -5,7 +5,6 @@ import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl
 import com.binance.connector.futures.client.utils.JSONParser
 import com.binance.connector.futures.client.utils.RequestHandler
-import com.g2s.trading.account.NewAccountUseCase
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.event.NewTradingEvent
@@ -14,10 +13,8 @@ import com.g2s.trading.indicator.Interval
 import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.order.NewOrderUseCase
 import com.g2s.trading.order.OrderResult
-import com.g2s.trading.position.NewPositionUseCase
 import com.g2s.trading.symbol.NewSymbolUseCase
 import com.g2s.trading.symbol.Symbol
-import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
@@ -28,13 +25,8 @@ class ExchangeStream(
     private val binanceWebsocketClientImpl: UMWebsocketClientImpl,
     private val eventUseCase: EventUseCase,
     private val orderUseCase: NewOrderUseCase,
-    private val positionUseCase: NewPositionUseCase,
-    private val accountUseCase: NewAccountUseCase,
     private val symbolUseCase: NewSymbolUseCase
 ) {
-    private val om = ObjectMapperProvider.get()
-    private val pretty = om.writerWithDefaultPrettyPrinter()
-    private val logger = LoggerFactory.getLogger(this.javaClass)
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
 
@@ -95,7 +87,7 @@ class ExchangeStream(
                 numberOfTrades = jsonKlineData.get("n").asInt()
             )
 
-            eventUseCase.publishEvent(
+            eventUseCase.publishAsyncEvent(
                 NewTradingEvent.CandleStickEvent(candleStick)
             )
         }
@@ -108,7 +100,7 @@ class ExchangeStream(
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val lastMarkPrice = eventJson.get("p").asDouble()
             val markPrice = MarkPrice(symbol, lastMarkPrice)
-            eventUseCase.publishEvent(
+            eventUseCase.publishAsyncEvent(
                 NewTradingEvent.MarkPriceRefreshEvent(markPrice)
             )
         }
@@ -181,61 +173,18 @@ class ExchangeStream(
             val eventJson = ObjectMapperProvider.get().readTree(event)
             val eventType = eventJson.get("e").textValue()
             when (eventType) {
-                BinanceUserStreamEventType.ACCOUNT_UPDATE.toString() -> {
-                    val jsonBalanceAndPosition = eventJson.get("a")
-                    val accountUpdateEventReasonType = jsonBalanceAndPosition.get("m").asText()
-                    // TODO: Account Update 할 지 미정
-                    val jsonBalances = jsonBalanceAndPosition.get("B")
-                    // Position Update
-                    val positionRefreshDataList = jsonBalanceAndPosition.get("P").map { node ->
-                        val symbolValue = node["s"].asText()
-                        val entryPrice = node["ep"].asDouble()
-                        val amount = node["pa"].asDouble()
-                        val side = node["ps"].asText()
-                    // TODO: Position Update 할 지 미정
-                    }
-                    // Event reason type == ORDER 일 때 포지션 데이터 변동
-                    if (accountUpdateEventReasonType == BinanceAccountUpdateEventReasonType.ORDER.name) {
-                        // PositionSide가 BOTH인 경우 positionRefreshDataList의 원소는 1개임
-                        assert(positionRefreshDataList.size == 1)
-                        val positionRefreshData = positionRefreshDataList[0]
-                    }
-                }
-
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE.toString() -> {
                     val jsonOrder = eventJson.get("o")
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
-                    when (orderStatus) {
-                        BinanceUserStreamOrderStatus.NEW -> {
-                            // DO NOTHING
-                        }
-                        BinanceUserStreamOrderStatus.FILLED -> {
-                            val orderResult = OrderResult(
-                                orderId = jsonOrder["c"].asText(),
-                                symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
-                                price = jsonOrder["ap"].asDouble(),
-                                amount = jsonOrder["z"].asDouble(),
-                            )
-                            orderUseCase.handleResult(orderResult)
-                        }
-
-                        BinanceUserStreamOrderStatus.CANCELED -> {
-                            // DO NOTHING
-                        }
-
-                        BinanceUserStreamOrderStatus.PARTIALLY_FILLED -> {
-                            // DO NOTHING
-                        }
-
-                        BinanceUserStreamOrderStatus.EXPIRED -> {
-                            // DO NOTHING
-                        }
-
-                        BinanceUserStreamOrderStatus.EXPIRED_IN_MATCH -> {
-                            // DO NOTHING
-                        }
+                    if (orderStatus == BinanceUserStreamOrderStatus.FILLED) {
+                        val orderResult = OrderResult(
+                            orderId = jsonOrder["c"].asText(),
+                            symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
+                            price = jsonOrder["ap"].asDouble(),
+                            amount = jsonOrder["z"].asDouble()
+                        )
+                        orderUseCase.handleResult(orderResult)
                     }
-
                 }
             }
         }

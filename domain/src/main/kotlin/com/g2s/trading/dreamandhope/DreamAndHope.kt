@@ -23,7 +23,7 @@ class DreamAndHope(
             strategySpecRepository.findStrategySpecByKey(strategyKey)
                 ?.let { spec ->
                     if (spec.status == StrategySpecServiceStatus.SERVICE) {
-                        eventUseCase.publishEvent(StrategyEvent.StartStrategyEvent(spec))
+                        eventUseCase.publishAsyncEvent(StrategyEvent.StartStrategyEvent(spec))
                     }
                 }
         } catch (e: Exception) {
@@ -37,7 +37,7 @@ class DreamAndHope(
             strategySpecRepository.findStrategySpecByKey(strategyKey)
                 ?.let { spec ->
                     if (spec.status == StrategySpecServiceStatus.STOP) {
-                        eventUseCase.publishEvent(StrategyEvent.StartStrategyEvent(spec))
+                        eventUseCase.publishAsyncEvent(StrategyEvent.StopStrategyEvent(spec))
                     }
                 }
         } catch (e: Exception) {
@@ -49,7 +49,7 @@ class DreamAndHope(
         try {
             logger.debug("update: ${strategySpec.strategyKey}")
             strategySpecRepository.updateSpec(strategySpec)
-                .let { spec -> eventUseCase.publishEvent(StrategyEvent.UpdateStrategyEvent(spec)) }
+                .let { spec -> eventUseCase.publishAsyncEvent(StrategyEvent.UpdateStrategyEvent(spec)) }
         } catch (e: Exception) {
             throw DreamAndHopeErrors.UPDATE_STRATEGY_ERROR.error(
                 "Failed to update Strategy: ${strategySpec.strategyKey}",

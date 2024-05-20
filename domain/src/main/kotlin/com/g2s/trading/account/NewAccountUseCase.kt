@@ -10,16 +10,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 class NewAccountUseCase(
     private val exchangeImpl: Exchange
 ) {
-    private val logger = LoggerFactory.getLogger(this.javaClass)
     private lateinit var localAccount: NewAccount
     private val lock = AtomicBoolean(false)
 
     init {
         localAccount = loadAccount()
-    }
-
-    fun withdraw(amount: Double) {
-        localAccount.withdraw(amount)
     }
 
     fun withdraw(spec: NewStrategySpec): Money {
