@@ -1,15 +1,17 @@
 package com.g2s.trading.exchange
 
 import com.binance.connector.futures.client.exceptions.BinanceClientException
+import com.binance.connector.futures.client.exceptions.BinanceConnectorException
+import com.binance.connector.futures.client.exceptions.BinanceServerException
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.g2s.trading.account.Asset
-import com.g2s.trading.account.NewAccount
+import com.g2s.trading.account.Account
 import com.g2s.trading.common.ObjectMapperProvider
 import com.g2s.trading.order.OrderFailErrors
 import com.g2s.trading.indicator.MarkPrice
-import com.g2s.trading.order.NewOrder
+import com.g2s.trading.order.Order
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.util.BinanceOrderParameterConverter
@@ -70,14 +72,18 @@ class RestApiExchangeImpl(
      * }
      * ```
      */
-    override fun sendOrder(order: NewOrder) {
+    override fun sendOrder(order: Order) {
         try {
             val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
 
             val response: String = binanceClient.account().newOrder(parameters)
             logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.WARN, e.errMsg)
+            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+        } catch (e: BinanceServerException) {
+            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.message)
+        } catch (e: BinanceConnectorException) {
+            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.message)
         }
     }
 
@@ -136,7 +142,7 @@ class RestApiExchangeImpl(
         logger.debug(pretty.writeValueAsString(jsonResponse))
     }
 
-    override fun getAccount(): NewAccount {
+    override fun getAccount(): Account {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "timestamp" to System.currentTimeMillis().toString()
         )
@@ -146,7 +152,7 @@ class RestApiExchangeImpl(
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
             .let { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }
 
-        return NewAccount(balance.first, balance.second)
+        return Account(balance.first, balance.second)
     }
 
     override fun getMarkPrice(symbol: Symbol): MarkPrice {
@@ -307,10 +313,10 @@ class RestApiExchangeImpl(
      * @param order 조회할 주문
      * @return JSON 배열 형태의 거래 기록 데이터 노드. 거래 기록이 없거나 오류가 발생한 경우 null 반환
      */
-    override fun getHistoryInfo(order: NewOrder): JsonNode? {
+    override fun getHistoryInfo(order: Order): JsonNode? {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
             "symbol" to order.symbol.value,
-            "orderId" to order.id
+            "orderId" to order.orderId
         )
 
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))

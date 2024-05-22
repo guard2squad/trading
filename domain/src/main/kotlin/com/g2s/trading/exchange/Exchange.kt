@@ -4,13 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.g2s.trading.indicator.MarkPrice
 import com.g2s.trading.position.PositionMode
 import com.g2s.trading.symbol.Symbol
-import com.g2s.trading.order.NewOrder
-import com.g2s.trading.account.NewAccount
+import com.g2s.trading.order.Order
+import com.g2s.trading.account.Account
 
 interface Exchange {
-    fun sendOrder(order: NewOrder)
+    fun sendOrder(order: Order)
     fun cancelOrder(symbol: Symbol, orderId: String)
-    fun getAccount(): NewAccount
+    fun getAccount(): Account
     fun getMarkPrice(symbol: Symbol): MarkPrice
     fun setPositionMode(positionMode: PositionMode)
     fun getQuantityPrecision(symbolValue: String): Int
@@ -22,6 +22,6 @@ interface Exchange {
     fun getCommissionRate(symbolValue: String): Double
     fun getLeverage(symbolValue: String): Int
     fun setLeverage(symbolValue: String, leverage: Int): Int
-    fun getHistoryInfo(order: NewOrder): JsonNode?
+    fun getHistoryInfo(order: Order): JsonNode?
     fun getCurrentBalance(timeStamp: Long): Double
 }

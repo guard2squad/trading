@@ -3,11 +3,11 @@ package com.g2s.trading.strategy
 import org.springframework.stereotype.Service
 
 @Service
-class NewStrategySpecUseCase(
+class StrategySpecUseCase(
     private val strategySpecRepository: StrategySpecRepository,
 ) {
     // 전략 - 스펙 목록
-    private val specsByStrategy: MutableMap<NewStrategyType, MutableList<NewStrategySpec>> = mutableMapOf()
+    private val specsByStrategy: MutableMap<StrategyType, MutableList<StrategySpec>> = mutableMapOf()
 
     init {
         load()
@@ -21,11 +21,11 @@ class NewStrategySpecUseCase(
         }
     }
 
-    fun findAllServiceSpecs(): List<NewStrategySpec> {
+    fun findAllServiceSpecs(): List<StrategySpec> {
         return strategySpecRepository.findAllServiceStrategySpec()
     }
 
-    fun findSpecsByStrategyType(strategyType: NewStrategyType): List<NewStrategySpec>? {
+    fun findSpecsByStrategyType(strategyType: StrategyType): List<StrategySpec>? {
         return specsByStrategy[strategyType]
     }
 }

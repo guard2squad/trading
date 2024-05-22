@@ -4,7 +4,7 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface OrderRepository {
-    fun findAllPendingOrders(): List<NewOrder>
-    fun savePendingOrder(order: NewOrder)
+    fun findAllPendingOrders(): List<Order>
+    fun savePendingOrder(order: Order)
     fun deletePendingOrder(id: String)
 }

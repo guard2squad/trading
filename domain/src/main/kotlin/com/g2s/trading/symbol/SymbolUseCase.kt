@@ -1,18 +1,18 @@
 package com.g2s.trading.symbol
 
-import com.g2s.trading.event.NewPositionEvent
+import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.position.NewPositionUseCase
-import com.g2s.trading.strategy.NewStrategySpecUseCase
+import com.g2s.trading.position.PositionUseCase
+import com.g2s.trading.strategy.StrategySpecUseCase
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Service
-class NewSymbolUseCase(
+class SymbolUseCase(
     private val exchangeImpl: Exchange,
-    strategySpecUseCase: NewStrategySpecUseCase,
-    positionUseCase: NewPositionUseCase
+    strategySpecUseCase: StrategySpecUseCase,
+    positionUseCase: PositionUseCase
 ) {
     private val symbols: Map<Symbol, AtomicBoolean>
 
@@ -23,7 +23,7 @@ class NewSymbolUseCase(
 
         val positions = positionUseCase.getAllPositions()
         positions.forEach { position ->
-            useSymbol(position.openOrder.symbol)
+            useSymbol(position.symbol)
         }
     }
 
@@ -39,8 +39,9 @@ class NewSymbolUseCase(
     }
 
     @EventListener
-    fun handlePositionClosedEvent(event: NewPositionEvent.PositionClosedEvent) {
-        unUseSymbol(event.source.openOrder.symbol)
+    fun handlePositionClosedEvent(event: PositionEvent.PositionClosedEvent) {
+        val position = event.source.first
+        unUseSymbol(position.symbol)
     }
 
     fun getSymbol(value: String): Symbol? {

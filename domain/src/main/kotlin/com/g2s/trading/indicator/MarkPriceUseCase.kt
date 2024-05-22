@@ -2,7 +2,7 @@ package com.g2s.trading.indicator
 
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.symbol.Symbol
-import com.g2s.trading.event.NewTradingEvent
+import com.g2s.trading.event.TradingEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 
@@ -13,7 +13,7 @@ class MarkPriceUseCase(
     private val markPrices = mutableMapOf<Symbol, MarkPrice>()
 
     @EventListener
-    fun handleRefreshMarkPriceEvent(event: NewTradingEvent.MarkPriceRefreshEvent) {
+    fun handleRefreshMarkPriceEvent(event: TradingEvent.MarkPriceRefreshEvent) {
         markPrices[event.source.symbol] = event.source
     }
 

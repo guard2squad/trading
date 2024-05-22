@@ -1,7 +1,7 @@
 package com.g2s.trading.event
 
-import com.g2s.trading.strategy.NewStrategy
-import com.g2s.trading.strategy.NewStrategySpecUseCase
+import com.g2s.trading.strategy.Strategy
+import com.g2s.trading.strategy.StrategySpecUseCase
 import org.springframework.context.ApplicationContext
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
@@ -9,14 +9,14 @@ import kotlin.reflect.KClass
 
 @Service
 class EventRouter(
-    private val newStrategySpecUseCase: NewStrategySpecUseCase,
+    private val strategySpecUseCase: StrategySpecUseCase,
     applicationContext: ApplicationContext
 ) {
     // 이벤트 - 전략
-    private val eventRoutingTable: Map<KClass<out NewEvent>, MutableList<NewStrategy>>
+    private val eventRoutingTable: Map<KClass<out Event>, MutableList<Strategy>>
 
     init {
-        eventRoutingTable = applicationContext.getBeansOfType(NewStrategy::class.java).values
+        eventRoutingTable = applicationContext.getBeansOfType(Strategy::class.java).values
             .flatMap { strategy ->
                 strategy.getTriggerEventTypes().map { event -> event to strategy }
             }.fold(mutableMapOf()) { acc, pair ->
@@ -31,10 +31,10 @@ class EventRouter(
     }
 
     @EventListener
-    fun route(event: NewEvent) {
+    fun route(event: Event) {
         eventRoutingTable[event::class]?.let { strategies ->
             strategies.forEach { strategy ->
-                newStrategySpecUseCase.findSpecsByStrategyType(strategy.getType())?.forEach { spec ->
+                strategySpecUseCase.findSpecsByStrategyType(strategy.getType())?.forEach { spec ->
                     strategy.handle(event, spec)
                 }
             }

@@ -1,6 +1,6 @@
 package com.g2s.trading.account
 
-data class NewAccount(
+data class Account(
     var totalBalance: Double,
     var availableBalance: Double,
     var unSyncedMoney: Double = 0.0

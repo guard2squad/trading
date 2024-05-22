@@ -4,7 +4,7 @@ import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.event.StrategyEvent
 import com.g2s.trading.strategy.StrategySpecRepository
 import com.g2s.trading.strategy.StrategySpecServiceStatus
-import com.g2s.trading.strategy.NewStrategySpec
+import com.g2s.trading.strategy.StrategySpec
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -45,7 +45,7 @@ class DreamAndHope(
         }
     }
 
-    fun update(strategySpec: NewStrategySpec) {
+    fun update(strategySpec: StrategySpec) {
         try {
             logger.debug("update: ${strategySpec.strategyKey}")
             strategySpecRepository.updateSpec(strategySpec)

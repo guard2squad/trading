@@ -356,7 +356,7 @@ class ExchangeTest {
             CandleStick(
                 symbol = symbol,
                 interval = interval,
-                key = jsonCandleStick.get(0).asLong(),
+                openTime = jsonCandleStick.get(0).asLong(),
                 open = jsonCandleStick.get(1).asDouble(),
                 high = jsonCandleStick.get(2).asDouble(),
                 low = jsonCandleStick.get(3).asDouble(),

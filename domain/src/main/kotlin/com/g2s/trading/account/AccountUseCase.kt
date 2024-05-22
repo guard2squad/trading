@@ -1,23 +1,22 @@
 package com.g2s.trading.account
 
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.strategy.NewStrategySpec
-import org.slf4j.LoggerFactory
+import com.g2s.trading.strategy.StrategySpec
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Service
-class NewAccountUseCase(
+class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
-    private lateinit var localAccount: NewAccount
+    private lateinit var localAccount: Account
     private val lock = AtomicBoolean(false)
 
     init {
         localAccount = loadAccount()
     }
 
-    fun withdraw(spec: NewStrategySpec): Money {
+    fun withdraw(spec: StrategySpec): Money {
         if (!acquire()) return Money.NotAvailableMoney
         localAccount.sync()
 
@@ -28,6 +27,18 @@ class NewAccountUseCase(
 
         release()
         return Money.AvailableMoney(withdrawAmount)
+    }
+
+    fun withdraw(amount: Double): Money {
+        if (!acquire()) return Money.NotAvailableMoney
+        localAccount.sync()
+
+        if (amount <= localAccount.availableBalance) {
+            localAccount.withdraw(amount)
+        }
+
+        release()
+        return Money.AvailableMoney(amount)
     }
 
     fun deposit(amount: Double) {
@@ -43,7 +54,7 @@ class NewAccountUseCase(
     }
 
 
-    private fun loadAccount(): NewAccount {
+    private fun loadAccount(): Account {
         return exchangeImpl.getAccount()
     }
 }

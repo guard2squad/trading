@@ -1,6 +1,6 @@
 package com.g2s.trading.repository
 
-import com.g2s.trading.order.NewOrder
+import com.g2s.trading.order.Order
 import com.g2s.trading.order.OrderRepository
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
@@ -16,11 +16,11 @@ class MongoOrderRepository(
         const val ORDER_COLLECTION_NAME = "pending_orders"
     }
 
-    override fun findAllPendingOrders(): List<NewOrder> {
-        return mongoTemplate.findAll(NewOrder::class.java)
+    override fun findAllPendingOrders(): List<Order> {
+        return mongoTemplate.findAll(Order::class.java)
     }
 
-    override fun savePendingOrder(order: NewOrder) {
+    override fun savePendingOrder(order: Order) {
         mongoTemplate.save(order, ORDER_COLLECTION_NAME)
     }
 

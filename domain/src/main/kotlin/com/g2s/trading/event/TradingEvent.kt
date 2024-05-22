@@ -3,15 +3,15 @@ package com.g2s.trading.event
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.MarkPrice
 
-sealed class NewTradingEvent(
+sealed class TradingEvent(
     source: Any
-) : NewEvent(source) {
+) : Event(source) {
 
     data class CandleStickEvent(
         val source: CandleStick
-    ) : NewTradingEvent(source)
+    ) : TradingEvent(source)
 
     data class MarkPriceRefreshEvent(
         val source: MarkPrice
-    ) : NewTradingEvent(source)
+    ) : TradingEvent(source)
 }
