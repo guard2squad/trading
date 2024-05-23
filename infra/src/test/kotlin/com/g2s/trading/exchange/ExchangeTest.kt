@@ -19,7 +19,6 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
-@Disabled
 @ContextConfiguration(classes = [TestConfig::class])
 @ExtendWith(SpringExtension::class)
 class ExchangeTest {
@@ -37,6 +36,7 @@ class ExchangeTest {
         println(pretty.writeValueAsString(jsonExchangeInfo))
     }
 
+    @Disabled
     @Test
     fun test() {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
@@ -96,6 +96,7 @@ class ExchangeTest {
      *     ]
      * }
      */
+    @Disabled
     @Test
     fun testGetInitialLeverageBracket() {
         val parameters = LinkedHashMap<String, Any>()
@@ -182,6 +183,7 @@ class ExchangeTest {
      * } ]
      *
      */
+    @Disabled
     @Test
     fun testGetInitialLeverage() {
         val parameters = LinkedHashMap<String, Any>()
@@ -204,6 +206,7 @@ class ExchangeTest {
      * binanceJavaConnector에서 account 클래스의 메서드는 signed한 요청임.
      * @param timestamp Required. binanceJavaConnector에서 알아서 기본값으로 현재 요청 시간(Epoch)을 입력함.
      */
+    @Disabled
     @Test
     fun testSetLeverage() {
         val parameters = LinkedHashMap<String, Any>()
@@ -221,6 +224,7 @@ class ExchangeTest {
      * orderId는 userStream 또는 최근 다건 기록을 조회하면 얻을 수 있음
      */
 
+    @Disabled
     @Test
     fun testGetTradeHistory() {
         val parameters = LinkedHashMap<String, Any>()
@@ -235,6 +239,7 @@ class ExchangeTest {
      * symbol을 통해 계정의 최근 다건 거래 기록 조회하는 API를 테스트
      * 디폴트 배열 사이즈: 500
      */
+    @Disabled
     @Test
     fun testGetTradeHistories() {
         val parameters = linkedMapOf<String, Any>(
@@ -243,7 +248,7 @@ class ExchangeTest {
         val jsonResponse = om.readTree(binanceClient.account().accountTradeList(parameters))
         println(pretty.writeValueAsString(jsonResponse))
     }
-
+    @Disabled
     @Test
     fun getAccountTest() {
         val parameters: LinkedHashMap<String, Any> = linkedMapOf(
@@ -254,6 +259,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 LastPrice
+    @Disabled
     @Test
     fun testGetContinuousContractCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -267,6 +273,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 IndexPrice
+    @Disabled
     @Test
     fun testGetIndexPriceCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -279,6 +286,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 MarkPrice
+    @Disabled
     @Test
     fun testGetMarkPriceCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -291,6 +299,7 @@ class ExchangeTest {
     }
 
     // Binance App Trading View 차트에서 LastPrice
+    @Disabled
     @Test
     fun testGetCandleStickData() {
         val parameters = LinkedHashMap<String, Any>()
@@ -302,6 +311,7 @@ class ExchangeTest {
         println(pretty.writeValueAsString(jsonCandleStick))
     }
 
+    @Disabled
     @Test
     fun testGetMinQtyByMarketOrder() {
         getMinQtyByMarketOrder("BTCUSDT")
@@ -367,6 +377,7 @@ class ExchangeTest {
         return candleStick
     }
 
+    @Disabled
     @Test
     fun getCurrentUtcDateTimeString() {
         val nowSeoul = ZonedDateTime.now(ZoneId.of("Asia/Seoul"))
@@ -385,6 +396,7 @@ class ExchangeTest {
      *     "takerCommissionRate": "0.0004"   // 0.04%
      *  }
      */
+    @Disabled
     @Test
     fun getCommissionRate() {
         val params = linkedMapOf<String, Any>(
@@ -394,6 +406,7 @@ class ExchangeTest {
         println(pretty.writeValueAsString(res))
     }
 
+    @Disabled
     @Test
     fun testBuyMarketOrder() {
         val params = linkedMapOf<String, Any>(
@@ -410,6 +423,7 @@ class ExchangeTest {
         println(pretty.writeValueAsString(response))
     }
 
+    @Disabled
     @Test
     fun testSellMarketOrder() {
         val params = linkedMapOf<String, Any>(
@@ -448,6 +462,7 @@ class ExchangeTest {
      * - GTX: Good Till Crossing (Post Only)
      * - GTD: Good Till Date
      */
+    @Disabled
     @Test
     fun testLimitOrder() {
         val orderType = "LIMIT"
@@ -466,7 +481,7 @@ class ExchangeTest {
         val response = binanceClient.account().newOrder(params)
         println(pretty.writeValueAsString(response))
     }
-
+    @Disabled
     @Test
     fun testCancelOrder() {
         val params = linkedMapOf<String, Any>(

@@ -1,10 +1,8 @@
 package com.g2s.trading.symbol
 
-import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.StrategySpecUseCase
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -36,12 +34,6 @@ class SymbolUseCase(
 
     fun unUseSymbol(symbol: Symbol) {
         symbols[symbol]!!.set(false)
-    }
-
-    @EventListener
-    fun handlePositionClosedEvent(event: PositionEvent.PositionClosedEvent) {
-        val position = event.source.first
-        unUseSymbol(position.symbol)
     }
 
     fun getSymbol(value: String): Symbol? {

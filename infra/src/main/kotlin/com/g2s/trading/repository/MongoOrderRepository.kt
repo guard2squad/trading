@@ -25,7 +25,7 @@ class MongoOrderRepository(
     }
 
     override fun deletePendingOrder(id: String) {
-        val query = Query(Criteria.where("id").`is`(id))
+        val query = Query(Criteria.where("orderId").`is`(id))
         mongoTemplate.remove(query, ORDER_COLLECTION_NAME)
     }
 }

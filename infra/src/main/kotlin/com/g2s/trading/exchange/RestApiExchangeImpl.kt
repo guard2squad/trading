@@ -79,11 +79,19 @@ class RestApiExchangeImpl(
             val response: String = binanceClient.account().newOrder(parameters)
             logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+            logger.error(e.errorCode.toString())
+            logger.error(e.errMsg)
+            if (e.errorCode == -2021) {
+                throw OrderFailErrors.ORDER_WOULD_IMMEDIATELY_TRIGGER.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+            } else {
+                throw OrderFailErrors.CLIENT_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+            }
         } catch (e: BinanceServerException) {
-            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.message)
+            logger.error(e.message)
+            throw OrderFailErrors.SERVER_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
         } catch (e: BinanceConnectorException) {
-            throw OrderFailErrors.ORDER_FAIL.error("선물 주문 실패", e, Level.ERROR, e.message)
+            logger.error(e.message)
+            throw OrderFailErrors.CONNECTOR_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
         }
     }
 
@@ -132,14 +140,26 @@ class RestApiExchangeImpl(
      *
      */
     override fun cancelOrder(symbol: Symbol, orderId: String) {
-        val params = linkedMapOf<String, Any>(
-            "symbol" to symbol.value,
-            "orderId" to orderId
-        )
-        val response = binanceClient.account().cancelOrder(params)
-        // debug
-        val jsonResponse = om.readTree(response)
-        logger.debug(pretty.writeValueAsString(jsonResponse))
+        try {
+            val params = linkedMapOf<String, Any>(
+                "symbol" to symbol.value,
+                "origClientOrderId" to orderId
+            )
+            val response = binanceClient.account().cancelOrder(params)
+            // debug
+            val jsonResponse = om.readTree(response)
+            logger.debug(pretty.writeValueAsString(jsonResponse))
+        } catch (e: BinanceClientException) {
+            logger.error(e.errorCode.toString())
+            logger.error(e.errMsg)
+            throw OrderFailErrors.CLIENT_ERROR.error("주문 취소 실패", e, Level.ERROR, e.errMsg)
+        } catch (e: BinanceServerException) {
+            logger.error(e.message)
+            throw OrderFailErrors.SERVER_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+        } catch (e: BinanceConnectorException) {
+            logger.error(e.message)
+            throw OrderFailErrors.CONNECTOR_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+        }
     }
 
     override fun getAccount(): Account {

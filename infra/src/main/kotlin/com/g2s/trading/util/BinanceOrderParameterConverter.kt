@@ -9,6 +9,7 @@ object BinanceOrderParameterConverter {
 
     fun toNewOrderParam(order: Order): LinkedHashMap<String, Any> {
         val parameters = linkedMapOf<String, Any>(
+            "newClientOrderId" to order.orderId,
             "symbol" to order.symbol.value,
             "timeStamp" to System.currentTimeMillis(),
             "positionMode" to "ONE_WAY_MODE"
@@ -24,7 +25,12 @@ object BinanceOrderParameterConverter {
                 addCloseOrderParameters(parameters, order, "TAKE_PROFIT")
             }
             is CloseOrder.StopLossOrder -> {
-                addCloseOrderParameters(parameters, order, "STOP_LOSS")
+                addCloseOrderParameters(parameters, order, "STOP")  // STOP_LOSS 아니고, STOP임
+            }
+            is CloseOrder.MarketOrder -> {
+                parameters["quantity"] = order.amount
+                parameters["type"] = "MARKET"
+                parameters["side"] = orderSide(order.side)
             }
             is Order.CancelOrder -> {
                 throw IllegalArgumentException("CancelOrder cannot be converted to order parameters.")

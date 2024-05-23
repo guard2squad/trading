@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class PositionUseCase(
     private val positionRepository: PositionRepository,
-    private val eventUseCase: EventUseCase
+    private val eventUseCase: EventUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val openedPositions = ConcurrentHashMap<String, Position>()
@@ -41,7 +41,8 @@ class PositionUseCase(
             symbol = order.symbol,
             side = order.side,
             referenceData = order.referenceData,
-            openOrder = order,
+            originalPrice = order.originalPrice,
+            openOrderId = order.orderId,
             closeOrderIds = mutableSetOf()
         )
         order.positionId = position.positionId
@@ -60,7 +61,7 @@ class PositionUseCase(
 
     fun updateOpenedPosition(orderResult: OrderResult.FilledOrderResult) {
         openedPositions.values.firstOrNull { position ->
-            position.openOrder.orderId == orderResult.orderId
+            position.openOrderId == orderResult.orderId
         }?.apply {
             val quoteValue = BigDecimal(this.price) * BigDecimal(this.amount) +
                     BigDecimal(orderResult.price) * BigDecimal(orderResult.amount)
@@ -73,7 +74,7 @@ class PositionUseCase(
 
     fun syncOpenedPosition(orderResult: OrderResult.FilledOrderResult.Filled) {
         openedPositions.values.firstOrNull { position ->
-            position.openOrder.orderId == orderResult.orderId
+            position.openOrderId == orderResult.orderId
         }?.apply {
             if (this.amount != orderResult.accumulatedAmount) {
                 this.amount = orderResult.accumulatedAmount
@@ -85,17 +86,16 @@ class PositionUseCase(
         }
     }
 
-    fun findOpenedPosition(orderId: String): Pair<Position, Boolean>? {
-        openedPositions.values.firstOrNull() {
-            it.openOrder.orderId == orderId || it.closeOrderIds.contains(orderId)
-        }?.let { position ->
-            val isOpen = position.openOrder.orderId == orderId
-            return Pair(position, isOpen)
+    fun findOpenedPosition(orderId: String): Position? {
+        val position = openedPositions.values.firstOrNull {
+            it.openOrderId == orderId || it.closeOrderIds.contains(orderId)
         } ?: return null
+
+        return position
     }
 
     fun publishPositionOpenedEvent(orderResult: OrderResult.FilledOrderResult.Filled) {
-        openedPositions.values.firstOrNull { position -> position.openOrder.orderId == orderResult.orderId }
+        openedPositions.values.firstOrNull { position -> position.openOrderId == orderResult.orderId }
             ?.also { position ->
                 val event = PositionEvent.PositionOpenedEvent(position)
                 eventUseCase.publishAsyncEvent(event)

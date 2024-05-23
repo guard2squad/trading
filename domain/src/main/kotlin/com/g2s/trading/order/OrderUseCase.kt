@@ -2,6 +2,9 @@ package com.g2s.trading.order
 
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.account.AccountUseCase
+import com.g2s.trading.common.ApiErrors
+import com.g2s.trading.event.EventUseCase
+import com.g2s.trading.event.OrderEvent
 import com.g2s.trading.position.PositionUseCase
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -11,8 +14,8 @@ class OrderUseCase(
     private val exchangeImpl: Exchange,
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
+    private val eventUseCase: EventUseCase,
     private val orderRepository: OrderRepository
-    // order repository
 ) {
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
 
@@ -42,14 +45,11 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.PartiallyFilled -> {
-                val positionResult = positionUseCase.findOpenedPosition(result.orderId)
-                positionResult?.run {
-                    val position = positionResult.first
-                    val isOpen = positionResult.second
-                    if (isOpen) {
+                val position = positionUseCase.findOpenedPosition(result.orderId)
+                position?.run {
+                    if (position.openOrderId == result.orderId) {
                         positionUseCase.updateOpenedPosition(result)
-                        val openOrder = position.openOrder
-                        val expectedExpense = BigDecimal(openOrder.originalPrice) * BigDecimal(result.amount)
+                        val expectedExpense = BigDecimal(position.originalPrice) * BigDecimal(result.amount)
                         val actualExpense = BigDecimal(result.price) * BigDecimal(result.amount)
                         val expenseVariance = (expectedExpense - actualExpense).toDouble()
                         accountUseCase.deposit(expenseVariance) // 차액 입금 (음수/양수 상관없음)
@@ -64,14 +64,11 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.Filled -> {
-                val positionResult = positionUseCase.findOpenedPosition(result.orderId)
-                positionResult?.run {
-                    val position = positionResult.first
-                    val isOpen = positionResult.second
-                    if (isOpen) {
+                val position = positionUseCase.findOpenedPosition(result.orderId)
+                position?.run {
+                    if (position.openOrderId == result.orderId) {
                         positionUseCase.updateOpenedPosition(result)
-                        val openOrder = position.openOrder
-                        val expectedExpense = BigDecimal(openOrder.originalPrice) * BigDecimal(result.amount)
+                        val expectedExpense = BigDecimal(position.originalPrice) * BigDecimal(result.amount)
                         val actualExpense = BigDecimal(result.price) * BigDecimal(result.amount)
                         val expenseVariance = (expectedExpense - actualExpense).toDouble()
                         accountUseCase.deposit(expenseVariance) // 차액 입금 (음수/양수 상관없음)
@@ -97,6 +94,7 @@ class OrderUseCase(
 
     private fun send(order: Order) {
         pendingOrders[order.orderId] = order
+        orderRepository.savePendingOrder(order)
 
         val result: SendOrderResult
         if (order is Order.CancelOrder) {
@@ -117,8 +115,13 @@ class OrderUseCase(
             }
         }
 
-        if (result is SendOrderResult.Success) {
-            orderRepository.savePendingOrder(order)
+        if (result is SendOrderResult.Failure) {
+            orderRepository.deletePendingOrder(order.orderId)
+
+            if (result.e as ApiErrors == OrderFailErrors.ORDER_WOULD_IMMEDIATELY_TRIGGER) {
+                eventUseCase.publishAsyncEvent(OrderEvent.OrderImmediatelyTriggerEvent(order as CloseOrder))
+                return
+            }
         }
     }
 }

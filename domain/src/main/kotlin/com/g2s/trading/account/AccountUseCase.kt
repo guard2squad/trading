@@ -17,7 +17,7 @@ class AccountUseCase(
     }
 
     fun withdraw(spec: StrategySpec): Money {
-        if (!acquire()) return Money.NotAvailableMoney
+        if (!acquire()) return Money.NotAvailableMoney  // TODO: 이름 변경
         localAccount.sync()
 
         val withdrawAmount = (localAccount.totalBalance * spec.allocatedRatio) / spec.symbols.size

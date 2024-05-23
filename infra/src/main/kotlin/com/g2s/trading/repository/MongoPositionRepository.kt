@@ -29,7 +29,7 @@ class MongoPositionRepository(private val mongoTemplate: MongoTemplate) : Positi
     }
 
     override fun deletePosition(id: String) {
-        val query = Query(Criteria.where("id").`is`(id))
+        val query = Query(Criteria.where("positionId").`is`(id))
         mongoTemplate.remove(query, POSITION_COLLECTION_NAME)
     }
 }

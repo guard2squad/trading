@@ -58,6 +58,15 @@ sealed class CloseOrder : Order() {
         override val side: OrderSide,
         override val positionId: String
     ) : CloseOrder()
+
+    data class MarketOrder(
+        override val orderId: String = UUID.randomUUID().toString(),
+        override val symbol: Symbol,
+        override val price: Double,
+        override val amount: Double,
+        override val side: OrderSide,
+        override val positionId: String
+    ) : CloseOrder()
 }
 
 

@@ -226,6 +226,7 @@ class ExchangeStream(
             when (eventType) {
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE -> {
                     val jsonOrder = eventJson.get("o")
+                    logger.debug(ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(jsonOrder))
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
