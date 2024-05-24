@@ -118,7 +118,7 @@ class OrderUseCase(
         if (result is SendOrderResult.Failure) {
             orderRepository.deletePendingOrder(order.orderId)
 
-            if (result.e as ApiErrors == OrderFailErrors.ORDER_WOULD_IMMEDIATELY_TRIGGER) {
+            if (result.e as ApiErrors == OrderFailErrors.RETRYABLE_ERROR) {
                 eventUseCase.publishAsyncEvent(OrderEvent.OrderImmediatelyTriggerEvent(order as CloseOrder))
                 return
             }

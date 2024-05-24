@@ -81,17 +81,25 @@ class RestApiExchangeImpl(
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)
-            if (e.errorCode == -2021) {
-                throw OrderFailErrors.ORDER_WOULD_IMMEDIATELY_TRIGGER.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
-            } else {
-                throw OrderFailErrors.CLIENT_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+            when (e.errorCode) {
+                -2021 -> {
+                    throw OrderFailErrors.RETRYABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                }
+
+                -4131 -> {
+                    throw OrderFailErrors.IGNORABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                }
+
+                else -> {
+                    throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                }
             }
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.SERVER_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.CONNECTOR_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
         }
     }
 
@@ -152,13 +160,13 @@ class RestApiExchangeImpl(
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)
-            throw OrderFailErrors.CLIENT_ERROR.error("주문 취소 실패", e, Level.ERROR, e.errMsg)
+            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.errMsg)
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.SERVER_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.CONNECTOR_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
         }
     }
 

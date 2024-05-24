@@ -24,7 +24,6 @@ import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategyType
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -41,9 +40,8 @@ class SingleCandleStrategy(
     private val orderUseCase: OrderUseCase,
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
-    private val logger = LoggerFactory.getLogger(SingleCandleStrategy::class.java)
 
-    private var orderMode = OrderMode.MINIMUM_QUANTITY
+    private var orderMode = OrderMode.NORMAL
 
     override fun getType(): StrategyType {
         return StrategyType.SINGLE_CANDLE
@@ -63,7 +61,7 @@ class SingleCandleStrategy(
             is TradingEvent.CandleStickEvent -> open(event, spec)
             is PositionEvent.PositionOpenedEvent -> close(event, spec)
             is PositionEvent.PositionClosedEvent -> cancelOppositeOrder(event, spec)
-            is OrderEvent.OrderImmediatelyTriggerEvent -> reOpen(event, spec)
+            is OrderEvent.OrderImmediatelyTriggerEvent -> reClose(event, spec)
 
             else -> throw RuntimeException("invalid event type: $event")
         }
@@ -213,7 +211,7 @@ class SingleCandleStrategy(
         }
     }
 
-    private fun reOpen(event: OrderEvent.OrderImmediatelyTriggerEvent, spec: StrategySpec) {
+    private fun reClose(event: OrderEvent.OrderImmediatelyTriggerEvent, spec: StrategySpec) {
         val position = positionUseCase.findOpenedPosition(event.source.positionId)
         position?.let {
             val strategyKey = position.referenceData["strategyKey"].asText()
