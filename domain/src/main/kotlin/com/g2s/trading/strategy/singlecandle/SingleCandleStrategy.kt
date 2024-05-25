@@ -41,7 +41,7 @@ class SingleCandleStrategy(
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
 
-    private var orderMode = OrderMode.NORMAL
+    private var orderMode = OrderMode.MINIMUM_QUANTITY
 
     override fun getType(): StrategyType {
         return StrategyType.SINGLE_CANDLE
