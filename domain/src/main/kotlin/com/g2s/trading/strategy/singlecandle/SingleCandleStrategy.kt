@@ -24,6 +24,7 @@ import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategyType
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -41,7 +42,17 @@ class SingleCandleStrategy(
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
 
-    private var orderMode = OrderMode.MINIMUM_QUANTITY
+    private val logger = LoggerFactory.getLogger(SingleCandleStrategy::class.java)
+    private var orderMode = OrderMode.NORMAL
+
+    override fun changeOrderMode(orderMode: String) {
+        val newOrderMode = try {
+            OrderMode.valueOf(orderMode)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid order mode: $orderMode")
+        }
+        this.orderMode = newOrderMode
+    }
 
     override fun getType(): StrategyType {
         return StrategyType.SINGLE_CANDLE
@@ -79,7 +90,7 @@ class SingleCandleStrategy(
         val canUseSymbol = symbolUseCase.useSymbol(candleStick.symbol)
         if (!canUseSymbol) return
 
-        val money = accountUseCase.withdraw(spec)
+        val money = accountUseCase.withdraw(spec, BigDecimal(candleStick.symbol.commissionRate))
         when (money) {
             is Money.NotAvailableMoney -> {
                 symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -90,14 +101,28 @@ class SingleCandleStrategy(
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
+                        logger.debug("캔들스틱 업데이트 실패")
+                        // debug
+                        logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
+                        // 출금 취소
+                        accountUseCase.cancelWithdrawal(money)
                         symbolUseCase.unUseSymbol(candleStick.symbol)
+                        // debug
+                        logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                         return
                     }
 
                     is CandleStickUpdateResult.Success -> {
                         // 캔들스틱 유효성 검증
                         if (!isValidCandleStick(updateResult.old, updateResult.new)) {
+                            logger.debug("유효하지 않은 캔들스틱")
+                            // debug
+                            logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
+                            // 출금 취소
+                            accountUseCase.cancelWithdrawal(money)
                             symbolUseCase.unUseSymbol(candleStick.symbol)
+                            // debug
+                            logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                             return
                         }
 
@@ -108,13 +133,19 @@ class SingleCandleStrategy(
                         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
                         when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
-                                symbolUseCase.unUseSymbol(event.source.symbol)
-                                accountUseCase.deposit(money.amount)
+                                logger.debug("${candleStick.symbol.value}: NonMatchingReport")
+                                // debug
+                                logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
+                                /// 출금 취소
+                                accountUseCase.cancelWithdrawal(money)
+                                symbolUseCase.unUseSymbol(candleStick.symbol)
+                                // debug
+                                logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                             }
 
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
-                                    balance = money.amount,
+                                    amount = money.allocatedAmount,
                                     minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
                                     markPrice = BigDecimal(markPrice.price),
                                     takeProfitFactor = takeProfitFactor,
@@ -123,29 +154,17 @@ class SingleCandleStrategy(
                                     quantityPrecision = analyzeReport.symbol.quantityPrecision,
                                     orderSide = analyzeReport.orderSide
                                 )
-                                // 수수료 출금
-                                val expectedFee = analyzeReport.referenceData["expectedFee"].asDouble()
-                                val feeMoney = accountUseCase.withdraw(expectedFee)
-                                when (feeMoney) {
-                                    is Money.NotAvailableMoney -> {
-                                        symbolUseCase.unUseSymbol(candleStick.symbol)
-                                        accountUseCase.deposit(money.amount)
-                                        return
-                                    }
-
-                                    is Money.AvailableMoney -> {
-                                        val order = OpenOrder.MarketOrder(
-                                            symbol = analyzeReport.symbol,
-                                            price = markPrice.price,
-                                            amount = quantity,
-                                            side = analyzeReport.orderSide,
-                                            withdrawalAmount = money.amount + feeMoney.amount,
-                                            originalPrice = markPrice.price,
-                                            referenceData = analyzeReport.referenceData,
-                                        )
-                                        orderUseCase.sendOrder(order)
-                                    }
-                                }
+                                val order = OpenOrder.MarketOrder(
+                                    symbol = analyzeReport.symbol,
+                                    price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨
+                                    amount = quantity,
+                                    side = analyzeReport.orderSide,
+                                    expectedPrice = (money.allocatedAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    referenceData = analyzeReport.referenceData,
+                                )
+                                orderUseCase.sendOrder(order)
+                                // debug
+                                logger.debug("주문 후 ${accountUseCase.getAccount()}")
                             }
                         }
                     }
@@ -211,7 +230,8 @@ class SingleCandleStrategy(
     }
 
     private fun reClose(event: OrderEvent.OrderImmediatelyTriggerEvent, spec: StrategySpec) {
-        val position = positionUseCase.findOpenedPosition(event.source.positionId)
+        val closeOrder = event.source
+        val position = positionUseCase.findPosition(closeOrder.positionId)
         position?.let {
             val strategyKey = position.referenceData["strategyKey"].asText()
             if (strategyKey != spec.strategyKey) {
@@ -234,6 +254,8 @@ class SingleCandleStrategy(
     }
 
     private fun isValidCandleStick(old: CandleStick, new: CandleStick): Boolean {
+        // TODO: 테스트용이라 제거 필요
+        return true
         val now = Instant.now().toEpochMilli()
         val oneSecond = 1000L
         val oneMinute = 60 * oneSecond
@@ -334,11 +356,6 @@ class SingleCandleStrategy(
                     close = bodyTop + tailLength * decimalTakeProfitFactor
                 )
             ) {
-                val expectedFee = expectedFee(
-                    symbol = candleStick.symbol,
-                    open = bodyTop,
-                    close = bodyTop + tailLength * decimalTakeProfitFactor
-                )
                 val referenceData =
                     ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
                 referenceData.put("strategyType", spec.strategyType.toString())
@@ -347,7 +364,6 @@ class SingleCandleStrategy(
                     "tailLength",
                     DoubleNode(tailLength.toDouble())
                 )
-                referenceData.set<DoubleNode>("expectedFee", DoubleNode(expectedFee))
 
                 return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
@@ -363,11 +379,6 @@ class SingleCandleStrategy(
                     close = bodyBottom + tailLength * operationalHammerRatio
                 )
             ) {
-                val expectedFee = expectedFee(
-                    symbol = candleStick.symbol,
-                    open = tailBottom,
-                    close = bodyBottom + tailLength * operationalHammerRatio
-                )
                 val referenceData =
                     ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
                 referenceData.put("strategyType", spec.strategyType.toString())
@@ -376,7 +387,6 @@ class SingleCandleStrategy(
                     "tailLength",
                     DoubleNode(tailLength.toDouble())
                 )
-                referenceData.set<DoubleNode>("expectedFee", DoubleNode(expectedFee))
 
                 return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
@@ -395,11 +405,6 @@ class SingleCandleStrategy(
                         close = bodyTop + totalLength * decimalTakeProfitFactor
                     )
                 ) {
-                    val expectedFee = expectedFee(
-                        symbol = candleStick.symbol,
-                        open = bodyTop,
-                        close = bodyTop + totalLength * decimalTakeProfitFactor
-                    )
                     val referenceData =
                         ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
                     referenceData.put("strategyType", spec.strategyType.toString())
@@ -408,7 +413,6 @@ class SingleCandleStrategy(
                         "tailLength",
                         DoubleNode(highTailLength.toDouble())
                     )
-                    referenceData.set<DoubleNode>("expectedFee", DoubleNode(expectedFee))
 
                     return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
                 }
@@ -422,11 +426,6 @@ class SingleCandleStrategy(
                         close = bodyBottom + totalLength * decimalTakeProfitFactor
                     )
                 ) {
-                    val expectedFee = expectedFee(
-                        symbol = candleStick.symbol,
-                        open = bodyBottom,
-                        close = bodyBottom + totalLength * decimalTakeProfitFactor
-                    )
                     val referenceData =
                         ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
                     referenceData.put("strategyType", spec.strategyType.toString())
@@ -435,7 +434,6 @@ class SingleCandleStrategy(
                         "tailLength",
                         DoubleNode(lowTailLength.toDouble())
                     )
-                    referenceData.set<DoubleNode>("expectedFee", DoubleNode(expectedFee))
 
                     return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
                 }
@@ -447,7 +445,7 @@ class SingleCandleStrategy(
 
 
     private fun quantity(
-        balance: Double,
+        amount: BigDecimal,
         minNotional: BigDecimal,
         markPrice: BigDecimal,
         takeProfitFactor: Double,
@@ -496,7 +494,7 @@ class SingleCandleStrategy(
             }
 
             OrderMode.NORMAL -> {
-                BigDecimal(balance).divide(markPrice, quantityPrecision, RoundingMode.DOWN).toDouble()
+                amount.divide(markPrice, quantityPrecision, RoundingMode.DOWN).toDouble()
             }
         }
     }
@@ -507,12 +505,6 @@ class SingleCandleStrategy(
         val fee = (open + close).multiply(BigDecimal(commissionRate))
 
         return pnl > fee
-    }
-
-    private fun expectedFee(symbol: Symbol, open: BigDecimal, close: BigDecimal): Double {
-        val commissionRate = symbol.commissionRate
-
-        return (open + close).multiply(BigDecimal(commissionRate)).toDouble()
     }
 
     enum class OrderMode {

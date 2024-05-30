@@ -178,7 +178,7 @@ class RestApiExchangeImpl(
         val bodyJson = om.readTree(bodyString)
 
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
-            .let { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }
+            .let { it["walletBalance"].textValue().toBigDecimal() to it["availableBalance"].textValue().toBigDecimal() }
 
         return Account(balance.first, balance.second)
     }
@@ -357,5 +357,4 @@ class RestApiExchangeImpl(
 
         return jsonResponse
     }
-
 }

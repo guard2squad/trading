@@ -18,19 +18,17 @@ sealed class OpenOrder : Order() {
     abstract val price: Double
     abstract val amount: Double
     abstract val side: OrderSide
-    abstract val originalPrice: Double
-    abstract val withdrawalAmount: Double
+    abstract val expectedPrice: Double
     abstract val referenceData: JsonNode
     lateinit var positionId: String
 
     data class MarketOrder(
         override val orderId: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,
-        override val price: Double,
+        override val price: Double, // entryPrice
         override val amount: Double,
         override val side: OrderSide,
-        override val originalPrice: Double,
-        override val withdrawalAmount: Double,
+        override val expectedPrice: Double,
         override val referenceData: JsonNode,
     ) : OpenOrder()
 }
@@ -68,6 +66,3 @@ sealed class CloseOrder : Order() {
         override val positionId: String
     ) : CloseOrder()
 }
-
-
-
