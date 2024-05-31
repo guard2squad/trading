@@ -79,27 +79,29 @@ class RestApiExchangeImpl(
             val response: String = binanceClient.account().newOrder(parameters)
             logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            logger.error(e.errorCode.toString())
-            logger.error(e.errMsg)
+            logger.debug(e.errorCode.toString())
+            logger.debug(e.errMsg)
             when (e.errorCode) {
                 -2021 -> {
-                    throw OrderFailErrors.RETRYABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw OrderFailErrors.ORDER_IMMEDIATELY_TRIGGERED_ERROR
+                        .error("주문이 바로 체결되는 가격으로 지정가 주문 실패", e, Level.DEBUG, e.errMsg)
                 }
 
                 -4131 -> {
-                    throw OrderFailErrors.IGNORABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw OrderFailErrors.MARKET_ORDER_REJECTED_ERROR
+                        .error("테스트넷의 공급 부족으로 선물 주문 실패", e, Level.DEBUG, e.errMsg)
                 }
 
                 else -> {
-                    throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw RuntimeException("선물 주문 실패")
                 }
             }
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("선물 주문 실패")
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("선물 주문 실패")
         }
     }
 
@@ -160,13 +162,13 @@ class RestApiExchangeImpl(
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.errMsg)
+            throw RuntimeException("주문 취소 실패")
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("주문 취소 실패")
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("주문 취소 실패")
         }
     }
 

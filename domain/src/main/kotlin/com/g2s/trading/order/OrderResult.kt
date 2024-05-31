@@ -20,6 +20,8 @@ sealed class OrderResult {
         abstract val amount: Double
         abstract val commission: Double
         abstract val realizedPnL: Double
+        abstract val averagePrice: Double
+        abstract val accumulatedAmount: Double
 
         data class PartiallyFilled(
             override val orderId: String,
@@ -27,7 +29,9 @@ sealed class OrderResult {
             override val price: Double,
             override val amount: Double,
             override val commission: Double,
-            override val realizedPnL: Double
+            override val realizedPnL: Double,
+            override val averagePrice: Double,
+            override val accumulatedAmount: Double,
         ) : FilledOrderResult()
 
         data class Filled(
@@ -37,8 +41,8 @@ sealed class OrderResult {
             override val amount: Double,
             override val commission: Double,
             override val realizedPnL: Double,
-            val averagePrice: Double,
-            val accumulatedAmount: Double,
+            override val averagePrice: Double,
+            override val accumulatedAmount: Double,
         ) : FilledOrderResult()
     }
 }

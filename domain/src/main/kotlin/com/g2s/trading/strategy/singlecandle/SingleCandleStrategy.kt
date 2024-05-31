@@ -249,8 +249,6 @@ class SingleCandleStrategy(
             position.closeOrderIds.add(new.orderId)
             orderUseCase.sendOrder(new)
         }
-
-
     }
 
     private fun isValidCandleStick(old: CandleStick, new: CandleStick): Boolean {

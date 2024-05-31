@@ -1,6 +1,5 @@
 package com.g2s.trading.position
 
-import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.order.OpenOrder
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -9,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class PositionUseCase(
     private val positionRepository: PositionRepository,
-    private val eventUseCase: EventUseCase,
 ) {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val openedPositions = ConcurrentHashMap<String, Position>()

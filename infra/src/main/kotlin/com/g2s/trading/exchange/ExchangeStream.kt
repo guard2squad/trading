@@ -245,7 +245,9 @@ class ExchangeStream(
                                 price = jsonOrder["L"].asDouble(),
                                 amount = jsonOrder["l"].asDouble(),
                                 commission = jsonOrder["n"].asDouble(),
-                                realizedPnL = jsonOrder["rp"].asDouble()
+                                realizedPnL = jsonOrder["rp"].asDouble(),
+                                averagePrice = jsonOrder["ap"].asDouble(),
+                                accumulatedAmount = jsonOrder["z"].asDouble()
                             )
                             logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble() + " 바이낸스 누적수량(z): " + jsonOrder["z"].asDouble())
                             orderUseCase.handleResult(orderResult)
