@@ -38,18 +38,6 @@ class MongoStrategySpecRepository(
         )
     }
 
-//    override fun findAllServiceStrategySpecByType(type: String): List<NewStrategySpec> {
-//        val query = Query.query(
-//            Criteria.where(NewStrategySpec::status.name).`is`(StrategySpecServiceStatus.SERVICE.name)
-//                .andOperator(
-//                    Criteria.where(NewStrategySpec::strategyType.name).`is`(type)
-//                )
-//        )
-//        return mongoTemplate.find(
-//            query, NewStrategySpec::class.java, SPEC_COLLECTION_NAME
-//        )
-//    }
-
     override fun updateSpec(strategySpec: StrategySpec): StrategySpec {
         val om = ObjectMapperProvider.get()
         val resultDocument = mongoTemplate.db.getCollection(SPEC_COLLECTION_NAME).findOneAndReplace(

@@ -26,7 +26,6 @@ class RestApiExchangeImpl(
 ) : Exchange {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val om = ObjectMapperProvider.get()
-    private val pretty = om.writerWithDefaultPrettyPrinter()
 
     private var positionMode = PositionMode.ONE_WAY_MODE
     private var positionSide = "BOTH"
@@ -75,12 +74,10 @@ class RestApiExchangeImpl(
     override fun sendOrder(order: Order) {
         try {
             val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
-
             val response: String = binanceClient.account().newOrder(parameters)
-            logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
-            logger.debug(e.errorCode.toString())
-            logger.debug(e.errMsg)
+            logger.error(e.errorCode.toString())
+            logger.error(e.errMsg)
             when (e.errorCode) {
                 -2021 -> {
                     throw OrderFailErrors.ORDER_IMMEDIATELY_TRIGGERED_ERROR
@@ -156,9 +153,6 @@ class RestApiExchangeImpl(
                 "origClientOrderId" to orderId
             )
             val response = binanceClient.account().cancelOrder(params)
-            // debug
-            val jsonResponse = om.readTree(response)
-            logger.debug(pretty.writeValueAsString(jsonResponse))
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)

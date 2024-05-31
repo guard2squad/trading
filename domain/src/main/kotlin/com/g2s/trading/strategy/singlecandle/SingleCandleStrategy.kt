@@ -24,7 +24,6 @@ import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategyType
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -42,7 +41,6 @@ class SingleCandleStrategy(
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
 
-    private val logger = LoggerFactory.getLogger(SingleCandleStrategy::class.java)
     private var orderMode = OrderMode.NORMAL
 
     override fun changeOrderMode(orderMode: String) {
@@ -101,28 +99,17 @@ class SingleCandleStrategy(
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
-                        logger.debug("캔들스틱 업데이트 실패")
-                        // debug
-                        logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
                         // 출금 취소
                         accountUseCase.cancelWithdrawal(money)
                         symbolUseCase.unUseSymbol(candleStick.symbol)
-                        // debug
-                        logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                         return
                     }
 
                     is CandleStickUpdateResult.Success -> {
                         // 캔들스틱 유효성 검증
                         if (!isValidCandleStick(updateResult.old, updateResult.new)) {
-                            logger.debug("유효하지 않은 캔들스틱")
-                            // debug
-                            logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
-                            // 출금 취소
                             accountUseCase.cancelWithdrawal(money)
                             symbolUseCase.unUseSymbol(candleStick.symbol)
-                            // debug
-                            logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                             return
                         }
 
@@ -133,14 +120,9 @@ class SingleCandleStrategy(
                         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
                         when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
-                                logger.debug("${candleStick.symbol.value}: NonMatchingReport")
-                                // debug
-                                logger.debug("출금 취소 전: ${accountUseCase.getAccount()}")
                                 /// 출금 취소
                                 accountUseCase.cancelWithdrawal(money)
                                 symbolUseCase.unUseSymbol(candleStick.symbol)
-                                // debug
-                                logger.debug("출금 취소 후: ${accountUseCase.getAccount()}")
                             }
 
                             is AnalyzeReport.MatchingReport -> {
@@ -163,8 +145,6 @@ class SingleCandleStrategy(
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
-                                // debug
-                                logger.debug("주문 후 ${accountUseCase.getAccount()}")
                             }
                         }
                     }
@@ -252,8 +232,6 @@ class SingleCandleStrategy(
     }
 
     private fun isValidCandleStick(old: CandleStick, new: CandleStick): Boolean {
-        // TODO: 테스트용이라 제거 필요
-        return true
         val now = Instant.now().toEpochMilli()
         val oneSecond = 1000L
         val oneMinute = 60 * oneSecond
@@ -311,7 +289,6 @@ class SingleCandleStrategy(
         if (remainder > BigDecimal.ZERO) {
             return (precisePrice - remainder + tickSize).toDouble()
         }
-        // TODO: 최대가격, 최소가격 필터 고려하기
 
         return precisePrice.toDouble()
     }
@@ -346,7 +323,6 @@ class SingleCandleStrategy(
             // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
             val tailLength = tailTop - bodyTop  // tailLength = topTailLength
             val candleHammerRatio = tailLength / bodyLength
-//            logger.debug("top tail")
             if (candleHammerRatio > operationalHammerRatio
                 && isPositivePnl(
                     symbol = candleStick.symbol,
@@ -366,7 +342,6 @@ class SingleCandleStrategy(
                 return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
         } else if (tailBottom < bodyBottom && tailTop == bodyTop) {
-//            logger.debug("bottom tail")
             val tailLength = bodyBottom - tailBottom
             val candleHammerRatio = tailLength / bodyLength
 
@@ -394,7 +369,6 @@ class SingleCandleStrategy(
 
             if (highTailLength > lowTailLength) {
                 // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
-//                logger.debug("middle high tail")
                 val candleHammerRatio = highTailLength / bodyLength
                 if (candleHammerRatio > operationalHammerRatio
                     && isPositivePnl(
@@ -415,7 +389,6 @@ class SingleCandleStrategy(
                     return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
                 }
             } else {
-//                logger.debug("middle high tail")
                 val candleHammerRatio = lowTailLength / bodyLength
                 if (candleHammerRatio > operationalHammerRatio
                     && isPositivePnl(

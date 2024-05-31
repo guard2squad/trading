@@ -15,7 +15,6 @@ import com.g2s.trading.order.OrderUseCase
 import com.g2s.trading.order.OrderResult
 import com.g2s.trading.symbol.SymbolUseCase
 import com.g2s.trading.symbol.Symbol
-import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
@@ -28,7 +27,6 @@ class ExchangeStream(
     private val orderUseCase: OrderUseCase,
     private val symbolUseCase: SymbolUseCase
 ) {
-    private val logger = LoggerFactory.getLogger(this.javaClass)
 
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
@@ -226,9 +224,6 @@ class ExchangeStream(
             when (eventType) {
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE -> {
                     val jsonOrder = eventJson.get("o")
-                    logger.debug(
-                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(jsonOrder)
-                    )
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
@@ -249,7 +244,6 @@ class ExchangeStream(
                                 averagePrice = jsonOrder["ap"].asDouble(),
                                 accumulatedAmount = jsonOrder["z"].asDouble()
                             )
-                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble() + " 바이낸스 누적수량(z): " + jsonOrder["z"].asDouble())
                             orderUseCase.handleResult(orderResult)
                         }
 
@@ -264,7 +258,6 @@ class ExchangeStream(
                                 averagePrice = jsonOrder["ap"].asDouble(),
                                 accumulatedAmount = jsonOrder["z"].asDouble()
                             )
-                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble() + " 바이낸스 누적수량(z): " + jsonOrder["z"].asDouble())
                             orderUseCase.handleResult(orderResult)
                         }
 
@@ -283,9 +276,7 @@ class ExchangeStream(
                 }
 
                 BinanceUserStreamEventType.ACCOUNT_UPDATE -> {
-                    logger.debug(
-                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson)
-                    )
+                    // debug
                 }
             }
         }
