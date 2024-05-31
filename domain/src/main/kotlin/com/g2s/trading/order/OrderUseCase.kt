@@ -1,11 +1,13 @@
 package com.g2s.trading.order
 
-import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.account.AccountUseCase
-import com.g2s.trading.common.ApiErrors
+import com.g2s.trading.common.ApiError
 import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.event.OrderEvent
+import com.g2s.trading.event.PositionEvent
+import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.PositionUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 
@@ -15,9 +17,12 @@ class OrderUseCase(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
-    private val orderRepository: OrderRepository
+    private val pendingOrderRepository: PendingOrderRepository
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
+    private val processingOpenOrders: MutableMap<String, OpenOrder> = mutableMapOf()
+    private val processingCloseOrders: MutableMap<String, CloseOrder> = mutableMapOf()
 
     fun sendOrder(vararg order: Order) {
         order.forEach { send(it) }
@@ -28,14 +33,18 @@ class OrderUseCase(
             is OrderResult.New -> {
                 val order = pendingOrders.remove(result.orderId)
                 order?.run {
-                    orderRepository.deletePendingOrder(result.orderId)
+                    pendingOrderRepository.deleteOrder(result.orderId)
                     when (order) {
                         is OpenOrder -> {
+                            processingOpenOrders[order.orderId] = order
                             positionUseCase.openPosition(order)
                         }
 
                         is CloseOrder -> {
-                            positionUseCase.addCloseOrder(order)
+                            processingCloseOrders[order.orderId] = order
+                            val position = positionUseCase.findPosition(order.positionId)!!
+                            position.closeOrderIds.add(orderId)
+                            positionUseCase.updatePosition(position)
                         }
 
                         else -> {}
@@ -45,48 +54,125 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.PartiallyFilled -> {
-                val position = positionUseCase.findOpenedPosition(result.orderId)
-                position?.run {
-                    if (position.openOrderId == result.orderId) {
-                        positionUseCase.updateOpenedPosition(result)
-                        val expectedExpense = BigDecimal(position.originalPrice) * BigDecimal(result.amount)
-                        val actualExpense = BigDecimal(result.price) * BigDecimal(result.amount)
-                        val expenseVariance = (expectedExpense - actualExpense).toDouble()
-                        accountUseCase.deposit(expenseVariance) // 차액 입금 (음수/양수 상관없음)
-                        accountUseCase.deposit(-result.commission)  // 수수료 음수로 입금
-                    } else {
-                        positionUseCase.updateClosePosition(result)
-                        val realizedPnL = (BigDecimal(result.price) * BigDecimal(result.amount)).toDouble()
-                        accountUseCase.deposit(realizedPnL) // 수익 입금
+                processingOpenOrders[result.orderId]?.let {
+                    val position = positionUseCase.findPosition(it.positionId)
+                    position?.run {
+                        // position update
+                        this.amount = result.accumulatedAmount
+                        this.price = result.averagePrice
+                        positionUseCase.updatePosition(this)
+                        // position update debug
+                        logger.debug("포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        // account debug
+                        logger.debug("계좌 싱크 전: ${accountUseCase.getAccount()}")
+                        // account sync
+                        // 포지션에 할당된 금액 싱크
+                        val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
+                        val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
+                        accountUseCase.reverseTransfer(expectedPositionValue - actualPositionValue)
+                        // 수수료 차액 입금
+                        val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
+                        val actualCommission = BigDecimal(result.commission)
+                        accountUseCase.deposit(expectedCommission - actualCommission)
+                        logger.debug("수수료 차액: " + (expectedCommission - actualCommission))
+                        // account debug
+                        logger.debug("계좌 싱크 후: ${accountUseCase.getAccount()}")
                     }
                 }
-
+                processingCloseOrders[result.orderId]?.let {
+                    val position = positionUseCase.findPosition(it.positionId)
+                    position?.run {
+                        // position update
+                        this.amount -= result.amount
+                        positionUseCase.updatePosition(this)
+                        // position update debug
+                        logger.debug("포지션 양: ${this.amount}")
+                        // account debug
+                        logger.debug("계좌 싱크 전: ${accountUseCase.getAccount()}")
+                        // account sync
+                        // 포지션에 할당된 금액 싱크
+                        val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
+                        accountUseCase.reverseTransfer(closedPositionValue)
+                        // 수수료 차액 입금
+                        val expectedCommission =
+                            BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
+                        val actualCommission = BigDecimal(result.commission)
+                        accountUseCase.deposit(expectedCommission - actualCommission)
+                        logger.debug("수수료 차액: " + (expectedCommission - actualCommission))
+                        // pnl 입금
+                        accountUseCase.deposit(BigDecimal(result.realizedPnL))
+                        // account debug
+                        logger.debug("계좌 싱크 후: ${accountUseCase.getAccount()}")
+                    }
+                }
             }
 
             is OrderResult.FilledOrderResult.Filled -> {
-                val position = positionUseCase.findOpenedPosition(result.orderId)
-                position?.run {
-                    if (position.openOrderId == result.orderId) {
-                        positionUseCase.updateOpenedPosition(result)
-                        val expectedExpense = BigDecimal(position.originalPrice) * BigDecimal(result.amount)
-                        val actualExpense = BigDecimal(result.price) * BigDecimal(result.amount)
-                        val expenseVariance = (expectedExpense - actualExpense).toDouble()
-                        accountUseCase.deposit(expenseVariance) // 차액 입금 (음수/양수 상관없음)
-                        accountUseCase.deposit(-result.commission)  // 수수료 음수로 입금
-                        positionUseCase.syncOpenedPosition(result)
-                        positionUseCase.publishPositionOpenedEvent(result)
-                    } else {
-                        positionUseCase.updateClosePosition(result)
-                        val realizedPnL = (BigDecimal(result.price) * BigDecimal(result.amount)).toDouble()
-                        accountUseCase.deposit(realizedPnL) // 수익 입금
-                        positionUseCase.publishPositionClosedEvent(result)
+                processingOpenOrders.remove(result.orderId)?.let {
+                    val position = positionUseCase.findPosition(it.positionId)
+                    position?.run {
+                        // position update
+                        this.amount = result.accumulatedAmount
+                        this.price = result.averagePrice
+                        positionUseCase.updatePosition(this)
+                        // position update debug
+                        logger.debug("포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        // account debug
+                        logger.debug("계좌 싱크 전: ${accountUseCase.getAccount()}")
+                        // account sync
+                        // 포지션에 할당된 금액 싱크
+                        val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
+                        val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
+                        accountUseCase.reverseTransfer(expectedPositionValue - actualPositionValue)
+                        // 수수료 차액 입금
+                        val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
+                        val actualCommission = BigDecimal(result.commission)
+                        accountUseCase.deposit(expectedCommission - actualCommission)
+                        logger.debug("수수료 차액: " + (expectedCommission - actualCommission))
+                        // account debug
+                        logger.debug("계좌 싱크 후: ${accountUseCase.getAccount()}")
+                        // publish close 주문 트리거
+                        val event = PositionEvent.PositionOpenedEvent(this)
+                        eventUseCase.publishAsyncEvent(event)
+                    }
+                }
+
+                // close
+                processingCloseOrders.remove(result.orderId)?.let {
+                    val position = positionUseCase.findPosition(it.positionId)
+                    position?.run {
+                        this.amount -= result.amount
+                        positionUseCase.updatePosition(this)
+                        // position update debug
+                        logger.debug("포지션 양: ${this.amount}")
+                        // account debug
+                        logger.debug("계좌 싱크 전: ${accountUseCase.getAccount()}")
+                        // account sync
+                        // 포지션에 할당된 금액 싱크
+                        val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
+                        accountUseCase.reverseTransfer(closedPositionValue)
+                        // 수수료 차액 입금
+                        val expectedCommission =
+                            BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
+                        val actualCommission = BigDecimal(result.commission)
+                        accountUseCase.deposit(expectedCommission - actualCommission)
+                        logger.debug("수수료 차액: " + (expectedCommission - actualCommission))
+                        // pnl 입금
+                        accountUseCase.deposit(BigDecimal(result.realizedPnL))
+                        // account debug
+                        logger.debug("계좌 싱크 후: ${accountUseCase.getAccount()}")
+                        // 포지션 삭제
+                        positionUseCase.removePosition(position.positionId)
+                        // publish 반대 close 주문 취소 트리거
+                        val event = PositionEvent.PositionClosedEvent(Pair(position, result.orderId))
+                        eventUseCase.publishAsyncEvent(event)
                     }
                 }
             }
 
             is OrderResult.Canceled -> {
                 pendingOrders.remove(result.orderId)?.let {
-                    orderRepository.deletePendingOrder(result.orderId)
+                    pendingOrderRepository.deleteOrder(result.orderId)
                 } ?: RuntimeException("invalid order id ${result.orderId}")
             }
         }
@@ -94,7 +180,7 @@ class OrderUseCase(
 
     private fun send(order: Order) {
         pendingOrders[order.orderId] = order
-        orderRepository.savePendingOrder(order)
+        pendingOrderRepository.saveOrder(order)
 
         val result: SendOrderResult
         if (order is Order.CancelOrder) {
@@ -116,9 +202,9 @@ class OrderUseCase(
         }
 
         if (result is SendOrderResult.Failure) {
-            orderRepository.deletePendingOrder(order.orderId)
+            pendingOrderRepository.deleteOrder(order.orderId)
 
-            if (result.e as ApiErrors == OrderFailErrors.RETRYABLE_ERROR) {
+            if (result.e is ApiError && result.e.code == OrderFailErrors.ORDER_IMMEDIATELY_TRIGGERED_ERROR.code) {
                 eventUseCase.publishAsyncEvent(OrderEvent.OrderImmediatelyTriggerEvent(order as CloseOrder))
                 return
             }

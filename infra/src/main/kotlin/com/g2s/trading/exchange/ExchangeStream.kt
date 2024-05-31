@@ -226,7 +226,9 @@ class ExchangeStream(
             when (eventType) {
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE -> {
                     val jsonOrder = eventJson.get("o")
-                    logger.debug(ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(jsonOrder))
+                    logger.debug(
+                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(jsonOrder)
+                    )
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
@@ -242,9 +244,12 @@ class ExchangeStream(
                                 symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
                                 price = jsonOrder["L"].asDouble(),
                                 amount = jsonOrder["l"].asDouble(),
-                                commission = jsonOrder["n"].asDouble()
+                                commission = jsonOrder["n"].asDouble(),
+                                realizedPnL = jsonOrder["rp"].asDouble(),
+                                averagePrice = jsonOrder["ap"].asDouble(),
+                                accumulatedAmount = jsonOrder["z"].asDouble()
                             )
-                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble())
+                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble() + " 바이낸스 누적수량(z): " + jsonOrder["z"].asDouble())
                             orderUseCase.handleResult(orderResult)
                         }
 
@@ -255,10 +260,11 @@ class ExchangeStream(
                                 price = jsonOrder["L"].asDouble(),
                                 amount = jsonOrder["l"].asDouble(),
                                 commission = jsonOrder["n"].asDouble(),
+                                realizedPnL = jsonOrder["rp"].asDouble(),
                                 averagePrice = jsonOrder["ap"].asDouble(),
-                                accumulatedAmount = jsonOrder["z"].asDouble(),
-                                realizedPnL = jsonOrder["rp"].asDouble()
+                                accumulatedAmount = jsonOrder["z"].asDouble()
                             )
+                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble() + " 바이낸스 누적수량(z): " + jsonOrder["z"].asDouble())
                             orderUseCase.handleResult(orderResult)
                         }
 
@@ -277,7 +283,9 @@ class ExchangeStream(
                 }
 
                 BinanceUserStreamEventType.ACCOUNT_UPDATE -> {
-
+                    logger.debug(
+                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson)
+                    )
                 }
             }
         }
