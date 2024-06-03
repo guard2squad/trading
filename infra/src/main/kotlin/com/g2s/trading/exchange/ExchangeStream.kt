@@ -49,16 +49,21 @@ class ExchangeStream(
         socketConnectionIds.add(userStreamConnectionId)
     }
 
-    @Scheduled(fixedRate = 59, timeUnit = TimeUnit.MINUTES)
+    @Scheduled(initialDelay = 59, fixedRate = 59, timeUnit = TimeUnit.MINUTES)
     fun scheduleKeepAliveListenKey() {
         keepAliveListenKey()
     }
 
-    @Scheduled(fixedRate = 23, timeUnit = TimeUnit.HOURS)
+    @Scheduled(initialDelay = 23, fixedRate = 23, timeUnit = TimeUnit.HOURS)
     fun scheduleRefreshSocket() {
         // close all connections (A single connection is only valid for 24 hours; expect to be disconnected at the 24hour mark)
         // https://binance-docs.github.io/apidocs/futures/en/#websocket-market-streams
-        socketConnectionIds.forEach { closeConnection(it) }
+        val connectionIdIterator = socketConnectionIds.iterator()
+        while (connectionIdIterator.hasNext()) {
+            val connectionId = connectionIdIterator.next()
+            connectionIdIterator.remove()
+            closeConnection(connectionId)
+        }
 
         // open market stream
         val marketStreamConnectionIds = openMarketStreams()
