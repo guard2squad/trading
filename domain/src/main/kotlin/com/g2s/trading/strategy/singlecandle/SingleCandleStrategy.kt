@@ -258,7 +258,7 @@ class SingleCandleStrategy(
         if (now - new.openTime > oneSecond) {
             return false
         }
-
+        logger.info("현재 시간 - 캔들 스틱 오픈 타임: ${(now - new.openTime) / 1000}")
         return true
     }
 
