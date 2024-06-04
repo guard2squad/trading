@@ -94,6 +94,7 @@ class SingleCandleStrategy(
         when (money) {
             is Money.NotAvailableMoney -> {
                 logger.info("not available money: ${candleStick.symbol.value}")
+                logger.info(accountUseCase.getAccount().toString())
                 symbolUseCase.unUseSymbol(candleStick.symbol)
                 return
             }
@@ -111,7 +112,6 @@ class SingleCandleStrategy(
                     is CandleStickUpdateResult.Success -> {
                         // 캔들스틱 유효성 검증
                         if (!isValidCandleStick(updateResult.old, updateResult.new)) {
-                            logger.info("invaild candle stick: ${candleStick.symbol.value}")
                             // 출금 취소
                             accountUseCase.cancelWithdrawal(money)
                             symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -243,13 +243,11 @@ class SingleCandleStrategy(
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
         if (new.openTime - old.openTime != oneMinute) {
-            logger.info("${new.symbol.value} 1분 차이 X, old opentime: ${old.openTime}, new opentime: ${new.openTime}")
             return false
         }
 
         // 새로 열린지 1초 이하
         if (now - new.openTime > oneSecond) {
-            logger.info("${new.symbol.value} 새로 열린지 1초 지남, new opentime: ${new.openTime}, now: $now")
             return false
         }
 
