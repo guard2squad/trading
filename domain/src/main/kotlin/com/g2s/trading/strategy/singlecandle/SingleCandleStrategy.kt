@@ -243,13 +243,13 @@ class SingleCandleStrategy(
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
         if (new.openTime - old.openTime != oneMinute) {
-            logger.info("1분 차이 X: ${new.symbol.value}")
+            logger.info("${new.symbol.value} 1분 차이 X, old opentime: ${old.openTime}, new opentime: ${new.openTime}")
             return false
         }
 
         // 새로 열린지 1초 이하
         if (now - new.openTime > oneSecond) {
-            logger.info("새로 열린지 1초 지남: ${new.symbol.value}")
+            logger.info("${new.symbol.value} 새로 열린지 1초 지남, new opentime: ${new.openTime}, now: $now")
             return false
         }
 
