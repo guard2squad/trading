@@ -88,7 +88,10 @@ class SingleCandleStrategy(
 
         // symbol lock
         val canUseSymbol = symbolUseCase.useSymbol(candleStick.symbol)
-        if (!canUseSymbol) return
+        if (!canUseSymbol) {
+            logger.info("심볼 사용 중: ${candleStick.symbol.value}")
+            return
+        }
 
         val money = accountUseCase.withdraw(spec, BigDecimal(candleStick.symbol.commissionRate))
         when (money) {
@@ -125,7 +128,7 @@ class SingleCandleStrategy(
                         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
                         when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
-                                logger.info("non-matching-report: ${candleStick.symbol.value}")
+                                logger.info("non-matching-report: ${candleStick.symbol.value}, reason: ${analyzeReport.reason}")
                                 /// 출금 취소
                                 accountUseCase.cancelWithdrawal(money)
                                 symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -327,9 +330,9 @@ class SingleCandleStrategy(
         val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
         val decimalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
-            return AnalyzeReport.NonMatchingReport
+            return AnalyzeReport.NonMatchingReport("바디 길이 0")
         } else if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
-            return AnalyzeReport.NonMatchingReport
+            return AnalyzeReport.NonMatchingReport("바디 / 전체 <= 15%")
         } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
             // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
             val tailLength = tailTop - bodyTop  // tailLength = topTailLength
@@ -422,7 +425,7 @@ class SingleCandleStrategy(
             }
         }
 
-        return AnalyzeReport.NonMatchingReport
+        return AnalyzeReport.NonMatchingReport("매칭에 해당 안 됨")
     }
 
 
