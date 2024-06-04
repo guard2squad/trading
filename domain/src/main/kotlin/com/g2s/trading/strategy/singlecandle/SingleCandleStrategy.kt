@@ -24,6 +24,7 @@ import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategyType
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -41,6 +42,7 @@ class SingleCandleStrategy(
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
 
+    private val logger = LoggerFactory.getLogger(SingleCandleStrategy::class.java)
     private var orderMode = OrderMode.NORMAL
 
     override fun changeOrderMode(orderMode: String) {
@@ -91,6 +93,7 @@ class SingleCandleStrategy(
         val money = accountUseCase.withdraw(spec, BigDecimal(candleStick.symbol.commissionRate))
         when (money) {
             is Money.NotAvailableMoney -> {
+                logger.info("not available money: ${candleStick.symbol.value}")
                 symbolUseCase.unUseSymbol(candleStick.symbol)
                 return
             }
@@ -99,6 +102,7 @@ class SingleCandleStrategy(
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
+                        logger.info("candel stick update fail: ${candleStick.symbol.value}")
                         // 출금 취소
                         accountUseCase.cancelWithdrawal(money)
                         symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -108,6 +112,7 @@ class SingleCandleStrategy(
                     is CandleStickUpdateResult.Success -> {
                         // 캔들스틱 유효성 검증
                         if (!isValidCandleStick(updateResult.old, updateResult.new)) {
+                            logger.info("invaild candle stick: ${candleStick.symbol.value}")
                             // 출금 취소
                             accountUseCase.cancelWithdrawal(money)
                             symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -121,6 +126,7 @@ class SingleCandleStrategy(
                         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
                         when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
+                                logger.info("non-matching-report: ${candleStick.symbol.value}")
                                 /// 출금 취소
                                 accountUseCase.cancelWithdrawal(money)
                                 symbolUseCase.unUseSymbol(candleStick.symbol)
