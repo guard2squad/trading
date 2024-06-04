@@ -145,6 +145,11 @@ class SingleCandleStrategy(
                                     quantityPrecision = analyzeReport.symbol.quantityPrecision,
                                     orderSide = analyzeReport.orderSide
                                 )
+                                if (quantity == 0.0) {
+                                    accountUseCase.cancelWithdrawal(money)
+                                    symbolUseCase.unUseSymbol(candleStick.symbol)
+                                    return
+                                }
                                 val order = OpenOrder.MarketOrder(
                                     symbol = analyzeReport.symbol,
                                     price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨

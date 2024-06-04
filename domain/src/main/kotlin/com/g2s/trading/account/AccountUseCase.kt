@@ -13,21 +13,19 @@ class AccountUseCase(
 ) {
     private val logger = LoggerFactory.getLogger(AccountUseCase::class.java)
     private lateinit var localAccount: Account
-    private val lock = AtomicBoolean(false)
 
     init {
         localAccount = loadAccount()
     }
 
+    @Synchronized
     fun withdraw(spec: StrategySpec, commissionRate: BigDecimal): Money {
-        if (!acquire()) return Money.NotAvailableMoney
         localAccount.sync()
         // 포지션에 할당된 금액 이동
         val allocatedAmount =
             localAccount.totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
         if (allocatedAmount > localAccount.availableBalance) {
             logger.info("allocatedAmount: $allocatedAmount > availableBalance: ${localAccount.availableBalance}")
-            release()
             return Money.NotAvailableMoney
         }
         localAccount.transfer(allocatedAmount)
@@ -36,11 +34,9 @@ class AccountUseCase(
         if (expectedFee > localAccount.availableBalance) {
             logger.info("expectedFee: $expectedFee > availableBalance: ${localAccount.availableBalance}")
             localAccount.transfer(-allocatedAmount)
-            release()
             return Money.NotAvailableMoney
         }
         localAccount.withdraw(expectedFee)
-        release()
 
         return Money.AvailableMoney(allocatedAmount, expectedFee)
     }
@@ -61,14 +57,6 @@ class AccountUseCase(
 
     fun getAccount(): Account {
         return localAccount
-    }
-
-    private fun acquire(): Boolean {
-        return lock.compareAndSet(false, true)
-    }
-
-    private fun release(): Boolean {
-        return lock.compareAndSet(true, false)
     }
 
     private fun loadAccount(): Account {
