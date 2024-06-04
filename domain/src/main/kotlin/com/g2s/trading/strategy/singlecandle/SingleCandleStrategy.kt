@@ -102,7 +102,6 @@ class SingleCandleStrategy(
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
-                        logger.info("candel stick update fail: ${candleStick.symbol.value}")
                         // 출금 취소
                         accountUseCase.cancelWithdrawal(money)
                         symbolUseCase.unUseSymbol(candleStick.symbol)
@@ -243,10 +242,16 @@ class SingleCandleStrategy(
         val oneSecond = 1000L
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
-        if (new.openTime - old.openTime != oneMinute) return false
+        if (new.openTime - old.openTime != oneMinute) {
+            logger.info("1분 차이 X: ${new.symbol.value}")
+            return false
+        }
 
         // 새로 열린지 1초 이하
-        if (now - new.openTime > oneSecond) return false
+        if (now - new.openTime > oneSecond) {
+            logger.info("새로 열린지 1초 지남: ${new.symbol.value}")
+            return false
+        }
 
         return true
     }
