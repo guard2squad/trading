@@ -92,8 +92,16 @@ class SingleCandleStrategy(
             logger.info("심볼 사용 중: ${candleStick.symbol.value}")
             return
         }
-
-        val money = accountUseCase.withdraw(spec, BigDecimal(candleStick.symbol.commissionRate))
+        // 스펙에 따라 심볼에 할당된 금액
+        val allocatedAmount =
+            accountUseCase.getAccount().totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
+        // (거래소 제약)심볼에 허용된 최소 주문 금액
+        val minOrderAmount = BigDecimal(candleStick.symbol.minimumNotionalValue)
+        // 예상 포지션 명목 가치
+        val expectedPositionAmount = allocatedAmount.max(minOrderAmount)
+        // 예상 수수료
+        val expectedFee = expectedPositionAmount * BigDecimal(candleStick.symbol.commissionRate) * BigDecimal(2)
+        val money = accountUseCase.withdraw(expectedPositionAmount, expectedFee)
         when (money) {
             is Money.NotAvailableMoney -> {
                 logger.info("not available money: ${candleStick.symbol.value}")
@@ -107,7 +115,7 @@ class SingleCandleStrategy(
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
                         // 출금 취소
-                        accountUseCase.cancelWithdrawal(money)
+                        accountUseCase.undoWithdrawal(money)
                         symbolUseCase.unUseSymbol(candleStick.symbol)
                         return
                     }
@@ -116,7 +124,7 @@ class SingleCandleStrategy(
                         // 캔들스틱 유효성 검증
                         if (!isValidCandleStick(updateResult.old, updateResult.new)) {
                             // 출금 취소
-                            accountUseCase.cancelWithdrawal(money)
+                            accountUseCase.undoWithdrawal(money)
                             symbolUseCase.unUseSymbol(candleStick.symbol)
                             return
                         }
@@ -130,13 +138,13 @@ class SingleCandleStrategy(
                             is AnalyzeReport.NonMatchingReport -> {
                                 logger.info("non-matching-report: ${candleStick.symbol.value}, reason: ${analyzeReport.reason}")
                                 /// 출금 취소
-                                accountUseCase.cancelWithdrawal(money)
+                                accountUseCase.undoWithdrawal(money)
                                 symbolUseCase.unUseSymbol(candleStick.symbol)
                             }
 
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
-                                    amount = money.allocatedAmount,
+                                    amount = money.positionAmount,
                                     minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
                                     markPrice = BigDecimal(markPrice.price),
                                     takeProfitFactor = takeProfitFactor,
@@ -146,7 +154,7 @@ class SingleCandleStrategy(
                                     orderSide = analyzeReport.orderSide
                                 )
                                 if (quantity == 0.0) {
-                                    accountUseCase.cancelWithdrawal(money)
+                                    accountUseCase.undoWithdrawal(money)
                                     symbolUseCase.unUseSymbol(candleStick.symbol)
                                     return
                                 }
@@ -155,7 +163,7 @@ class SingleCandleStrategy(
                                     price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨
                                     amount = quantity,
                                     side = analyzeReport.orderSide,
-                                    expectedPrice = (money.allocatedAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    expectedPrice = (money.positionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
@@ -251,6 +259,7 @@ class SingleCandleStrategy(
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
         if (new.openTime - old.openTime != oneMinute) {
+            logger.info("${old.symbol.value}  갱신: ${new.openTime}, 이전: ${old.openTime}")
             return false
         }
 
@@ -258,7 +267,7 @@ class SingleCandleStrategy(
         if (now - new.openTime > oneSecond) {
             return false
         }
-        logger.info("현재 시간 - 캔들 스틱 오픈 타임: ${(now - new.openTime) / 1000}")
+        logger.info("${old.symbol.value} 현재 시간 - 캔들 스틱 오픈 타임: ${(now - new.openTime) / 1000}")
         return true
     }
 

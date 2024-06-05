@@ -1,7 +1,6 @@
 package com.g2s.trading.account
 
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.strategy.StrategySpec
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 
@@ -16,29 +15,23 @@ class AccountUseCase(
     }
 
     @Synchronized
-    fun withdraw(spec: StrategySpec, commissionRate: BigDecimal): Money {
-        localAccount.sync()
-        // 포지션에 할당된 금액 이동
-        val allocatedAmount =
-            localAccount.totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
-        if (allocatedAmount > localAccount.availableBalance) {
-            return Money.NotAvailableMoney
+    fun withdraw(positionNotionalValue: BigDecimal, commission: BigDecimal): Money {
+        if (positionNotionalValue > localAccount.availableBalance) {
+            return Money.NotAvailableMoney("예상 포지션 명목 가치 > 사용 가능 금액")
         }
-        localAccount.transfer(allocatedAmount)
-        // 예상 수수료 계산
-        val expectedFee = allocatedAmount * commissionRate * BigDecimal(2)
-        if (expectedFee > localAccount.availableBalance) {
-            localAccount.transfer(-allocatedAmount)
-            return Money.NotAvailableMoney
+        localAccount.transfer(positionNotionalValue)
+        if (commission > localAccount.availableBalance) {
+            return Money.NotAvailableMoney("수수료 > 사용 가능 금액")
         }
-        localAccount.withdraw(expectedFee)
+        localAccount.withdraw(commission)
 
-        return Money.AvailableMoney(allocatedAmount, expectedFee)
+        return Money.AvailableMoney(positionNotionalValue, commission)
     }
 
-    fun cancelWithdrawal(money: Money.AvailableMoney) {
-        localAccount.transfer(-money.allocatedAmount)
-        localAccount.deposit(money.expectedFee)
+    @Synchronized
+    fun undoWithdrawal(money: Money.AvailableMoney) {
+        localAccount.transfer(-money.positionAmount)
+        localAccount.deposit(money.fee)
     }
 
     fun deposit(amount: BigDecimal) {
