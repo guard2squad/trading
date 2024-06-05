@@ -16,7 +16,8 @@ class OrderUseCase(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
-    private val pendingOrderRepository: PendingOrderRepository
+    private val pendingOrderRepository: PendingOrderRepository,
+    private val processingOrderRepository: ProcessingOrderRepository
 ) {
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
     private val processingOpenOrders: MutableMap<String, OpenOrder> = mutableMapOf()
@@ -35,11 +36,13 @@ class OrderUseCase(
                     when (order) {
                         is OpenOrder -> {
                             processingOpenOrders[order.orderId] = order
+                            processingOrderRepository.saveOrder(order)
                             positionUseCase.openPosition(order)
                         }
 
                         is CloseOrder -> {
                             processingCloseOrders[order.orderId] = order
+                            processingOrderRepository.saveOrder(order)
                             val position = positionUseCase.findPosition(order.positionId)!!
                             position.closeOrderIds.add(orderId)
                             positionUseCase.updatePosition(position)
@@ -52,8 +55,8 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.PartiallyFilled -> {
-                processingOpenOrders[result.orderId]?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingOpenOrders[result.orderId]?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
                         // position update
                         this.amount = result.accumulatedAmount
@@ -70,8 +73,8 @@ class OrderUseCase(
                         accountUseCase.deposit(expectedCommission - actualCommission)
                     }
                 }
-                processingCloseOrders[result.orderId]?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingCloseOrders[result.orderId]?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
                         // position update
                         this.amount -= result.amount
@@ -92,8 +95,8 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.Filled -> {
-                processingOpenOrders.remove(result.orderId)?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingOpenOrders.remove(result.orderId)?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
                         // position update
                         this.amount = result.accumulatedAmount
@@ -112,11 +115,12 @@ class OrderUseCase(
                         val event = PositionEvent.PositionOpenedEvent(this)
                         eventUseCase.publishAsyncEvent(event)
                     }
+                    processingOrderRepository.deleteOrder(order.orderId)
                 }
 
                 // close
-                processingCloseOrders.remove(result.orderId)?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingCloseOrders.remove(result.orderId)?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
                         // position update
                         this.amount -= result.amount
@@ -138,6 +142,7 @@ class OrderUseCase(
                         val event = PositionEvent.PositionClosedEvent(Pair(position, result.orderId))
                         eventUseCase.publishAsyncEvent(event)
                     }
+                    processingOrderRepository.deleteOrder(order.orderId)
                 }
             }
 

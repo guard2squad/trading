@@ -29,6 +29,7 @@ import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
+import kotlin.math.log
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.reflect.KClass
@@ -80,6 +81,7 @@ class SingleCandleStrategy(
 
     private fun open(event: TradingEvent.CandleStickEvent, spec: StrategySpec) {
         val candleStick = event.source
+        logger.debug("캔들 이벤트: ${candleStick.symbol.value}")
 
         // check symbol
         if (!spec.symbols.contains(candleStick.symbol.value)) {
@@ -259,7 +261,7 @@ class SingleCandleStrategy(
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
         if (new.openTime - old.openTime != oneMinute) {
-            logger.info("${old.symbol.value}  갱신: ${new.openTime}, 이전: ${old.openTime}")
+            logger.info("이전과 같은 1분봉: ${old.symbol.value}  갱신: ${new.openTime}, 이전: ${old.openTime}")
             return false
         }
 
