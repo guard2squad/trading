@@ -16,6 +16,7 @@ class AccountUseCase(
 
     @Synchronized
     fun withdraw(positionNotionalValue: BigDecimal, commission: BigDecimal): Money {
+        localAccount.sync()
         if (positionNotionalValue > localAccount.availableBalance) {
             return Money.NotAvailableMoney("예상 포지션 명목 가치 > 사용 가능 금액")
         }

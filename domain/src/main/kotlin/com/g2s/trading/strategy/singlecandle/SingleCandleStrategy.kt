@@ -29,7 +29,6 @@ import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
-import kotlin.math.log
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.reflect.KClass
@@ -106,7 +105,7 @@ class SingleCandleStrategy(
         val money = accountUseCase.withdraw(expectedPositionAmount, expectedFee)
         when (money) {
             is Money.NotAvailableMoney -> {
-                logger.info("not available money: ${candleStick.symbol.value}")
+                logger.info("not available money: ${candleStick.symbol.value}, reason: ${money.reason}")
                 logger.info(accountUseCase.getAccount().toString())
                 symbolUseCase.unUseSymbol(candleStick.symbol)
                 return
@@ -347,103 +346,108 @@ class SingleCandleStrategy(
         val decimalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             return AnalyzeReport.NonMatchingReport("바디 길이 0")
-        } else if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
+        }
+
+        if ((bodyLength.divide(totalLength, 3, RoundingMode.HALF_UP)) <= BigDecimal(0.15)) {
             return AnalyzeReport.NonMatchingReport("바디 / 전체 <= 15%")
-        } else if (tailTop > bodyTop && tailBottom == bodyBottom) {
-            // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
-            val tailLength = tailTop - bodyTop  // tailLength = topTailLength
-            val candleHammerRatio = tailLength / bodyLength
-            if (candleHammerRatio > operationalHammerRatio
-                && isPositivePnl(
+        }
+
+        val pattern = SingleCandlePattern.entries.find { it.matches(tailTop, bodyTop, tailBottom, bodyBottom) }
+
+        val report: AnalyzeReport
+        when (pattern) {
+            SingleCandlePattern.TOP_TAIL -> {
+                val tailLength = tailTop - bodyTop
+                val canOpen = tailLength / bodyLength > operationalHammerRatio
+                val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyTop,
                     close = bodyTop + tailLength * decimalTakeProfitFactor
                 )
-            ) {
-                val referenceData =
-                    ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
-                referenceData.put("strategyType", spec.strategyType.toString())
-                referenceData.put("strategyKey", spec.strategyKey)
-                referenceData.set<DoubleNode>(
-                    "tailLength",
-                    DoubleNode(tailLength.toDouble())
-                )
-
-                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                if (!canOpen) {
+                    return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
+                }
+                if (!isPositivePnL) {
+                    return AnalyzeReport.NonMatchingReport("PNL 미달")
+                }
+                val referenceData = createReferenceData(candleStick, spec, tailLength)
+                report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
-        } else if (tailBottom < bodyBottom && tailTop == bodyTop) {
-            val tailLength = bodyBottom - tailBottom
-            val candleHammerRatio = tailLength / bodyLength
 
-            if (candleHammerRatio > operationalHammerRatio
-                && isPositivePnl(
+            SingleCandlePattern.BOTTOM_TAIL -> {
+                val tailLength = bodyBottom - tailBottom
+                val canOpen = tailLength / bodyLength > operationalHammerRatio
+                val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyBottom,
                     close = bodyBottom + tailLength * decimalTakeProfitFactor
                 )
-            ) {
-                val referenceData =
-                    ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
-                referenceData.put("strategyType", spec.strategyType.toString())
-                referenceData.put("strategyKey", spec.strategyKey)
-                referenceData.set<DoubleNode>(
-                    "tailLength",
-                    DoubleNode(tailLength.toDouble())
-                )
-
-                return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                if (!canOpen) {
+                    return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
+                }
+                if (!isPositivePnL) {
+                    return AnalyzeReport.NonMatchingReport("PNL 미달")
+                }
+                val referenceData = createReferenceData(candleStick, spec, tailLength)
+                report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
-        } else {
-            val highTailLength = tailTop - bodyTop
-            val lowTailLength = bodyBottom - tailBottom
 
-            if (highTailLength > lowTailLength) {
-                // 예상 구매 가격: bodyTop, 예상 익절 가격: bodyTop + topTailLength * takeProfitFactor
-                val candleHammerRatio = highTailLength / bodyLength
-                if (candleHammerRatio > operationalHammerRatio
-                    && isPositivePnl(
-                        symbol = candleStick.symbol,
-                        open = bodyTop,
-                        close = bodyTop + totalLength * decimalTakeProfitFactor
-                    )
-                ) {
-                    val referenceData =
-                        ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
-                    referenceData.put("strategyType", spec.strategyType.toString())
-                    referenceData.put("strategyKey", spec.strategyKey)
-                    referenceData.set<DoubleNode>(
-                        "tailLength",
-                        DoubleNode(highTailLength.toDouble())
-                    )
-
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+            SingleCandlePattern.MIDDLE_HIGH_TAIL -> {
+                val highTailLength = tailTop - bodyTop
+                val canOpen = highTailLength / bodyLength > operationalHammerRatio
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyTop,
+                    close = bodyTop + totalLength * decimalTakeProfitFactor
+                )
+                if (!canOpen) {
+                    return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
                 }
-            } else {
-                val candleHammerRatio = lowTailLength / bodyLength
-                if (candleHammerRatio > operationalHammerRatio
-                    && isPositivePnl(
-                        symbol = candleStick.symbol,
-                        open = bodyBottom,
-                        close = bodyBottom + totalLength * decimalTakeProfitFactor
-                    )
-                ) {
-                    val referenceData =
-                        ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
-                    referenceData.put("strategyType", spec.strategyType.toString())
-                    referenceData.put("strategyKey", spec.strategyKey)
-                    referenceData.set<DoubleNode>(
-                        "tailLength",
-                        DoubleNode(lowTailLength.toDouble())
-                    )
-
-                    return AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+                if (!isPositivePnL) {
+                    return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
+                val referenceData = createReferenceData(candleStick, spec, highTailLength)
+                report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+            }
+
+            SingleCandlePattern.MIDDLE_LOW_TAIL -> {
+                val lowTailLength = bodyBottom - tailBottom
+                val canOpen = lowTailLength / bodyLength > operationalHammerRatio
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyBottom,
+                    close = bodyBottom + totalLength * decimalTakeProfitFactor
+                )
+                if (!canOpen) {
+                    return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
+                }
+                if (!isPositivePnL) {
+                    return AnalyzeReport.NonMatchingReport("PNL 미달")
+                }
+                val referenceData = createReferenceData(candleStick, spec, lowTailLength)
+                report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
+            }
+
+            null -> {
+                return AnalyzeReport.NonMatchingReport("매칭에 해당 안 됨")
             }
         }
-
-        return AnalyzeReport.NonMatchingReport("매칭에 해당 안 됨")
+        return report
     }
 
+    private fun createReferenceData(
+        candleStick: CandleStick,
+        spec: StrategySpec,
+        tailLength: BigDecimal
+    ): ObjectNode {
+        val referenceData =
+            ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
+        referenceData.put("strategyType", spec.strategyType.toString())
+        referenceData.put("strategyKey", spec.strategyKey)
+        referenceData.set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
+
+        return referenceData
+    }
 
     private fun quantity(
         amount: BigDecimal,
@@ -500,7 +504,7 @@ class SingleCandleStrategy(
         }
     }
 
-    private fun isPositivePnl(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
+    private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
         val commissionRate = symbol.commissionRate
         val pnl = (open - close).abs()
         val fee = (open + close).multiply(BigDecimal(commissionRate))
