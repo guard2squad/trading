@@ -53,7 +53,8 @@ class SymbolUseCase(
             minimumPrice = exchangeImpl.getMinPrice(symbolValue),
             tickSize = exchangeImpl.getTickSize(symbolValue),
             commissionRate = exchangeImpl.getCommissionRate(symbolValue),
-            leverage = exchangeImpl.getLeverage(symbolValue)
+            leverage = exchangeImpl.getLeverage(symbolValue),
+            quotePrecision = exchangeImpl.getQuotePrecision(symbolValue),
         )
     }
 }

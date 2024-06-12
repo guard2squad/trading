@@ -9,6 +9,7 @@ import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.PositionUseCase
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Service
 class OrderUseCase(
@@ -66,7 +67,15 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.transferToAvailable((expectedPositionValue - actualPositionValue).divide(BigDecimal(this.symbol.leverage)))
+                        // 레버리지로 나눠서 포지션 마진 차이 입금
+                        accountUseCase.transferToAvailable(
+                            (expectedPositionValue - actualPositionValue)
+                                .divide(
+                                    BigDecimal(this.symbol.leverage),
+                                    this.symbol.quotePrecision,
+                                    RoundingMode.HALF_UP
+                                )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
@@ -82,7 +91,14 @@ class OrderUseCase(
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.transferToAvailable(closedPositionValue.divide(BigDecimal(this.symbol.leverage)))
+                        // 레버리지로 나눠서 포지션 마진 차이 입금
+                        accountUseCase.transferToAvailable(
+                            closedPositionValue.divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
@@ -106,7 +122,13 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.transferToAvailable((expectedPositionValue - actualPositionValue).divide(BigDecimal(this.symbol.leverage)))
+                        accountUseCase.transferToAvailable(
+                            (expectedPositionValue - actualPositionValue).divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
@@ -128,7 +150,13 @@ class OrderUseCase(
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.transferToAvailable(closedPositionValue.divide(BigDecimal(this.symbol.leverage)))
+                        accountUseCase.transferToAvailable(
+                            closedPositionValue.divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)

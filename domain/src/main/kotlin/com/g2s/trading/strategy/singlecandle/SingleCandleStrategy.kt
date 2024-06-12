@@ -95,12 +95,14 @@ class SingleCandleStrategy(
         }
         // 스펙에 따라 심볼에 할당된 금액
         val allocatedAmount =
-            accountUseCase.getAccount().totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
+            (accountUseCase.getAccount().totalBalance * BigDecimal(spec.allocatedRatio))
+                .divide(BigDecimal(spec.symbols.size), candleStick.symbol.quotePrecision, RoundingMode.HALF_UP)
         // (거래소 제약)심볼에 허용된 최소 주문 금액
         val minOrderAmount = BigDecimal(candleStick.symbol.minimumNotionalValue)
         // 예상 포지션 출금액 == 예상 포지션 가치(마진) / 레버리지
         val expectedPositionAmount = allocatedAmount.max(minOrderAmount)
-        val expectedWithdrawalAmount = (expectedPositionAmount).divide(BigDecimal(candleStick.symbol.leverage))
+        val expectedWithdrawalAmount = expectedPositionAmount
+            .divide(BigDecimal(candleStick.symbol.leverage), candleStick.symbol.quotePrecision, RoundingMode.HALF_UP)
         // 예상 수수료
         val expectedFee = expectedPositionAmount * BigDecimal(candleStick.symbol.commissionRate) * BigDecimal(2)
         val money = accountUseCase.withdraw(expectedWithdrawalAmount, expectedFee)
@@ -140,7 +142,7 @@ class SingleCandleStrategy(
                         when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
                                 logger.info("non-matching-report: ${candleStick.symbol.value}, reason: ${analyzeReport.reason}")
-                                /// 출금 취소
+                                // 출금 취소
                                 accountUseCase.undoWithdrawal(money)
                                 symbolUseCase.unUseSymbol(candleStick.symbol)
                             }

@@ -269,6 +269,11 @@ class RestApiExchangeImpl(
         return changedLeverage
     }
 
+    override fun getQuotePrecision(symbolValue: String): Int {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("quotePrecision").asInt()
+    }
+
     /**
      * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
      *

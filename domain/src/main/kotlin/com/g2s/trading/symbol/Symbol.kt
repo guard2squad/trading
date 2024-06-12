@@ -9,4 +9,5 @@ data class Symbol(
     val tickSize: Double,
     val commissionRate: Double,
     val leverage: Int,
+    val quotePrecision: Int
 )
