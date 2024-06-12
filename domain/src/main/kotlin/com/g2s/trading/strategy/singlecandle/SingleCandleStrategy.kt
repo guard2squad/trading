@@ -112,6 +112,7 @@ class SingleCandleStrategy(
             }
 
             is Money.AvailableMoney -> {
+                logger.info("AvailableMoney 출금" + accountUseCase.getAccount().toString())
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
