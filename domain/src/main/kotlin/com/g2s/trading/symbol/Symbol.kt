@@ -8,4 +8,5 @@ data class Symbol(
     val minimumPrice: Double,
     val tickSize: Double,
     val commissionRate: Double,
+    val leverage: Int,
 )

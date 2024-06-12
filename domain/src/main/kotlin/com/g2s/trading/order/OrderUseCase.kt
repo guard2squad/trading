@@ -66,7 +66,7 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.transferToAvailable(expectedPositionValue - actualPositionValue)
+                        accountUseCase.transferToAvailable((expectedPositionValue - actualPositionValue).divide(BigDecimal(this.symbol.leverage)))
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
@@ -82,7 +82,7 @@ class OrderUseCase(
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.transferToAvailable(closedPositionValue)
+                        accountUseCase.transferToAvailable(closedPositionValue.divide(BigDecimal(this.symbol.leverage)))
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
@@ -106,7 +106,7 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.transferToAvailable(expectedPositionValue - actualPositionValue)
+                        accountUseCase.transferToAvailable((expectedPositionValue - actualPositionValue).divide(BigDecimal(this.symbol.leverage)))
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
@@ -128,7 +128,7 @@ class OrderUseCase(
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.transferToAvailable(closedPositionValue)
+                        accountUseCase.transferToAvailable(closedPositionValue.divide(BigDecimal(this.symbol.leverage)))
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
@@ -147,6 +147,11 @@ class OrderUseCase(
             }
 
             is OrderResult.Canceled -> {
+                // 로컬에서 요청한 CANCEL 주문이 접수 됨
+                pendingOrders.remove(result.orderId)?.let {
+                    pendingOrderRepository.deleteOrder(result.orderId)
+                } ?: RuntimeException("invalid order id ${result.orderId}")
+                // FILLED or CANCELLED 로 상태가 변하기를 기다리던 주문 제거
                 processingCloseOrders.remove(result.orderId)?.let {
                     processingOrderRepository.deleteOrder(result.orderId)
                 } ?: RuntimeException("invalid order id ${result.orderId}")

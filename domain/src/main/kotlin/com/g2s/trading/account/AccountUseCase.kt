@@ -15,19 +15,19 @@ class AccountUseCase(
     }
 
     @Synchronized
-    fun withdraw(positionNotionalValue: BigDecimal, commission: BigDecimal): Money {
+    fun withdraw(positionMargin: BigDecimal, commission: BigDecimal): Money {
         localAccount.sync()
-        if (positionNotionalValue > localAccount.availableBalance) {
+        if (positionMargin > localAccount.availableBalance) {
             return Money.NotAvailableMoney("예상 포지션 명목 가치 > 사용 가능 금액")
         }
-        localAccount.transfer(positionNotionalValue)
+        localAccount.transfer(positionMargin)
         if (commission > localAccount.availableBalance) {
-            localAccount.transfer(-positionNotionalValue)
+            localAccount.transfer(-positionMargin)
             return Money.NotAvailableMoney("수수료 > 사용 가능 금액")
         }
         localAccount.withdraw(commission)
 
-        return Money.AvailableMoney(positionNotionalValue, commission)
+        return Money.AvailableMoney(positionMargin, commission)
     }
 
     @Synchronized

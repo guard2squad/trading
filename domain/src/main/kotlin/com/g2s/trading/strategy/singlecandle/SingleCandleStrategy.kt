@@ -98,11 +98,12 @@ class SingleCandleStrategy(
             accountUseCase.getAccount().totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
         // (거래소 제약)심볼에 허용된 최소 주문 금액
         val minOrderAmount = BigDecimal(candleStick.symbol.minimumNotionalValue)
-        // 예상 포지션 명목 가치
+        // 예상 포지션 출금액 == 예상 포지션 가치(마진) / 레버리지
         val expectedPositionAmount = allocatedAmount.max(minOrderAmount)
+        val expectedWithdrawalAmount = (expectedPositionAmount).divide(BigDecimal(candleStick.symbol.leverage))
         // 예상 수수료
         val expectedFee = expectedPositionAmount * BigDecimal(candleStick.symbol.commissionRate) * BigDecimal(2)
-        val money = accountUseCase.withdraw(expectedPositionAmount, expectedFee)
+        val money = accountUseCase.withdraw(expectedWithdrawalAmount, expectedFee)
         when (money) {
             is Money.NotAvailableMoney -> {
                 logger.info("not available money: ${candleStick.symbol.value}, reason: ${money.reason}")
@@ -112,7 +113,7 @@ class SingleCandleStrategy(
             }
 
             is Money.AvailableMoney -> {
-                logger.info("AvailableMoney 출금" + accountUseCase.getAccount().toString())
+                logger.info("${candleStick.symbol.value} AvailableMoney 출금" + accountUseCase.getAccount().toString())
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
