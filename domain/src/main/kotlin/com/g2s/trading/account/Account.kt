@@ -8,7 +8,6 @@ data class Account(
     var totalBalance: BigDecimal,
     var availableBalance: BigDecimal,
     var unavailableBalance: BigDecimal = BigDecimal.ZERO,
-    var unSyncedMoney: BigDecimal = BigDecimal.ZERO,
 ) {
     private val decimalFormat = DecimalFormat("#.##").apply { roundingMode = RoundingMode.HALF_EVEN }
 
@@ -18,7 +17,7 @@ data class Account(
 
     @Synchronized
     fun deposit(amount: BigDecimal) {
-        unSyncedMoney += amount
+        availableBalance += amount
     }
 
     @Synchronized
@@ -28,16 +27,13 @@ data class Account(
     }
 
     fun sync() {
-        availableBalance += unSyncedMoney
         totalBalance = availableBalance + unavailableBalance
-        unSyncedMoney = BigDecimal.ZERO
     }
 
     override fun toString(): String {
         return "Account(totalBalance=${format(totalBalance)}, " +
                 "availableBalance=${format(availableBalance)}, " +
-                "unavailableBalance=${format(unavailableBalance)}, " +
-                "unSyncedMoney=${format(unSyncedMoney)})"
+                "unavailableBalance=${format(unavailableBalance)}, "
     }
 
     private fun format(amount: BigDecimal): String {

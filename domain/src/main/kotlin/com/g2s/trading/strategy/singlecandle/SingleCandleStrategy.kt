@@ -146,7 +146,6 @@ class SingleCandleStrategy(
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
                                     amount = money.positionAmount,
-                                    minNotional = BigDecimal(analyzeReport.symbol.minimumNotionalValue),
                                     markPrice = BigDecimal(markPrice.price),
                                     takeProfitFactor = takeProfitFactor,
                                     stopLossFactor = stopLossFactor,
@@ -451,7 +450,6 @@ class SingleCandleStrategy(
 
     private fun quantity(
         amount: BigDecimal,
-        minNotional: BigDecimal,
         markPrice: BigDecimal,
         takeProfitFactor: Double,
         stopLossFactor: Double,
@@ -459,49 +457,42 @@ class SingleCandleStrategy(
         quantityPrecision: Int,
         orderSide: OrderSide
     ): Double {
-        return when (orderMode) {
-            OrderMode.MINIMUM_QUANTITY -> {
-                // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
-                // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
-                val quantity = minNotional.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
-                var takeProfitQuantity: Double
-                var stopLossQuantity: Double
-                when (orderSide) {
-                    OrderSide.LONG -> {
-                        takeProfitQuantity = minNotional.divide(
-                            markPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
-                            quantityPrecision,
-                            RoundingMode.CEILING
-                        ).toDouble()
+        // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
+        // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
+        val quantity = amount.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+        val takeProfitQuantity: Double
+        val stopLossQuantity: Double
+        when (orderSide) {
+            OrderSide.LONG -> {
+                takeProfitQuantity = amount.divide(
+                    markPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                    quantityPrecision,
+                    RoundingMode.CEILING
+                ).toDouble()
 
-                        stopLossQuantity = minNotional.divide(
-                            markPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
-                            quantityPrecision,
-                            RoundingMode.CEILING
-                        ).toDouble()
-                    }
-
-                    OrderSide.SHORT -> {
-                        takeProfitQuantity = minNotional.divide(
-                            markPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
-                            quantityPrecision,
-                            RoundingMode.CEILING
-                        ).toDouble()
-
-                        stopLossQuantity = minNotional.divide(
-                            markPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
-                            quantityPrecision,
-                            RoundingMode.CEILING
-                        ).toDouble()
-                    }
-                }
-                maxOf(takeProfitQuantity, stopLossQuantity, quantity)
+                stopLossQuantity = amount.divide(
+                    markPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
+                    quantityPrecision,
+                    RoundingMode.CEILING
+                ).toDouble()
             }
 
-            OrderMode.NORMAL -> {
-                amount.divide(markPrice, quantityPrecision, RoundingMode.DOWN).toDouble()
+            OrderSide.SHORT -> {
+                takeProfitQuantity = amount.divide(
+                    markPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                    quantityPrecision,
+                    RoundingMode.CEILING
+                ).toDouble()
+
+                stopLossQuantity = amount.divide(
+                    markPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
+                    quantityPrecision,
+                    RoundingMode.CEILING
+                ).toDouble()
             }
         }
+
+        return maxOf(takeProfitQuantity, stopLossQuantity, quantity)
     }
 
     private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {

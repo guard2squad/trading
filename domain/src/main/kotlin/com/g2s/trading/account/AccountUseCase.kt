@@ -20,10 +20,11 @@ class AccountUseCase(
         if (positionNotionalValue > localAccount.availableBalance) {
             return Money.NotAvailableMoney("예상 포지션 명목 가치 > 사용 가능 금액")
         }
+        localAccount.transfer(positionNotionalValue)
         if (commission > localAccount.availableBalance) {
+            localAccount.transfer(-positionNotionalValue)
             return Money.NotAvailableMoney("수수료 > 사용 가능 금액")
         }
-        localAccount.transfer(positionNotionalValue)
         localAccount.withdraw(commission)
 
         return Money.AvailableMoney(positionNotionalValue, commission)
