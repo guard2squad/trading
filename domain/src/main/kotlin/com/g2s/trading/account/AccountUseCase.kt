@@ -41,7 +41,7 @@ class AccountUseCase(
     }
 
     // unavailable -> available
-    fun reverseTransfer(amount: BigDecimal) {
+    fun transferToAvailable(amount: BigDecimal) {
         localAccount.transfer(-amount)
     }
 
