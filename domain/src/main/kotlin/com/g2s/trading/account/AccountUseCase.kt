@@ -32,7 +32,7 @@ class AccountUseCase(
 
     @Synchronized
     fun undoWithdrawal(money: Money.AvailableMoney) {
-        localAccount.transfer(-money.positionAmount)
+        localAccount.transfer(-money.positionMargin)
         localAccount.deposit(money.fee)
     }
 

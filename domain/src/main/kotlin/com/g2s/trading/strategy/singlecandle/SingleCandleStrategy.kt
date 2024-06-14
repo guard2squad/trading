@@ -27,11 +27,13 @@ import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
+import java.math.MathContext
 import java.math.RoundingMode
 import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.reflect.KClass
+
 
 @Component
 class SingleCandleStrategy(
@@ -115,7 +117,10 @@ class SingleCandleStrategy(
             }
 
             is Money.AvailableMoney -> {
-                logger.info("${candleStick.symbol.value} AvailableMoney 출금" + accountUseCase.getAccount().toString())
+                logger.info(
+                    "${candleStick.symbol.value} AvailableMoney 출금: " + money.toString() + " 계좌: " + accountUseCase.getAccount()
+                        .toString()
+                )
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
@@ -149,12 +154,12 @@ class SingleCandleStrategy(
 
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
-                                    amount = money.positionAmount,
+                                    amount = money.positionMargin,
                                     markPrice = BigDecimal(markPrice.price),
                                     takeProfitFactor = takeProfitFactor,
                                     stopLossFactor = stopLossFactor,
                                     tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
-                                    quantityPrecision = analyzeReport.symbol.quantityPrecision,
+                                    symbol = candleStick.symbol,
                                     orderSide = analyzeReport.orderSide
                                 )
                                 if (quantity == 0.0) {
@@ -167,7 +172,7 @@ class SingleCandleStrategy(
                                     price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨
                                     amount = quantity,
                                     side = analyzeReport.orderSide,
-                                    expectedPrice = (money.positionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    expectedPrice = (money.positionMargin / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
@@ -458,23 +463,27 @@ class SingleCandleStrategy(
         takeProfitFactor: Double,
         stopLossFactor: Double,
         tailLength: Double,
-        quantityPrecision: Int,
+        symbol: Symbol,
         orderSide: OrderSide
     ): Double {
         // "code":-4164,"msg":"Order's notional must be no smaller than 100 (unless you choose reduce only)."
         // 수량이 부족하다는 이유로 예외가 너무 자주 떠서 올림으로 처리함
-        val quantity = amount.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
+        val leverage = symbol.leverage
+        val quantityPrecision = symbol.quantityPrecision
+        val positionNotionalValue =
+            amount.multiply(BigDecimal(leverage), MathContext(symbol.quotePrecision, RoundingMode.HALF_UP))
+        val quantity = positionNotionalValue.divide(markPrice, quantityPrecision, RoundingMode.CEILING).toDouble()
         val takeProfitQuantity: Double
         val stopLossQuantity: Double
         when (orderSide) {
             OrderSide.LONG -> {
-                takeProfitQuantity = amount.divide(
+                takeProfitQuantity = positionNotionalValue.divide(
                     markPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
                     quantityPrecision,
                     RoundingMode.CEILING
                 ).toDouble()
 
-                stopLossQuantity = amount.divide(
+                stopLossQuantity = positionNotionalValue.divide(
                     markPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
                     quantityPrecision,
                     RoundingMode.CEILING
@@ -482,13 +491,13 @@ class SingleCandleStrategy(
             }
 
             OrderSide.SHORT -> {
-                takeProfitQuantity = amount.divide(
+                takeProfitQuantity = positionNotionalValue.divide(
                     markPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
                     quantityPrecision,
                     RoundingMode.CEILING
                 ).toDouble()
 
-                stopLossQuantity = amount.divide(
+                stopLossQuantity = positionNotionalValue.divide(
                     markPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor)),
                     quantityPrecision,
                     RoundingMode.CEILING
