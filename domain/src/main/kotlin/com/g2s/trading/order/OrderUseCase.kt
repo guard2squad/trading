@@ -7,6 +7,7 @@ import com.g2s.trading.event.OrderEvent
 import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.PositionUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -20,6 +21,7 @@ class OrderUseCase(
     private val pendingOrderRepository: PendingOrderRepository,
     private val processingOrderRepository: ProcessingOrderRepository
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
     private val processingOpenOrders: MutableMap<String, OpenOrder> = mutableMapOf()
     private val processingCloseOrders: MutableMap<String, CloseOrder> = mutableMapOf()
@@ -80,6 +82,9 @@ class OrderUseCase(
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
                         accountUseCase.deposit(expectedCommission - actualCommission)
+                        // debug
+                        logger.info("OPEN ORDER PARTIALLY FILLED 후 포지션: $this")
+                        logger.info("OPEN ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
                     }
                 }
                 processingCloseOrders[result.orderId]?.let { order ->
@@ -106,6 +111,9 @@ class OrderUseCase(
                         accountUseCase.deposit(expectedCommission - actualCommission)
                         // pnl 입금
                         accountUseCase.deposit(BigDecimal(result.realizedPnL))
+                        // debug
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 후 포지션: $this")
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
                     }
                 }
             }
@@ -136,6 +144,9 @@ class OrderUseCase(
                         // publish close 주문 트리거
                         val event = PositionEvent.PositionOpenedEvent(this)
                         eventUseCase.publishAsyncEvent(event)
+                        // debug
+                        logger.info("OPEN ORDER 완전히 FILLED 후 포지션: $this")
+                        logger.info("OPEN ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }
@@ -169,6 +180,8 @@ class OrderUseCase(
                         // publish 반대 close 주문 취소 트리거
                         val event = PositionEvent.PositionClosedEvent(Pair(position, result.orderId))
                         eventUseCase.publishAsyncEvent(event)
+                        // debug
+                        logger.info("CLOSE ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }
