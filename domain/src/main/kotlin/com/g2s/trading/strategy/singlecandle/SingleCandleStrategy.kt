@@ -27,7 +27,6 @@ import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
-import java.math.MathContext
 import java.math.RoundingMode
 import java.time.Instant
 import kotlin.math.max
@@ -154,7 +153,7 @@ class SingleCandleStrategy(
 
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
-                                    amount = money.positionMargin,
+                                    amount = expectedPositionAmount,
                                     markPrice = BigDecimal(markPrice.price),
                                     takeProfitFactor = takeProfitFactor,
                                     stopLossFactor = stopLossFactor,
@@ -268,7 +267,7 @@ class SingleCandleStrategy(
         val oneMinute = 60 * oneSecond
         // 이전 꺼랑 1분 차이
         if (new.openTime - old.openTime != oneMinute) {
-            logger.info("이전과 같은 1분봉: ${old.symbol.value}  갱신: ${new.openTime}, 이전: ${old.openTime}")
+//            logger.info("이전과 같은 1분봉: ${old.symbol.value}  갱신: ${new.openTime}, 이전: ${old.openTime}")
             return false
         }
 
