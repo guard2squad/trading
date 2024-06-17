@@ -15,12 +15,10 @@ data class Account(
         availableBalance -= amount
     }
 
-    @Synchronized
     fun deposit(amount: BigDecimal) {
         availableBalance += amount
     }
 
-    @Synchronized
     fun transfer(amount: BigDecimal) {
         availableBalance -= amount
         unavailableBalance += amount
