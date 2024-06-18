@@ -27,6 +27,7 @@ import com.g2s.trading.symbol.SymbolUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
+import java.math.MathContext
 import java.math.RoundingMode
 import java.time.Instant
 import kotlin.math.max
@@ -100,10 +101,19 @@ class SingleCandleStrategy(
                 .divide(BigDecimal(spec.symbols.size), candleStick.symbol.quotePrecision, RoundingMode.HALF_UP)
         // (거래소 제약)심볼에 허용된 최소 주문 금액
         val minOrderAmount = BigDecimal(candleStick.symbol.minimumNotionalValue)
-        // 예상 포지션 출금액 == 예상 포지션 가치(마진) / 레버리지
-        val expectedPositionAmount = allocatedAmount.max(minOrderAmount)
-        val expectedWithdrawalAmount = expectedPositionAmount
-            .divide(BigDecimal(candleStick.symbol.leverage), candleStick.symbol.quotePrecision, RoundingMode.HALF_UP)
+        // 예상 포지션 출금액 == Max(스펙에 따라 심볼에 할당된 금액, 예상 포지션 가치(마진) / 레버리지)
+        val expectedWithdrawalAmount = allocatedAmount.max(
+            minOrderAmount.divide(
+                BigDecimal(candleStick.symbol.leverage),
+                candleStick.symbol.quotePrecision,
+                RoundingMode.HALF_UP
+            )
+        )
+        // 예상 포지션 명목 가치 == 예상 포지션 출금액 * 레버리지
+        val expectedPositionAmount = expectedWithdrawalAmount.multiply(
+            BigDecimal(candleStick.symbol.leverage),
+            MathContext(candleStick.symbol.quotePrecision, RoundingMode.HALF_UP)
+        )
         // 예상 수수료
         val expectedFee = expectedPositionAmount * BigDecimal(candleStick.symbol.commissionRate) * BigDecimal(2)
         val money = accountUseCase.withdraw(expectedWithdrawalAmount, expectedFee)
@@ -171,7 +181,7 @@ class SingleCandleStrategy(
                                     price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨
                                     amount = quantity,
                                     side = analyzeReport.orderSide,
-                                    expectedPrice = (money.positionMargin / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    expectedPrice = (expectedPositionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
