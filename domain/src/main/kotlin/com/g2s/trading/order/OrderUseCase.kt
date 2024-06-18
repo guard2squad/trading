@@ -64,6 +64,7 @@ class OrderUseCase(
                         // debug
                         logger.info("OPEN ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -88,6 +89,7 @@ class OrderUseCase(
                         // debug
                         logger.info("OPEN ORDER PARTIALLY FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                     }
                 }
                 processingCloseOrders[result.orderId]?.let { order ->
@@ -96,6 +98,7 @@ class OrderUseCase(
                         // debug
                         logger.info("CLOSE ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("CLOSE ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
@@ -120,6 +123,7 @@ class OrderUseCase(
                         // debug
                         logger.info("CLOSE ORDER PARTIALLY FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("CLOSE ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                     }
                 }
             }
@@ -131,6 +135,7 @@ class OrderUseCase(
                         // debug
                         logger.info("OPEN ORDER 완전히 FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -156,6 +161,7 @@ class OrderUseCase(
                         // debug
                         logger.info("OPEN ORDER 완전히 FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }
@@ -166,6 +172,7 @@ class OrderUseCase(
                     position?.run {
                         // debug
                         logger.info("CLOSE ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
@@ -193,6 +200,7 @@ class OrderUseCase(
                         eventUseCase.publishAsyncEvent(event)
                         // debug
                         logger.info("CLOSE ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        accountUseCase.printAccount()
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }

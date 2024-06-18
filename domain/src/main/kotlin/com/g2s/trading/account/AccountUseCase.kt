@@ -69,12 +69,15 @@ class AccountUseCase(
     fun getAccount(): Account {
         lock.readLock().lock()
         try {
-            // debug
-            exchangeImpl.getAccount()
             return localAccount
         } finally {
             lock.readLock().unlock()
         }
+    }
+
+    // debug
+    fun printAccount() {
+        exchangeImpl.getAccount()
     }
 
     private fun loadAccount(): Account {

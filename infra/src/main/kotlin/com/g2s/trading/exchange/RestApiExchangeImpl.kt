@@ -177,7 +177,10 @@ class RestApiExchangeImpl(
         val bodyJson = om.readTree(bodyString)
 
         // debug
-        logger.info(om.writerWithDefaultPrettyPrinter().writeValueAsString(bodyJson))
+        logger.info(
+            om.writerWithDefaultPrettyPrinter()
+                .writeValueAsString((bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" })
+        )
 
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
             .let { it["walletBalance"].textValue().toBigDecimal() to it["availableBalance"].textValue().toBigDecimal() }
