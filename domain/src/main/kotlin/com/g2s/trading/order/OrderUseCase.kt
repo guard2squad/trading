@@ -61,6 +61,9 @@ class OrderUseCase(
                 processingOpenOrders[result.orderId]?.let { order ->
                     val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        // debug
+                        logger.info("OPEN ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -90,6 +93,9 @@ class OrderUseCase(
                 processingCloseOrders[result.orderId]?.let { order ->
                     val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        // debug
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
@@ -122,6 +128,9 @@ class OrderUseCase(
                 processingOpenOrders.remove(result.orderId)?.let { order ->
                     val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        // debug
+                        logger.info("OPEN ORDER 완전히 FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -155,6 +164,8 @@ class OrderUseCase(
                 processingCloseOrders.remove(result.orderId)?.let { order ->
                     val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        // debug
+                        logger.info("CLOSE ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
