@@ -176,6 +176,9 @@ class RestApiExchangeImpl(
         val bodyString = binanceClient.account().accountInformation(parameters)
         val bodyJson = om.readTree(bodyString)
 
+        // debug
+        logger.info(om.writerWithDefaultPrettyPrinter().writeValueAsString(bodyJson))
+
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
             .let { it["walletBalance"].textValue().toBigDecimal() to it["availableBalance"].textValue().toBigDecimal() }
 
