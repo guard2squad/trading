@@ -1,71 +1,84 @@
 package com.g2s.trading.account
 
 import com.g2s.trading.exchange.Exchange
-import com.g2s.trading.strategy.StrategySpec
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 @Service
 class AccountUseCase(
     private val exchangeImpl: Exchange
 ) {
     private lateinit var localAccount: Account
-    private val lock = AtomicBoolean(false)
+    private val lock = ReentrantReadWriteLock()
 
     init {
         localAccount = loadAccount()
     }
 
-    fun withdraw(spec: StrategySpec, commissionRate: BigDecimal): Money {
-        if (!acquire()) return Money.NotAvailableMoney
-        localAccount.sync()
-        // 포지션에 할당된 금액 이동
-        val allocatedAmount =
-            localAccount.totalBalance * BigDecimal(spec.allocatedRatio) / BigDecimal(spec.symbols.size)
-        if (allocatedAmount > localAccount.availableBalance) {
-            release()
-            return Money.NotAvailableMoney
-        }
-        localAccount.transfer(allocatedAmount)
-        // 예상 수수료 계산
-        val expectedFee = allocatedAmount * commissionRate * BigDecimal(2)
-        if (expectedFee > localAccount.availableBalance) {
-            localAccount.transfer(-allocatedAmount)
-            release()
-            return Money.NotAvailableMoney
-        }
-        localAccount.withdraw(expectedFee)
-        release()
+    fun withdraw(positionMargin: BigDecimal, commission: BigDecimal): Money {
+        lock.writeLock().lock()
+        try {
+            localAccount.sync()
+            if (positionMargin > localAccount.availableBalance) {
+                return Money.NotAvailableMoney("예상 포지션 명목 가치 > 사용 가능 금액")
+            }
+            localAccount.transfer(positionMargin)
+            if (commission > localAccount.availableBalance) {
+                localAccount.transfer(-positionMargin)
+                return Money.NotAvailableMoney("수수료 > 사용 가능 금액")
+            }
+            localAccount.withdraw(commission)
 
-        return Money.AvailableMoney(allocatedAmount, expectedFee)
+            return Money.AvailableMoney(positionMargin, commission)
+        } finally {
+            lock.writeLock().unlock()
+        }
     }
 
-    fun cancelWithdrawal(money: Money.AvailableMoney) {
-        localAccount.transfer(-money.allocatedAmount)
-        localAccount.deposit(money.expectedFee)
+    fun undoWithdrawal(money: Money.AvailableMoney) {
+        lock.writeLock().lock()
+        try {
+            localAccount.transfer(-money.positionMargin)
+            localAccount.deposit(money.fee)
+        } finally {
+            lock.writeLock().unlock()
+        }
     }
 
     fun deposit(amount: BigDecimal) {
-        localAccount.deposit(amount)
+        lock.writeLock().lock()
+        try {
+            localAccount.deposit(amount)
+        } finally {
+            lock.writeLock().unlock()
+        }
     }
 
     // unavailable -> available
-    fun reverseTransfer(amount: BigDecimal) {
-        localAccount.transfer(-amount)
+    fun transferToAvailable(amount: BigDecimal) {
+        lock.writeLock().lock()
+        try {
+            localAccount.transfer(-amount)
+        } finally {
+            lock.writeLock().unlock()
+        }
+
     }
 
     fun getAccount(): Account {
-        return localAccount
+        lock.readLock().lock()
+        try {
+            return localAccount
+        } finally {
+            lock.readLock().unlock()
+        }
     }
 
-    private fun acquire(): Boolean {
-        return lock.compareAndSet(false, true)
-    }
-
-    private fun release(): Boolean {
-        return lock.compareAndSet(true, false)
-    }
+//    // debug
+//    fun printAccount() {
+//        exchangeImpl.getAccount()
+//    }
 
     private fun loadAccount(): Account {
         return exchangeImpl.getAccount()

@@ -7,8 +7,10 @@ import com.g2s.trading.event.OrderEvent
 import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exchange.Exchange
 import com.g2s.trading.position.PositionUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Service
 class OrderUseCase(
@@ -16,8 +18,10 @@ class OrderUseCase(
     private val positionUseCase: PositionUseCase,
     private val accountUseCase: AccountUseCase,
     private val eventUseCase: EventUseCase,
-    private val pendingOrderRepository: PendingOrderRepository
+    private val pendingOrderRepository: PendingOrderRepository,
+    private val processingOrderRepository: ProcessingOrderRepository
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
     private val processingOpenOrders: MutableMap<String, OpenOrder> = mutableMapOf()
     private val processingCloseOrders: MutableMap<String, CloseOrder> = mutableMapOf()
@@ -35,11 +39,13 @@ class OrderUseCase(
                     when (order) {
                         is OpenOrder -> {
                             processingOpenOrders[order.orderId] = order
+                            processingOrderRepository.saveOrder(order)
                             positionUseCase.openPosition(order)
                         }
 
                         is CloseOrder -> {
                             processingCloseOrders[order.orderId] = order
+                            processingOrderRepository.saveOrder(order)
                             val position = positionUseCase.findPosition(order.positionId)!!
                             position.closeOrderIds.add(orderId)
                             positionUseCase.updatePosition(position)
@@ -52,9 +58,13 @@ class OrderUseCase(
             }
 
             is OrderResult.FilledOrderResult.PartiallyFilled -> {
-                processingOpenOrders[result.orderId]?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingOpenOrders[result.orderId]?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        logger.info("OPEN ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -63,23 +73,46 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.reverseTransfer(expectedPositionValue - actualPositionValue)
+                        // 레버리지로 나눠서 포지션 마진 차이 입금
+                        accountUseCase.transferToAvailable(
+                            (expectedPositionValue - actualPositionValue)
+                                .divide(
+                                    BigDecimal(this.symbol.leverage),
+                                    this.symbol.quotePrecision,
+                                    RoundingMode.HALF_UP
+                                )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
                         accountUseCase.deposit(expectedCommission - actualCommission)
+                        logger.info("OPEN ORDER PARTIALLY FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                     }
                 }
-                processingCloseOrders[result.orderId]?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingCloseOrders[result.orderId]?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.reverseTransfer(closedPositionValue)
+                        // 레버리지로 나눠서 포지션 마진 차이 입금
+                        accountUseCase.transferToAvailable(
+                            closedPositionValue.divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
@@ -87,14 +120,22 @@ class OrderUseCase(
                         accountUseCase.deposit(expectedCommission - actualCommission)
                         // pnl 입금
                         accountUseCase.deposit(BigDecimal(result.realizedPnL))
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("CLOSE ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                     }
                 }
             }
 
             is OrderResult.FilledOrderResult.Filled -> {
-                processingOpenOrders.remove(result.orderId)?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingOpenOrders.remove(result.orderId)?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        logger.info("OPEN ORDER 완전히 FILLED 전 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                         // position update
                         this.amount = result.accumulatedAmount
                         this.price = result.averagePrice
@@ -103,7 +144,13 @@ class OrderUseCase(
                         // 포지션에 할당된 금액 싱크
                         val expectedPositionValue = BigDecimal(this.expectedPrice) * BigDecimal(result.amount)
                         val actualPositionValue = BigDecimal(result.price) * BigDecimal(result.amount)
-                        accountUseCase.reverseTransfer(expectedPositionValue - actualPositionValue)
+                        accountUseCase.transferToAvailable(
+                            (expectedPositionValue - actualPositionValue).divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission = expectedPositionValue * BigDecimal(this.symbol.commissionRate)
                         val actualCommission = BigDecimal(result.commission)
@@ -111,20 +158,34 @@ class OrderUseCase(
                         // publish close 주문 트리거
                         val event = PositionEvent.PositionOpenedEvent(this)
                         eventUseCase.publishAsyncEvent(event)
+                        logger.info("OPEN ORDER 완전히 FILLED 후 포지션 양: ${this.amount}, 포지션 금액: ${this.price}")
+                        logger.info("OPEN ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                     }
+                    processingOrderRepository.deleteOrder(order.orderId)
                 }
 
                 // close
-                processingCloseOrders.remove(result.orderId)?.let {
-                    val position = positionUseCase.findPosition(it.positionId)
+                processingCloseOrders.remove(result.orderId)?.let { order ->
+                    val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
+                        logger.info("CLOSE ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                         // position update
                         this.amount -= result.amount
                         positionUseCase.updatePosition(this)
                         // account sync
                         // 포지션에 할당된 금액 싱크
                         val closedPositionValue = (BigDecimal(this.price) * BigDecimal(result.amount))
-                        accountUseCase.reverseTransfer(closedPositionValue)
+                        accountUseCase.transferToAvailable(
+                            closedPositionValue.divide(
+                                BigDecimal(this.symbol.leverage),
+                                this.symbol.quotePrecision,
+                                RoundingMode.HALF_UP
+                            )
+                        )
                         // 수수료 차액 입금
                         val expectedCommission =
                             BigDecimal(this.expectedPrice) * BigDecimal(result.amount) * BigDecimal(this.symbol.commissionRate)
@@ -137,13 +198,22 @@ class OrderUseCase(
                         // publish 반대 close 주문 취소 트리거
                         val event = PositionEvent.PositionClosedEvent(Pair(position, result.orderId))
                         eventUseCase.publishAsyncEvent(event)
+                        logger.info("CLOSE ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+//                        accountUseCase.printAccount()
                     }
+                    processingOrderRepository.deleteOrder(order.orderId)
                 }
             }
 
             is OrderResult.Canceled -> {
+                // 로컬에서 요청한 CANCEL 주문이 접수 됨
                 pendingOrders.remove(result.orderId)?.let {
                     pendingOrderRepository.deleteOrder(result.orderId)
+                } ?: RuntimeException("invalid order id ${result.orderId}")
+                // FILLED or CANCELLED 로 상태가 변하기를 기다리던 주문 제거
+                processingCloseOrders.remove(result.orderId)?.let {
+                    processingOrderRepository.deleteOrder(result.orderId)
                 } ?: RuntimeException("invalid order id ${result.orderId}")
             }
         }

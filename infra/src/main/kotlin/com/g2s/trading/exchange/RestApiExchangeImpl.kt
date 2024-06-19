@@ -176,6 +176,12 @@ class RestApiExchangeImpl(
         val bodyString = binanceClient.account().accountInformation(parameters)
         val bodyJson = om.readTree(bodyString)
 
+        // debug
+        logger.info(
+            om.writerWithDefaultPrettyPrinter()
+                .writeValueAsString((bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" })
+        )
+
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
             .let { it["walletBalance"].textValue().toBigDecimal() to it["availableBalance"].textValue().toBigDecimal() }
 
@@ -267,6 +273,11 @@ class RestApiExchangeImpl(
         val changedLeverage = jsonResponse.get("leverage").asInt()
 
         return changedLeverage
+    }
+
+    override fun getQuotePrecision(symbolValue: String): Int {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("quotePrecision").asInt()
     }
 
     /**

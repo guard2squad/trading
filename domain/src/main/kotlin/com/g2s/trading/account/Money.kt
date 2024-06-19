@@ -5,9 +5,11 @@ import java.math.BigDecimal
 sealed class Money {
 
     data class AvailableMoney(
-        val allocatedAmount: BigDecimal,
-        val expectedFee: BigDecimal,
+        val positionMargin: BigDecimal,
+        val fee: BigDecimal,
     ) : Money()
 
-    object NotAvailableMoney : Money()
+    data class NotAvailableMoney(
+        val reason: String
+    ) : Money()
 }

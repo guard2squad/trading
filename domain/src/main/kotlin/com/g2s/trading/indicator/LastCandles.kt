@@ -1,7 +1,6 @@
 package com.g2s.trading.indicator
 
 import com.g2s.trading.symbol.Symbol
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 object LastCandles {
