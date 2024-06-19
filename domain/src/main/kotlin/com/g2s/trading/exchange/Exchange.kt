@@ -24,4 +24,5 @@ interface Exchange {
     fun setLeverage(symbolValue: String, leverage: Int): Int
     fun getHistoryInfo(order: Order): JsonNode?
     fun getCurrentBalance(timeStamp: Long): Double
+    fun getQuotePrecision(symbolValue: String): Int
 }

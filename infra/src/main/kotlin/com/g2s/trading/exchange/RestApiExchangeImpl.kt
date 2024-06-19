@@ -26,7 +26,6 @@ class RestApiExchangeImpl(
 ) : Exchange {
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val om = ObjectMapperProvider.get()
-    private val pretty = om.writerWithDefaultPrettyPrinter()
 
     private var positionMode = PositionMode.ONE_WAY_MODE
     private var positionSide = "BOTH"
@@ -77,29 +76,30 @@ class RestApiExchangeImpl(
             val parameters = BinanceOrderParameterConverter.toNewOrderParam(order)
 
             val response: String = binanceClient.account().newOrder(parameters)
-            logger.debug("POST /fapi/v1/order 주문 api 응답: " + pretty.writeValueAsString(om.readTree(response)))
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)
             when (e.errorCode) {
                 -2021 -> {
-                    throw OrderFailErrors.RETRYABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw OrderFailErrors.ORDER_IMMEDIATELY_TRIGGERED_ERROR
+                        .error("주문이 바로 체결되는 가격으로 지정가 주문 실패", e, Level.DEBUG, e.errMsg)
                 }
 
                 -4131 -> {
-                    throw OrderFailErrors.IGNORABLE_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw OrderFailErrors.MARKET_ORDER_REJECTED_ERROR
+                        .error("테스트넷의 공급 부족으로 선물 주문 실패", e, Level.DEBUG, e.errMsg)
                 }
 
                 else -> {
-                    throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.errMsg)
+                    throw RuntimeException("선물 주문 실패")
                 }
             }
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("선물 주문 실패")
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("선물 주문 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("선물 주문 실패")
         }
     }
 
@@ -156,17 +156,16 @@ class RestApiExchangeImpl(
             val response = binanceClient.account().cancelOrder(params)
             // debug
             val jsonResponse = om.readTree(response)
-            logger.debug(pretty.writeValueAsString(jsonResponse))
         } catch (e: BinanceClientException) {
             logger.error(e.errorCode.toString())
             logger.error(e.errMsg)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.errMsg)
+            throw RuntimeException("주문 취소 실패")
         } catch (e: BinanceServerException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("주문 취소 실패")
         } catch (e: BinanceConnectorException) {
             logger.error(e.message)
-            throw OrderFailErrors.UNKNOWN_ERROR.error("주문 취소 실패", e, Level.ERROR, e.message)
+            throw RuntimeException("주문 취소 실패")
         }
     }
 
@@ -177,8 +176,14 @@ class RestApiExchangeImpl(
         val bodyString = binanceClient.account().accountInformation(parameters)
         val bodyJson = om.readTree(bodyString)
 
+        // debug
+        logger.info(
+            om.writerWithDefaultPrettyPrinter()
+                .writeValueAsString((bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" })
+        )
+
         val balance = (bodyJson["assets"] as ArrayNode).first { it["asset"].textValue() == "USDT" }
-            .let { it["walletBalance"].textValue().toDouble() to it["availableBalance"].textValue().toDouble() }
+            .let { it["walletBalance"].textValue().toBigDecimal() to it["availableBalance"].textValue().toBigDecimal() }
 
         return Account(balance.first, balance.second)
     }
@@ -270,6 +275,11 @@ class RestApiExchangeImpl(
         return changedLeverage
     }
 
+    override fun getQuotePrecision(symbolValue: String): Int {
+        return exchangeInfo.get("symbols")
+            .find { node -> node.get("symbol").asText() == symbolValue }!!.get("quotePrecision").asInt()
+    }
+
     /**
      * 주어진 타임스탬프를 기반으로 Binance에서 특정 자산(USDT)의 잔고를 조회합니다.
      *
@@ -357,5 +367,4 @@ class RestApiExchangeImpl(
 
         return jsonResponse
     }
-
 }

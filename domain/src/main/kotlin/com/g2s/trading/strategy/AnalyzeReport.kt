@@ -8,8 +8,10 @@ sealed class AnalyzeReport {
     data class MatchingReport(
         val symbol: Symbol,
         val orderSide: OrderSide,
-        val referenceData : JsonNode
+        val referenceData: JsonNode
     ) : AnalyzeReport()
 
-    object NonMatchingReport : AnalyzeReport()
+    data class NonMatchingReport(
+        val reason: String
+    ) : AnalyzeReport()
 }

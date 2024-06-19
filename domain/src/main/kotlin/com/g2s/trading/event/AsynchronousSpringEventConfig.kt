@@ -19,7 +19,7 @@ class AsynchronousSpringEventConfig {
     @Bean
     fun taskExecutor(): ThreadPoolTaskExecutor {
         val taskExecutor = ThreadPoolTaskExecutor().apply {
-            corePoolSize = 5
+            corePoolSize = 10
             setPrestartAllCoreThreads(true)
         }
 

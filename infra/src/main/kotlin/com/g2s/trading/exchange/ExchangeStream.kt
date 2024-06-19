@@ -33,6 +33,9 @@ class ExchangeStream(
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
 
+    // 임시로 승/패 보기 위함
+    private val scoreBoard: MutableMap<String, WinLose> = mutableMapOf()
+
     init {
         // create or get listen key
         listenKey = getListenKey()
@@ -49,16 +52,21 @@ class ExchangeStream(
         socketConnectionIds.add(userStreamConnectionId)
     }
 
-    @Scheduled(fixedRate = 59, timeUnit = TimeUnit.MINUTES)
+    @Scheduled(initialDelay = 59, fixedRate = 59, timeUnit = TimeUnit.MINUTES)
     fun scheduleKeepAliveListenKey() {
         keepAliveListenKey()
     }
 
-    @Scheduled(fixedRate = 23, timeUnit = TimeUnit.HOURS)
+    @Scheduled(initialDelay = 23, fixedRate = 23, timeUnit = TimeUnit.HOURS)
     fun scheduleRefreshSocket() {
         // close all connections (A single connection is only valid for 24 hours; expect to be disconnected at the 24hour mark)
         // https://binance-docs.github.io/apidocs/futures/en/#websocket-market-streams
-        socketConnectionIds.forEach { closeConnection(it) }
+        val connectionIdIterator = socketConnectionIds.iterator()
+        while (connectionIdIterator.hasNext()) {
+            val connectionId = connectionIdIterator.next()
+            connectionIdIterator.remove()
+            closeConnection(connectionId)
+        }
 
         // open market stream
         val marketStreamConnectionIds = openMarketStreams()
@@ -226,7 +234,9 @@ class ExchangeStream(
             when (eventType) {
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE -> {
                     val jsonOrder = eventJson.get("o")
-                    logger.debug(ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(jsonOrder))
+                    logger.info(
+                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson)
+                    )
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
@@ -242,9 +252,11 @@ class ExchangeStream(
                                 symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
                                 price = jsonOrder["L"].asDouble(),
                                 amount = jsonOrder["l"].asDouble(),
-                                commission = jsonOrder["n"].asDouble()
+                                commission = jsonOrder["n"].asDouble(),
+                                realizedPnL = jsonOrder["rp"].asDouble(),
+                                averagePrice = jsonOrder["ap"].asDouble(),
+                                accumulatedAmount = jsonOrder["z"].asDouble()
                             )
-                            logger.debug("OrderId[${orderResult.orderId}] 바이낸스 평균가격(ap): " + jsonOrder["ap"].asDouble())
                             orderUseCase.handleResult(orderResult)
                         }
 
@@ -255,11 +267,23 @@ class ExchangeStream(
                                 price = jsonOrder["L"].asDouble(),
                                 amount = jsonOrder["l"].asDouble(),
                                 commission = jsonOrder["n"].asDouble(),
+                                realizedPnL = jsonOrder["rp"].asDouble(),
                                 averagePrice = jsonOrder["ap"].asDouble(),
-                                accumulatedAmount = jsonOrder["z"].asDouble(),
-                                realizedPnL = jsonOrder["rp"].asDouble()
+                                accumulatedAmount = jsonOrder["z"].asDouble()
                             )
                             orderUseCase.handleResult(orderResult)
+
+                            val windAndLose = scoreBoard.getOrPut(jsonOrder["s"].asText()) { WinLose() }
+                            val ot = jsonOrder["ot"].asText()
+                            if (ot == "STOP") {
+                                // 패
+                                windAndLose.lose += 1
+                                logger.info(jsonOrder["s"].asText() + " 승/패: " + windAndLose.win + "/" + windAndLose.lose)
+                            } else if (ot == "TAKE_PROFIT") {
+                                // 승
+                                windAndLose.win += 1
+                                logger.info(jsonOrder["s"].asText() + " 승/패: " + windAndLose.win + "/" + windAndLose.lose)
+                            }
                         }
 
                         BinanceUserStreamOrderStatus.CANCELED -> {
@@ -277,7 +301,9 @@ class ExchangeStream(
                 }
 
                 BinanceUserStreamEventType.ACCOUNT_UPDATE -> {
-
+                    logger.info(
+                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson)
+                    )
                 }
             }
         }
@@ -322,3 +348,6 @@ class ExchangeStream(
         )
     }
 }
+
+// 임시로 승/패 보기 위함
+data class WinLose(var win: Int = 0, var lose: Int = 0)

@@ -10,7 +10,7 @@ data class Position(
     val symbol: Symbol,
     val side: OrderSide,
     val referenceData: JsonNode,
-    val originalPrice: Double,
+    val expectedPrice: Double,
     val openOrderId: String,
     val closeOrderIds: MutableSet<String>
 ) {

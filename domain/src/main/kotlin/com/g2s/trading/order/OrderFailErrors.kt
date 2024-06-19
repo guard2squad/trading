@@ -4,31 +4,26 @@ import com.g2s.trading.common.ApiError
 import com.g2s.trading.common.ApiErrors
 import org.slf4j.event.Level
 
-enum class OrderFailErrors : ApiErrors {
-    RETRYABLE_ERROR {
+enum class OrderFailErrors(val code: String) : ApiErrors {
+    ORDER_IMMEDIATELY_TRIGGERED_ERROR("-2021") {
         override fun error(message: String, cause: Throwable, logLevel: Level, logMessage: String?): ApiError {
             return ApiError(
-                code = "0",
-                message = "retry order",
-                logLevel = Level.INFO
+                code = this.code,
+                message = message,
+                cause = cause,
+                logLevel = logLevel,
+                logMessage = logMessage
             )
         }
     },
-    IGNORABLE_ERROR {
+    MARKET_ORDER_REJECTED_ERROR("-4131") {
         override fun error(message: String, cause: Throwable, logLevel: Level, logMessage: String?): ApiError {
             return ApiError(
-                code = "1",
-                message = "ignorable",
-                logLevel = Level.INFO
-            )
-        }
-    },
-    UNKNOWN_ERROR {
-        override fun error(message: String, cause: Throwable, logLevel: Level, logMessage: String?): ApiError {
-            return ApiError(
-                code = "-1",
-                message = "UNKNOWN",
-                logLevel = Level.ERROR
+                code = this.code,
+                message = message,
+                cause = cause,
+                logLevel = logLevel,
+                logMessage = logMessage
             )
         }
     },

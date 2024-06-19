@@ -7,4 +7,5 @@ interface Strategy {
     fun getType(): StrategyType
     fun getTriggerEventTypes(): List<KClass<out Event>>
     fun handle(event: Event, spec: StrategySpec)
+    fun changeOrderMode(orderMode: String)
 }
