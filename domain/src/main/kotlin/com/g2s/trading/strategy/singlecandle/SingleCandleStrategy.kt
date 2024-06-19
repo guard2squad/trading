@@ -24,6 +24,7 @@ import com.g2s.trading.strategy.StrategySpec
 import com.g2s.trading.strategy.StrategyType
 import com.g2s.trading.symbol.Symbol
 import com.g2s.trading.symbol.SymbolUseCase
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.math.MathContext
