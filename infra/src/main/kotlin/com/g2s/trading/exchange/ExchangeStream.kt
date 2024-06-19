@@ -33,6 +33,9 @@ class ExchangeStream(
     private val socketConnectionIds: MutableSet<Int> = mutableSetOf()
     private lateinit var listenKey: String
 
+    // 임시로 승/패 보기 위함
+    private val scoreBoard: MutableMap<String, WinLose> = mutableMapOf()
+
     init {
         // create or get listen key
         listenKey = getListenKey()
@@ -231,7 +234,9 @@ class ExchangeStream(
             when (eventType) {
                 BinanceUserStreamEventType.ORDER_TRADE_UPDATE -> {
                     val jsonOrder = eventJson.get("o")
-                    logger.info(ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson))
+                    logger.info(
+                        ObjectMapperProvider.get().writerWithDefaultPrettyPrinter().writeValueAsString(eventJson)
+                    )
                     val orderStatus = BinanceUserStreamOrderStatus.valueOf(jsonOrder.get("X").asText())
                     when (orderStatus) {
                         BinanceUserStreamOrderStatus.NEW -> {
@@ -267,6 +272,18 @@ class ExchangeStream(
                                 accumulatedAmount = jsonOrder["z"].asDouble()
                             )
                             orderUseCase.handleResult(orderResult)
+
+                            val windAndLose = scoreBoard.getOrPut(jsonOrder["s"].asText()) { WinLose() }
+                            val ot = jsonOrder["ot"].asText()
+                            if (ot == "STOP") {
+                                // 패
+                                windAndLose.lose += 1
+                                logger.info(jsonOrder["s"].asText() + " 승/패: " + windAndLose.win + "/" + windAndLose.lose)
+                            } else if (ot == "TAKE_PROFIT") {
+                                // 승
+                                windAndLose.win += 1
+                                logger.info(jsonOrder["s"].asText() + " 승/패: " + windAndLose.win + "/" + windAndLose.lose)
+                            }
                         }
 
                         BinanceUserStreamOrderStatus.CANCELED -> {
@@ -331,3 +348,6 @@ class ExchangeStream(
         )
     }
 }
+
+// 임시로 승/패 보기 위함
+data class WinLose(var win: Int = 0, var lose: Int = 0)

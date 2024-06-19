@@ -19,7 +19,7 @@ class PositionUseCase(
     private fun loadPositions() {
         // db 조회
         val positions = positionRepository.findAllPositions()
-        logger.debug("load positions: ${positions.size}")
+        logger.info("load positions: ${positions.size}")
         // map 저장
         positions.forEach { position ->
             openedPositions[position.positionId] = position

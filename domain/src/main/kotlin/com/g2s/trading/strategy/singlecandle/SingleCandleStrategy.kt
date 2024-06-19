@@ -92,7 +92,7 @@ class SingleCandleStrategy(
         // symbol lock
         val canUseSymbol = symbolUseCase.useSymbol(candleStick.symbol)
         if (!canUseSymbol) {
-            logger.info("심볼 사용 중: ${candleStick.symbol.value}")
+            logger.debug("심볼 사용 중: ${candleStick.symbol.value}")
             return
         }
         // 스펙에 따라 심볼에 할당된 금액
@@ -126,10 +126,10 @@ class SingleCandleStrategy(
             }
 
             is Money.AvailableMoney -> {
-//                logger.info(
-//                    "${candleStick.symbol.value} AvailableMoney 출금: " + money.toString() + " 계좌: " + accountUseCase.getAccount()
-//                        .toString()
-//                )
+                logger.debug(
+                    "${candleStick.symbol.value} AvailableMoney 출금: " + money.toString() + " 계좌: " + accountUseCase.getAccount()
+                        .toString()
+                )
                 val updateResult = LastCandles.update(candleStick)
                 when (updateResult) {
                     is CandleStickUpdateResult.Failed -> {
