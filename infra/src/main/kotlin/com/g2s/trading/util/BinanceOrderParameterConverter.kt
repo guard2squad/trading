@@ -17,7 +17,7 @@ object BinanceOrderParameterConverter {
 
         when (order) {
             is OpenOrder.MarketOrder -> {
-                parameters["quantity"] = order.amount
+                parameters["quantity"] = order.quantity
                 parameters["type"] = "MARKET"
                 parameters["side"] = orderSide(order.side)
             }
@@ -28,7 +28,7 @@ object BinanceOrderParameterConverter {
                 addCloseOrderParameters(parameters, order, "STOP")  // STOP_LOSS 아니고, STOP임
             }
             is CloseOrder.MarketOrder -> {
-                parameters["quantity"] = order.amount
+                parameters["quantity"] = order.quantity
                 parameters["type"] = "MARKET"
                 parameters["side"] = orderSide(order.side)
             }
@@ -48,7 +48,7 @@ object BinanceOrderParameterConverter {
     }
 
     private fun addCloseOrderParameters(parameters: LinkedHashMap<String, Any>, order: CloseOrder, type: String) {
-        parameters["quantity"] = order.amount
+        parameters["quantity"] = order.quantity
         parameters["type"] = type
         parameters["stopPrice"] = order.price
         parameters["price"] = order.price
