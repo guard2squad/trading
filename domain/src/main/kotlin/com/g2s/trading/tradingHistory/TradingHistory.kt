@@ -24,7 +24,7 @@ data class TradingHistory(
         result = when {
             pnl > 0 -> TradingResult.PROFIT
             pnl < 0 -> TradingResult.LOSS
-            else -> TradingResult.LOSS
+            else -> TradingResult.BREAK_EVEN
         }
     }
 }
