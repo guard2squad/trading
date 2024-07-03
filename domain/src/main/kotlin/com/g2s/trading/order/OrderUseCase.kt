@@ -65,6 +65,8 @@ class OrderUseCase(
                     position?.run {
                         logger.info("OPEN ORDER PARTIALLY FILLED 전 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                         // position update
                         this.quantity = result.accumulatedQuantity
                         this.price = result.averagePrice
@@ -89,6 +91,8 @@ class OrderUseCase(
                         accountUseCase.deposit(expectedCommission - actualCommission)
                         logger.info("OPEN ORDER PARTIALLY FILLED 후 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                     }
                 }
                 processingCloseOrders[result.orderId]?.let { order ->
@@ -96,6 +100,8 @@ class OrderUseCase(
                     position?.run {
                         logger.info("CLOSE ORDER PARTIALLY FILLED 전 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("CLOSE ORDER PARTIALLY FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                         // position update
                         this.setClosePrice(result.price, result.quantity)
                         this.quantity -= result.quantity
@@ -122,6 +128,8 @@ class OrderUseCase(
                         accountUseCase.deposit(BigDecimal(result.realizedPnL))
                         logger.info("CLOSE ORDER PARTIALLY FILLED 후 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("CLOSE ORDER PARTIALLY FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                     }
                 }
             }
@@ -132,6 +140,8 @@ class OrderUseCase(
                     position?.run {
                         logger.info("OPEN ORDER 완전히 FILLED 전 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                         // position update
                         this.quantity = result.accumulatedQuantity
                         this.price = result.averagePrice
@@ -157,6 +167,8 @@ class OrderUseCase(
                         eventUseCase.publishAsyncEvent(event)
                         logger.info("OPEN ORDER 완전히 FILLED 후 포지션 양: ${this.quantity}, 포지션 금액: ${this.price}")
                         logger.info("OPEN ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }
@@ -166,6 +178,8 @@ class OrderUseCase(
                     val position = positionUseCase.findPosition(order.positionId)
                     position?.run {
                         logger.info("CLOSE ORDER 완전히 FILLED 전 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                         // position update
                         this.setClosePrice(result.price, result.quantity)
                         this.quantity -= result.quantity
@@ -197,6 +211,8 @@ class OrderUseCase(
                         val event = PositionEvent.PositionClosedEvent(Pair(position, result.orderId))
                         eventUseCase.publishAsyncEvent(event)
                         logger.info("CLOSE ORDER 완전히 FILLED 후 계좌: " + accountUseCase.getAccount().toString())
+                        // debug
+                        accountUseCase.printAccount()
                     }
                     processingOrderRepository.deleteOrder(order.orderId)
                 }
