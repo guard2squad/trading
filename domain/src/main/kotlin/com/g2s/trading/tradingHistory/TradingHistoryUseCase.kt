@@ -26,6 +26,7 @@ class TradingHistoryUseCase(
                     * BigDecimal(2)).toDouble(),
             fee = position.fee,
             pnl = position.pnl,
+            referenceData = position.referenceData
         )
         tradingHistoryRepository.saveTradeHistory(history)
     }
