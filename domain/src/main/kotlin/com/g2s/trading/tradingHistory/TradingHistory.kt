@@ -3,10 +3,9 @@ package com.g2s.trading.tradingHistory
 import com.g2s.trading.order.OrderSide
 
 data class TradingHistory(
-    val positionId: String,
     val symbol: String,
     val side: OrderSide,
-    val amount: Double,
+    val quantity: Double,
     val strategyKey: String,
     val candlestickPattern: String,
     val expectedEntryPrice: Double,

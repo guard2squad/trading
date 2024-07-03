@@ -10,10 +10,9 @@ class TradingHistoryUseCase(
 ) {
     fun saveHistory(position: Position) {
         val history = TradingHistory(
-            positionId = position.positionId,
             symbol = position.symbol.value,
             side = position.side,
-            amount = position.expectedQuantity,
+            quantity = position.expectedQuantity,
             strategyKey = position.referenceData["strategyKey"].toString(),
             candlestickPattern = position.referenceData["candleStickPattern"].toString(),
             expectedEntryPrice = position.expectedEntryPrice,
