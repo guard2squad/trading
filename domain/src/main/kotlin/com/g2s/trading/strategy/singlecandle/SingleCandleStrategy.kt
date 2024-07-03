@@ -269,8 +269,6 @@ class SingleCandleStrategy(
                 side = old.side,
                 positionId = old.positionId
             )
-            position.closeOrderIds.remove(old.orderId)
-            position.closeOrderIds.add(new.orderId)
             orderUseCase.sendOrder(new)
         }
     }

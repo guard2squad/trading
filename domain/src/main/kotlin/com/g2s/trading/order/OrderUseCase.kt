@@ -220,7 +220,7 @@ class OrderUseCase(
         pendingOrderRepository.saveOrder(order)
 
         val result: SendOrderResult
-        if (order is Order.CancelOrder) {
+        if (order is Order.CancelOrder) {   // 주문 취소
             result = try {
                 exchangeImpl.cancelOrder(order.symbol, order.orderId)
                 SendOrderResult.Success
@@ -228,7 +228,7 @@ class OrderUseCase(
                 pendingOrders.remove(order.orderId)
                 SendOrderResult.Failure(e)
             }
-        } else {
+        } else {    // 주문
             result = try {
                 exchangeImpl.sendOrder(order)
                 SendOrderResult.Success
