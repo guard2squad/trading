@@ -417,7 +417,7 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyTop,
-                    close = bodyTop + totalLength * decimalTakeProfitFactor
+                    close = bodyTop + highTailLength * decimalTakeProfitFactor
                 )
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
@@ -435,7 +435,7 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyBottom,
-                    close = bodyBottom + totalLength * decimalTakeProfitFactor
+                    close = bodyBottom + lowTailLength * decimalTakeProfitFactor
                 )
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
