@@ -178,10 +178,9 @@ class SingleCandleStrategy(
                                 }
                                 val order = OpenOrder.MarketOrder(
                                     symbol = analyzeReport.symbol,
-                                    price = markPrice.price,    // 예상 entryPrice 체결되면 sync됨
-                                    amount = quantity,
+                                    quantity = quantity,
                                     side = analyzeReport.orderSide,
-                                    expectedPrice = (expectedPositionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    entryPrice = (expectedPositionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
@@ -202,29 +201,34 @@ class SingleCandleStrategy(
         val side = position.side
         val takeProfitFactor = spec.op["takeProfitFactor"].doubleValue()
         val stopLossFactor = spec.op["stopLossFactor"].doubleValue()
+        val takeProfitPrice = closePrice(
+            position,
+            takeProfitFactor,
+            stopLossFactor,
+            object : TypeReference<CloseOrder.TakeProfitOrder>() {}
+        )
+        val stopLossPrice = closePrice(
+            position,
+            takeProfitFactor,
+            stopLossFactor,
+            object : TypeReference<CloseOrder.StopLossOrder>() {}
+        )
+        // position에 takeProfitPrice, stopLossPrice 세팅
+        position.takeProfitPrice = takeProfitPrice
+        position.stopLossPrice = stopLossPrice
 
         val takeProfitOrder = CloseOrder.TakeProfitOrder(
             symbol = position.symbol,
-            price = closePrice(
-                position,
-                takeProfitFactor,
-                stopLossFactor,
-                object : TypeReference<CloseOrder.TakeProfitOrder>() {}
-            ),
-            amount = position.amount,
+            price = takeProfitPrice,
+            quantity = position.quantity,
             side = closeSide(side),
             positionId = position.positionId
         )
 
         val stopLossOrder = CloseOrder.StopLossOrder(
             symbol = position.symbol,
-            price = closePrice(
-                position,
-                takeProfitFactor,
-                stopLossFactor,
-                object : TypeReference<CloseOrder.StopLossOrder>() {}
-            ),
-            amount = position.amount,
+            price = stopLossPrice,
+            quantity = position.quantity,
             side = closeSide(side),
             positionId = position.positionId
         )
@@ -261,12 +265,10 @@ class SingleCandleStrategy(
             val new = CloseOrder.MarketOrder(
                 symbol = old.symbol,
                 price = old.price,
-                amount = old.amount,
+                quantity = old.quantity,
                 side = old.side,
                 positionId = old.positionId
             )
-            position.closeOrderIds.remove(old.orderId)
-            position.closeOrderIds.add(new.orderId)
             orderUseCase.sendOrder(new)
         }
     }
@@ -387,7 +389,7 @@ class SingleCandleStrategy(
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, tailLength)
+                val referenceData = createReferenceData(candleStick, spec, tailLength, pattern)
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
@@ -405,7 +407,7 @@ class SingleCandleStrategy(
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, tailLength)
+                val referenceData = createReferenceData(candleStick, spec, tailLength, pattern)
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
@@ -423,7 +425,7 @@ class SingleCandleStrategy(
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, highTailLength)
+                val referenceData = createReferenceData(candleStick, spec, highTailLength, pattern)
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
@@ -441,7 +443,7 @@ class SingleCandleStrategy(
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, lowTailLength)
+                val referenceData = createReferenceData(candleStick, spec, lowTailLength, pattern)
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
@@ -455,12 +457,14 @@ class SingleCandleStrategy(
     private fun createReferenceData(
         candleStick: CandleStick,
         spec: StrategySpec,
-        tailLength: BigDecimal
+        tailLength: BigDecimal,
+        pattern: SingleCandlePattern
     ): ObjectNode {
         val referenceData =
             ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
         referenceData.put("strategyType", spec.strategyType.toString())
         referenceData.put("strategyKey", spec.strategyKey)
+        referenceData.put("candleStickPattern", pattern.toString())
         referenceData.set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
 
         return referenceData

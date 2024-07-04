@@ -15,27 +15,25 @@ sealed class Order {
 }
 
 sealed class OpenOrder : Order() {
-    abstract val price: Double
-    abstract val amount: Double
+    abstract val quantity: Double
     abstract val side: OrderSide
-    abstract val expectedPrice: Double
+    abstract val entryPrice: Double
     abstract val referenceData: JsonNode
     lateinit var positionId: String
 
     data class MarketOrder(
         override val orderId: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,
-        override val price: Double, // entryPrice
-        override val amount: Double,
+        override val quantity: Double,
         override val side: OrderSide,
-        override val expectedPrice: Double,
+        override val entryPrice: Double,    // 예상 진입 가격
         override val referenceData: JsonNode,
     ) : OpenOrder()
 }
 
 sealed class CloseOrder : Order() {
     abstract val price: Double
-    abstract val amount: Double
+    abstract val quantity: Double
     abstract val side: OrderSide
     abstract val positionId: String
 
@@ -43,7 +41,7 @@ sealed class CloseOrder : Order() {
         override val orderId: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,
         override val price: Double,
-        override val amount: Double,
+        override val quantity: Double,
         override val side: OrderSide,
         override val positionId: String
     ) : CloseOrder()
@@ -52,7 +50,7 @@ sealed class CloseOrder : Order() {
         override val orderId: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,
         override val price: Double,
-        override val amount: Double,
+        override val quantity: Double,
         override val side: OrderSide,
         override val positionId: String
     ) : CloseOrder()
@@ -61,7 +59,7 @@ sealed class CloseOrder : Order() {
         override val orderId: String = UUID.randomUUID().toString(),
         override val symbol: Symbol,
         override val price: Double,
-        override val amount: Double,
+        override val quantity: Double,
         override val side: OrderSide,
         override val positionId: String
     ) : CloseOrder()

@@ -251,11 +251,11 @@ class ExchangeStream(
                                 orderId = jsonOrder["c"].asText(),
                                 symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
                                 price = jsonOrder["L"].asDouble(),
-                                amount = jsonOrder["l"].asDouble(),
+                                quantity = jsonOrder["l"].asDouble(),
                                 commission = jsonOrder["n"].asDouble(),
                                 realizedPnL = jsonOrder["rp"].asDouble(),
                                 averagePrice = jsonOrder["ap"].asDouble(),
-                                accumulatedAmount = jsonOrder["z"].asDouble()
+                                accumulatedQuantity = jsonOrder["z"].asDouble()
                             )
                             orderUseCase.handleResult(orderResult)
                         }
@@ -265,11 +265,11 @@ class ExchangeStream(
                                 orderId = jsonOrder["c"].asText(),
                                 symbol = symbolUseCase.getSymbol(jsonOrder["s"].asText())!!,
                                 price = jsonOrder["L"].asDouble(),
-                                amount = jsonOrder["l"].asDouble(),
+                                quantity = jsonOrder["l"].asDouble(),
                                 commission = jsonOrder["n"].asDouble(),
                                 realizedPnL = jsonOrder["rp"].asDouble(),
                                 averagePrice = jsonOrder["ap"].asDouble(),
-                                accumulatedAmount = jsonOrder["z"].asDouble()
+                                accumulatedQuantity = jsonOrder["z"].asDouble()
                             )
                             orderUseCase.handleResult(orderResult)
 

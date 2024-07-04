@@ -75,10 +75,10 @@ class AccountUseCase(
         }
     }
 
-//    // debug
-//    fun printAccount() {
-//        exchangeImpl.getAccount()
-//    }
+    // debug
+    fun printAccount() {
+        exchangeImpl.getAccount()
+    }
 
     private fun loadAccount(): Account {
         return exchangeImpl.getAccount()

@@ -35,7 +35,8 @@ class PositionUseCase(
             symbol = order.symbol,
             side = order.side,
             referenceData = order.referenceData,
-            expectedPrice = order.expectedPrice,
+            expectedEntryPrice = order.entryPrice,
+            expectedQuantity = order.quantity,
             openOrderId = order.orderId,
             closeOrderIds = mutableSetOf()
         )
