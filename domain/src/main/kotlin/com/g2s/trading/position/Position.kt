@@ -36,7 +36,7 @@ data class Position(
                 .plus(decimalLastFilledAmount.multiply(decimalLastFilledPrice)))
                 .divide(    //
                     decimalAccumulatedAmount + decimalLastFilledAmount,
-                    2,
+                    symbol.pricePrecision,
                     RoundingMode.HALF_UP
                 ).toDouble()
     }
