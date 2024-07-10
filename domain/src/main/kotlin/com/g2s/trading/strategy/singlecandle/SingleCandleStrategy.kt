@@ -338,7 +338,8 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyTop,
-                    close = BigDecimal(takeProfitPrice)
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
                 )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
@@ -386,7 +387,8 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyBottom,
-                    close = BigDecimal(takeProfitPrice)
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
                 )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
@@ -434,7 +436,8 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyTop,
-                    close = BigDecimal(takeProfitPrice)
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
                 )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
@@ -482,7 +485,8 @@ class SingleCandleStrategy(
                 val isPositivePnL = isPositivePnL(
                     symbol = candleStick.symbol,
                     open = bodyBottom,
-                    close = BigDecimal(takeProfitPrice)
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
                 )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
@@ -625,12 +629,17 @@ class SingleCandleStrategy(
         }
     }
 
-    private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
+    private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal, spec: StrategySpec): Boolean {
         val commissionRate = symbol.commissionRate
         val pnl = (open - close).abs()
         val fee = (open + close).multiply(BigDecimal(commissionRate))
+        val priceChangeRate = priceChangeRate(open, close)
 
-        return pnl > fee
+        return pnl > fee && priceChangeRate > spec.op["priceChangeRate"].asDouble() // %단위
+    }
+
+    private fun priceChangeRate(open: BigDecimal, close: BigDecimal): Double {
+        return (close - open).abs().divide(open, MathContext.DECIMAL128).multiply(BigDecimal(100)).toDouble()
     }
 
     enum class OrderMode {

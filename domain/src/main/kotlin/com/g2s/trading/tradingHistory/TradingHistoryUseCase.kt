@@ -20,10 +20,10 @@ class TradingHistoryUseCase(
             takeProfitPrice = position.referenceData["takeProfitPrice"].asDouble(),
             stopLossPrice = position.referenceData["stopLossPrice"].asDouble(),
             closePrice = position.closePrice,
-            expectedFee = (BigDecimal(position.expectedEntryPrice)
+            expectedFee =   // (예상 진입가 + 예상 이익 가격) * 예상 수량(==채결 수량) * 수수료율
+            ((BigDecimal(position.expectedEntryPrice) + BigDecimal(position.referenceData["takeProfitPrice"].asDouble()))
                     * BigDecimal(position.expectedQuantity)
-                    * BigDecimal(position.symbol.commissionRate)
-                    * BigDecimal(2)).toDouble(),
+                    * BigDecimal(position.symbol.commissionRate)).toDouble(),
             fee = position.fee,
             pnl = position.pnl,
             closeTime = position.closeTime,
