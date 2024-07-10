@@ -17,8 +17,8 @@ class TradingHistoryUseCase(
             candlestickPattern = position.referenceData["candleStickPattern"].toString(),
             expectedEntryPrice = position.expectedEntryPrice,
             entryPrice = position.price,
-            takeProfitPrice = position.takeProfitPrice,
-            stopLossPrice = position.stopLossPrice,
+            takeProfitPrice = position.referenceData["takeProfitPrice"].asDouble(),
+            stopLossPrice = position.referenceData["stopLossPrice"].asDouble(),
             closePrice = position.closePrice,
             expectedFee = (BigDecimal(position.expectedEntryPrice)
                     * BigDecimal(position.expectedQuantity)
@@ -26,6 +26,7 @@ class TradingHistoryUseCase(
                     * BigDecimal(2)).toDouble(),
             fee = position.fee,
             pnl = position.pnl,
+            closeTime = position.closeTime,
             referenceData = position.referenceData
         )
         tradingHistoryRepository.saveTradeHistory(history)

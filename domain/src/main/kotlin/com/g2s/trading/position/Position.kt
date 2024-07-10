@@ -22,8 +22,7 @@ data class Position(
     var closePrice: Double = 0.0
     var fee: Double = 0.0
     var pnl: Double = 0.0
-    var takeProfitPrice: Double = 0.0
-    var stopLossPrice: Double = 0.0
+    var closeTime: Long = 0L
 
     fun setClosePrice(lastFilledPrice: Double, lastFilledAmount: Double) {
         val decimalAccumulatedAmount = BigDecimal(this.expectedQuantity) - BigDecimal(this.quantity)
