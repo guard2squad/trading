@@ -18,13 +18,14 @@ data class TradingHistory(
     val fee: Double,
     val pnl: Double,
     var result: TradingResult = TradingResult.BREAK_EVEN,
+    val closeTime: Long,
     val referenceData: JsonNode,
 ) {
     init {
         result = when {
             pnl > 0 -> TradingResult.PROFIT
             pnl < 0 -> TradingResult.LOSS
-            else -> TradingResult.LOSS
+            else -> TradingResult.BREAK_EVEN
         }
     }
 }

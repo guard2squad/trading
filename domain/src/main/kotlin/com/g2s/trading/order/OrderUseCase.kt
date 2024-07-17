@@ -185,6 +185,7 @@ class OrderUseCase(
                         this.quantity -= result.quantity
                         this.fee += result.commission
                         this.pnl += result.realizedPnL
+                        this.closeTime = result.transactionTime
                         positionUseCase.updatePosition(this)
                         // account sync
                         // 포지션에 할당된 금액 싱크

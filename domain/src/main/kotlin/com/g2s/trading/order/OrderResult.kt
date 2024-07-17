@@ -43,6 +43,7 @@ sealed class OrderResult {
             override val realizedPnL: Double,
             override val averagePrice: Double,
             override val accumulatedQuantity: Double,
+            val transactionTime: Long
         ) : FilledOrderResult()
     }
 }

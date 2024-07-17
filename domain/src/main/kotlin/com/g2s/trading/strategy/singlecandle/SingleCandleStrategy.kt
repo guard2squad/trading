@@ -14,9 +14,7 @@ import com.g2s.trading.event.TradingEvent
 import com.g2s.trading.indicator.CandleStick
 import com.g2s.trading.indicator.CandleStickUpdateResult
 import com.g2s.trading.indicator.LastCandles
-import com.g2s.trading.indicator.MarkPriceUseCase
 import com.g2s.trading.order.*
-import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.strategy.AnalyzeReport
 import com.g2s.trading.strategy.Strategy
@@ -39,7 +37,6 @@ import kotlin.reflect.KClass
 class SingleCandleStrategy(
     private val accountUseCase: AccountUseCase,
     private val symbolUseCase: SymbolUseCase,
-    private val markPriceUseCase: MarkPriceUseCase,
     private val orderUseCase: OrderUseCase,
     private val positionUseCase: PositionUseCase,
 ) : Strategy {
@@ -149,11 +146,11 @@ class SingleCandleStrategy(
                         }
 
                         // 전략으로 오픈여부 판단
-                        val markPrice = markPriceUseCase.getMarkPrice(candleStick.symbol)
                         val hammerRatio = spec.op["hammerRatio"].asDouble()
                         val takeProfitFactor = spec.op["takeProfitFactor"].asDouble()
                         val stopLossFactor = spec.op["stopLossFactor"].asDouble()
-                        when (val analyzeReport = analyze(updateResult.old, hammerRatio, takeProfitFactor, spec)) {
+                        when (val analyzeReport =
+                            analyze(updateResult.old, hammerRatio, takeProfitFactor, stopLossFactor, spec)) {
                             is AnalyzeReport.NonMatchingReport -> {
                                 logger.info("non-matching-report: ${candleStick.symbol.value}, reason: ${analyzeReport.reason}")
                                 // 출금 취소
@@ -164,7 +161,7 @@ class SingleCandleStrategy(
                             is AnalyzeReport.MatchingReport -> {
                                 val quantity = quantity(
                                     amount = expectedPositionAmount,
-                                    markPrice = BigDecimal(markPrice.price),
+                                    expectedEntryPrice = BigDecimal(analyzeReport.referenceData["expectedEntryPrice"].asDouble()),
                                     takeProfitFactor = takeProfitFactor,
                                     stopLossFactor = stopLossFactor,
                                     tailLength = analyzeReport.referenceData["tailLength"].asDouble(),
@@ -180,7 +177,7 @@ class SingleCandleStrategy(
                                     symbol = analyzeReport.symbol,
                                     quantity = quantity,
                                     side = analyzeReport.orderSide,
-                                    entryPrice = (expectedPositionAmount / BigDecimal(quantity)).toDouble(),    // 예상 entryPrice를 기억
+                                    entryPrice = analyzeReport.referenceData["expectedEntryPrice"].asDouble(),
                                     referenceData = analyzeReport.referenceData,
                                 )
                                 orderUseCase.sendOrder(order)
@@ -199,23 +196,8 @@ class SingleCandleStrategy(
             return
         }
         val side = position.side
-        val takeProfitFactor = spec.op["takeProfitFactor"].doubleValue()
-        val stopLossFactor = spec.op["stopLossFactor"].doubleValue()
-        val takeProfitPrice = closePrice(
-            position,
-            takeProfitFactor,
-            stopLossFactor,
-            object : TypeReference<CloseOrder.TakeProfitOrder>() {}
-        )
-        val stopLossPrice = closePrice(
-            position,
-            takeProfitFactor,
-            stopLossFactor,
-            object : TypeReference<CloseOrder.StopLossOrder>() {}
-        )
-        // position에 takeProfitPrice, stopLossPrice 세팅
-        position.takeProfitPrice = takeProfitPrice
-        position.stopLossPrice = stopLossPrice
+        val takeProfitPrice = position.referenceData["takeProfitPrice"].asDouble()
+        val stopLossPrice = position.referenceData["stopLossPrice"].asDouble()
 
         val takeProfitOrder = CloseOrder.TakeProfitOrder(
             symbol = position.symbol,
@@ -234,6 +216,13 @@ class SingleCandleStrategy(
         )
 
         orderUseCase.sendOrder(takeProfitOrder, stopLossOrder)
+    }
+
+    private fun closeSide(openSide: OrderSide): OrderSide {
+        return when (openSide) {
+            OrderSide.LONG -> OrderSide.SHORT
+            OrderSide.SHORT -> OrderSide.LONG
+        }
     }
 
     private fun cancelOppositeOrder(event: PositionEvent.PositionClosedEvent, spec: StrategySpec) {
@@ -291,67 +280,11 @@ class SingleCandleStrategy(
         return true
     }
 
-    private fun closePrice(
-        position: Position,
-        takeProfitFactor: Double,
-        stopLossFactor: Double,
-        closeType: TypeReference<out CloseOrder>
-    ): Double {
-        val entryPrice = BigDecimal(position.price)
-        val tailLength = BigDecimal(position.referenceData["tailLength"].doubleValue())
-        val decimalTakeProfitFactor = BigDecimal(takeProfitFactor)
-        val decimalStopLossFactor = BigDecimal(stopLossFactor)
-        val price = when (closeType.type) {
-            CloseOrder.TakeProfitOrder::class.java -> {
-                when (position.side) {
-                    OrderSide.LONG -> {
-                        entryPrice + tailLength * decimalTakeProfitFactor
-                    }
-
-                    OrderSide.SHORT -> {
-                        entryPrice - tailLength * decimalTakeProfitFactor
-                    }
-                }
-            }
-
-            CloseOrder.StopLossOrder::class.java -> {
-                when (position.side) {
-                    OrderSide.LONG -> {
-                        entryPrice - tailLength * decimalStopLossFactor
-                    }
-
-                    OrderSide.SHORT -> {
-                        entryPrice + tailLength * decimalStopLossFactor
-                    }
-                }
-            }
-
-            else -> throw RuntimeException("close order type error")
-        }
-
-        val precisePrice = price.setScale(position.symbol.pricePrecision, RoundingMode.CEILING)
-        val tickSize = BigDecimal.valueOf(position.symbol.tickSize)
-        val remainder = precisePrice.remainder(tickSize)
-        // price % tickSize == 0
-        if (remainder > BigDecimal.ZERO) {
-            return (precisePrice - remainder + tickSize).toDouble()
-        }
-        // TODO: 최대가격, 최소가격 필터 고려하기
-
-        return precisePrice.toDouble()
-    }
-
-    private fun closeSide(openSide: OrderSide): OrderSide {
-        return when (openSide) {
-            OrderSide.LONG -> OrderSide.SHORT
-            OrderSide.SHORT -> OrderSide.LONG
-        }
-    }
-
     private fun analyze(
         candleStick: CandleStick,
         hammerRatio: Double,
         takeProfitFactor: Double,
+        stopLossFactor: Double,
         spec: StrategySpec
     ): AnalyzeReport {
 
@@ -363,6 +296,7 @@ class SingleCandleStrategy(
         val bodyLength = bodyTop - bodyBottom
         val operationalHammerRatio = BigDecimal(hammerRatio)    // 운영값 : default 2
         val decimalTakeProfitFactor = BigDecimal(takeProfitFactor)    // 운영값
+        val decimalStopLossFactor = BigDecimal(stopLossFactor)
         if (bodyLength.compareTo(BigDecimal.ZERO) == 0) {
             return AnalyzeReport.NonMatchingReport("바디 길이 0")
         }
@@ -376,74 +310,198 @@ class SingleCandleStrategy(
         val report: AnalyzeReport
         when (pattern) {
             SingleCandlePattern.TOP_TAIL -> {
-                val tailLength = tailTop - bodyTop
-                val canOpen = tailLength / bodyLength > operationalHammerRatio
-                val isPositivePnL = isPositivePnL(
-                    symbol = candleStick.symbol,
-                    open = bodyTop,
-                    close = bodyTop + tailLength * decimalTakeProfitFactor
-                )
+                val topTailLength = tailTop - bodyTop
+                val calculatedHammerRatio = topTailLength / bodyLength
+                val canOpen = calculatedHammerRatio > operationalHammerRatio
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
                 }
+
+                val takeProfitPrice = closePrice(
+                    expectedEntryPrice = bodyTop,
+                    tailLength = topTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.TakeProfitOrder>() {}
+                )
+                val stopLossPrice = closePrice(
+                    expectedEntryPrice = bodyTop,
+                    tailLength = topTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.StopLossOrder>() {}
+                )
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyTop,
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
+                )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, tailLength, pattern)
+                val referenceData =
+                    createReferenceData(
+                        candleStick = candleStick,
+                        spec = spec,
+                        tailLength = topTailLength,
+                        pattern = pattern,
+                        expectedEntryPrice = bodyTop.toDouble(),
+                        takeProfitPrice = takeProfitPrice,
+                        stopLossPrice = stopLossPrice,
+                        calculatedHammerRatio = calculatedHammerRatio.toDouble()
+                    )
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
             SingleCandlePattern.BOTTOM_TAIL -> {
-                val tailLength = bodyBottom - tailBottom
-                val canOpen = tailLength / bodyLength > operationalHammerRatio
-                val isPositivePnL = isPositivePnL(
-                    symbol = candleStick.symbol,
-                    open = bodyBottom,
-                    close = bodyBottom + tailLength * decimalTakeProfitFactor
-                )
+                val bottomTailLength = bodyBottom - tailBottom
+                val calculatedHammerRatio = bottomTailLength / bodyLength
+                val canOpen = calculatedHammerRatio > operationalHammerRatio
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
                 }
+
+                val takeProfitPrice = closePrice(
+                    expectedEntryPrice = bodyBottom,
+                    tailLength = bottomTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.TakeProfitOrder>() {}
+                )
+                val stopLossPrice = closePrice(
+                    expectedEntryPrice = bodyBottom,
+                    tailLength = bottomTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.StopLossOrder>() {}
+                )
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyBottom,
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
+                )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, tailLength, pattern)
+                val referenceData =
+                    createReferenceData(
+                        candleStick = candleStick,
+                        spec = spec,
+                        tailLength = bottomTailLength,
+                        pattern = pattern,
+                        expectedEntryPrice = bodyBottom.toDouble(),
+                        takeProfitPrice = takeProfitPrice,
+                        stopLossPrice = stopLossPrice,
+                        calculatedHammerRatio = calculatedHammerRatio.toDouble()
+                    )
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
             SingleCandlePattern.MIDDLE_HIGH_TAIL -> {
                 val highTailLength = tailTop - bodyTop
-                val canOpen = highTailLength / bodyLength > operationalHammerRatio
-                val isPositivePnL = isPositivePnL(
-                    symbol = candleStick.symbol,
-                    open = bodyTop,
-                    close = bodyTop + highTailLength * decimalTakeProfitFactor
-                )
+                val calculatedHammerRatio = highTailLength / bodyLength
+                val canOpen = calculatedHammerRatio > operationalHammerRatio
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
                 }
+
+                val takeProfitPrice = closePrice(
+                    expectedEntryPrice = bodyTop,
+                    tailLength = highTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.TakeProfitOrder>() {}
+                )
+                val stopLossPrice = closePrice(
+                    expectedEntryPrice = bodyTop,
+                    tailLength = highTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.StopLossOrder>() {}
+                )
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyTop,
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
+                )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, highTailLength, pattern)
+                val referenceData =
+                    createReferenceData(
+                        candleStick = candleStick,
+                        spec = spec,
+                        tailLength = highTailLength,
+                        pattern = pattern,
+                        expectedEntryPrice = bodyTop.toDouble(),
+                        takeProfitPrice = takeProfitPrice,
+                        stopLossPrice = stopLossPrice,
+                        calculatedHammerRatio = calculatedHammerRatio.toDouble()
+                    )
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
             SingleCandlePattern.MIDDLE_LOW_TAIL -> {
                 val lowTailLength = bodyBottom - tailBottom
-                val canOpen = lowTailLength / bodyLength > operationalHammerRatio
-                val isPositivePnL = isPositivePnL(
-                    symbol = candleStick.symbol,
-                    open = bodyBottom,
-                    close = bodyBottom + lowTailLength * decimalTakeProfitFactor
-                )
+                val calculatedHammerRatio = lowTailLength / bodyLength
+                val canOpen = calculatedHammerRatio > operationalHammerRatio
                 if (!canOpen) {
                     return AnalyzeReport.NonMatchingReport("해머 비율에 미달")
                 }
+
+                val takeProfitPrice = closePrice(
+                    expectedEntryPrice = bodyBottom,
+                    tailLength = lowTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.TakeProfitOrder>() {}
+                )
+                val stopLossPrice = closePrice(
+                    expectedEntryPrice = bodyBottom,
+                    tailLength = lowTailLength,
+                    takeProfitFactor = decimalTakeProfitFactor,
+                    stopLossFactor = decimalStopLossFactor,
+                    side = OrderSide.LONG,
+                    symbol = candleStick.symbol,
+                    closeType = object : TypeReference<CloseOrder.StopLossOrder>() {}
+                )
+                val isPositivePnL = isPositivePnL(
+                    symbol = candleStick.symbol,
+                    open = bodyBottom,
+                    close = BigDecimal(takeProfitPrice),
+                    spec = spec
+                )
                 if (!isPositivePnL) {
                     return AnalyzeReport.NonMatchingReport("PNL 미달")
                 }
-                val referenceData = createReferenceData(candleStick, spec, lowTailLength, pattern)
+                val referenceData =
+                    createReferenceData(
+                        candleStick = candleStick,
+                        spec = spec,
+                        tailLength = lowTailLength,
+                        pattern = pattern,
+                        expectedEntryPrice = bodyBottom.toDouble(),
+                        takeProfitPrice = takeProfitPrice,
+                        stopLossPrice = stopLossPrice,
+                        calculatedHammerRatio = calculatedHammerRatio.toDouble()
+                    )
                 report = AnalyzeReport.MatchingReport(candleStick.symbol, OrderSide.LONG, referenceData)
             }
 
@@ -454,11 +512,64 @@ class SingleCandleStrategy(
         return report
     }
 
+    private fun closePrice(
+        expectedEntryPrice: BigDecimal,
+        tailLength: BigDecimal, // referenceData["tailLength"]
+        takeProfitFactor: BigDecimal,
+        stopLossFactor: BigDecimal,
+        side: OrderSide,
+        symbol: Symbol,
+        closeType: TypeReference<out CloseOrder>
+    ): Double {
+        val price = when (closeType.type) {
+            CloseOrder.TakeProfitOrder::class.java -> {
+                when (side) {
+                    OrderSide.LONG -> {
+                        expectedEntryPrice + tailLength * takeProfitFactor
+                    }
+
+                    OrderSide.SHORT -> {
+                        expectedEntryPrice - tailLength * takeProfitFactor
+                    }
+                }
+            }
+
+            CloseOrder.StopLossOrder::class.java -> {
+                when (side) {
+                    OrderSide.LONG -> {
+                        expectedEntryPrice - tailLength * stopLossFactor
+                    }
+
+                    OrderSide.SHORT -> {
+                        expectedEntryPrice + tailLength * stopLossFactor
+                    }
+                }
+            }
+
+            else -> throw RuntimeException("close order type error")
+        }
+
+        val precisePrice = price.setScale(symbol.pricePrecision, RoundingMode.CEILING)
+        val tickSize = BigDecimal.valueOf(symbol.tickSize)
+        val remainder = precisePrice.remainder(tickSize)
+        // price % tickSize == 0
+        if (remainder > BigDecimal.ZERO) {
+            return (precisePrice - remainder + tickSize).toDouble()
+        }
+        // TODO: 최대가격, 최소가격 필터 고려하기
+
+        return precisePrice.toDouble()
+    }
+
     private fun createReferenceData(
         candleStick: CandleStick,
         spec: StrategySpec,
         tailLength: BigDecimal,
-        pattern: SingleCandlePattern
+        pattern: SingleCandlePattern,
+        expectedEntryPrice: Double,
+        takeProfitPrice: Double,
+        stopLossPrice: Double,
+        calculatedHammerRatio: Double,
     ): ObjectNode {
         val referenceData =
             ObjectMapperProvider.get().convertValue(candleStick, JsonNode::class.java) as ObjectNode
@@ -466,6 +577,10 @@ class SingleCandleStrategy(
         referenceData.put("strategyKey", spec.strategyKey)
         referenceData.put("candleStickPattern", pattern.toString())
         referenceData.set<DoubleNode>("tailLength", DoubleNode(tailLength.toDouble()))
+        referenceData.set<DoubleNode>("expectedEntryPrice", DoubleNode(expectedEntryPrice))
+        referenceData.set<DoubleNode>("takeProfitPrice", DoubleNode(takeProfitPrice))
+        referenceData.set<DoubleNode>("stopLossPrice", DoubleNode(stopLossPrice))
+        referenceData.set<DoubleNode>("calculatedHammerRatio", DoubleNode(calculatedHammerRatio))
 
         return referenceData
     }
@@ -473,7 +588,7 @@ class SingleCandleStrategy(
     // 예상 손절 가격, 예상 익절 가격, 예상 구매 가격 중 가장 큰 값을 찾아, 예상 포지션 명목 가치(마진 * 레버리지)에서 나눠 수량을 구함
     private fun quantity(
         amount: BigDecimal,
-        markPrice: BigDecimal,
+        expectedEntryPrice: BigDecimal,
         takeProfitFactor: Double,
         stopLossFactor: Double,
         tailLength: Double,
@@ -486,9 +601,9 @@ class SingleCandleStrategy(
         when (orderSide) {
             OrderSide.LONG -> {
                 val maxPrice = maxOf(
-                    markPrice,
-                    markPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
-                    markPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor))
+                    expectedEntryPrice,
+                    expectedEntryPrice + (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                    expectedEntryPrice - (BigDecimal(tailLength) * BigDecimal(stopLossFactor))
                 )
 
                 return amount.divide(
@@ -500,9 +615,9 @@ class SingleCandleStrategy(
 
             OrderSide.SHORT -> {
                 val maxPrice = maxOf(
-                    markPrice,
-                    markPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
-                    markPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor))
+                    expectedEntryPrice,
+                    expectedEntryPrice - (BigDecimal(tailLength) * BigDecimal(takeProfitFactor)),
+                    expectedEntryPrice + (BigDecimal(tailLength) * BigDecimal(stopLossFactor))
                 )
 
                 return amount.divide(
@@ -514,12 +629,17 @@ class SingleCandleStrategy(
         }
     }
 
-    private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal): Boolean {
+    private fun isPositivePnL(symbol: Symbol, open: BigDecimal, close: BigDecimal, spec: StrategySpec): Boolean {
         val commissionRate = symbol.commissionRate
         val pnl = (open - close).abs()
         val fee = (open + close).multiply(BigDecimal(commissionRate))
+        val priceChangeRate = priceChangeRate(open, close)
 
-        return pnl > fee
+        return pnl > fee && priceChangeRate > spec.op["priceChangeRate"].asDouble() // %단위
+    }
+
+    private fun priceChangeRate(open: BigDecimal, close: BigDecimal): Double {
+        return (close - open).abs().divide(open, MathContext.DECIMAL128).multiply(BigDecimal(100)).toDouble()
     }
 
     enum class OrderMode {
