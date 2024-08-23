@@ -6,12 +6,15 @@ import com.g2s.trading.event.EventUseCase
 import com.g2s.trading.event.OrderEvent
 import com.g2s.trading.event.PositionEvent
 import com.g2s.trading.exchange.Exchange
+import com.g2s.trading.position.Position
 import com.g2s.trading.position.PositionUseCase
 import com.g2s.trading.tradingHistory.TradingHistoryUseCase
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.concurrent.CountDownLatch
 
 @Service
 class OrderUseCase(
@@ -27,6 +30,18 @@ class OrderUseCase(
     private val pendingOrders: MutableMap<String, Order> = mutableMapOf()
     private val processingOpenOrders: MutableMap<String, OpenOrder> = mutableMapOf()
     private val processingCloseOrders: MutableMap<String, CloseOrder> = mutableMapOf()
+    private val countDownLatch = CountDownLatch(positionUseCase.getAllPositions().size)
+
+    @PreDestroy
+    fun appShutdownOrderCancellation() {
+        val cancelOrders = positionUseCase.getAllPositions().flatMap { position ->
+            position.closeOrderIds.map { closeOrderId ->
+                Order.CancelOrder(closeOrderId, position.symbol)
+            }
+        }.toTypedArray()
+        sendOrder(*cancelOrders)
+        countDownLatch.await() // 모든 주문 취소 요청 완료될 때 까지 기다리기
+    }
 
     fun sendOrder(vararg order: Order) {
         order.forEach { send(it) }
@@ -220,15 +235,25 @@ class OrderUseCase(
             }
 
             is OrderResult.Canceled -> {
-                // 로컬에서 요청한 CANCEL 주문이 접수 됨
                 pendingOrders.remove(result.orderId)?.let {
                     pendingOrderRepository.deleteOrder(result.orderId)
                 } ?: RuntimeException("invalid order id ${result.orderId}")
-                // FILLED or CANCELLED 로 상태가 변하기를 기다리던 주문 제거
-                processingCloseOrders.remove(result.orderId)?.let {
-                    processingOrderRepository.deleteOrder(result.orderId)
+                processingCloseOrders.remove(result.orderId)?.let { order ->
+                    processingOrderRepository.deleteOrder(order.orderId)
+                    // 포지션이 존재하는 경우는 셧다운 로직을 의미함
+                    positionUseCase.findPosition(order.positionId)?.let {
+                        handleAppShutdownOrderCancellationResult(it, order);
+                    }
                 } ?: RuntimeException("invalid order id ${result.orderId}")
             }
+        }
+    }
+
+    private fun handleAppShutdownOrderCancellationResult(position: Position, order: CloseOrder) {
+        position.closeOrderIds.remove(order.orderId)
+        positionUseCase.updatePosition(position)
+        if (position.closeOrderIds.isEmpty()) {
+            countDownLatch.countDown()
         }
     }
 
